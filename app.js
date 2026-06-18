@@ -363,6 +363,10 @@
     return String(value || "").replace(/\D/g, "");
   }
 
+  function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  }
+
   function blobToDataUrl(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1142,28 +1146,47 @@
       }
     }
 
+    function triggerFileDownload(file) {
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
     async function shareStatementOnWhatsapp(account) {
       const phone = normalizeWhatsappNumber(account.phone);
       const message = encodeURIComponent(`${account.customer} ka updated statement ready hai.`);
 
       try {
         const file = await buildStatementPdfFile(account);
-        if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+        if (isMobileDevice() && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
           await navigator.share({
             files: [file],
             title: `${account.customer} Statement`,
             text: `${account.customer} ka statement`
           });
-          exportNotice.textContent = "Share sheet open ho gayi hai. Wahan se WhatsApp select karke customer ko statement bhej dein.";
+          exportNotice.textContent = "Share sheet open ho gayi hai. WhatsApp select karke statement direct bhej dein.";
           return;
         }
+
+        triggerFileDownload(file);
       } catch (error) {
         // Fallback to chat open below.
       }
 
       if (phone) {
-        window.open(`https://wa.me/${phone}?text=${message}`, "_blank", "noopener,noreferrer");
-        exportNotice.textContent = "WhatsApp chat open ho gayi hai. Browser security ki wajah se PDF auto-attach nahi hoti, is liye PDF button se preview/save karke us chat mein attach karein.";
+        const baseUrl = isMobileDevice() ? "https://wa.me/" : "https://web.whatsapp.com/send?phone=";
+        const whatsappUrl = isMobileDevice()
+          ? `${baseUrl}${phone}?text=${message}`
+          : `${baseUrl}${phone}&text=${message}`;
+        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+        exportNotice.textContent = isMobileDevice()
+          ? "Agar device share-sheet support nahi karti to WhatsApp chat open ho gayi hai. PDF download ho chuki hai; attach karke send kar dein."
+          : "WhatsApp Web chat open ho gayi hai aur PDF download ho chuki hai. Ab downloaded PDF us chat mein attach karke send kar dein.";
       } else {
         exportNotice.textContent = "Customer ka valid WhatsApp number nahi mila.";
       }
