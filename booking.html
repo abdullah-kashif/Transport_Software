@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Booking Form</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="booking">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+        <p>Booking module with create, read, update and delete behavior.</p>
+      </div>
+      <nav class="nav">
+        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Customer Ledger</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="invoice.html" data-page="invoice">Invoice Screen</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Khata Page</a>
+      </nav>
+      <div class="tip">
+        <strong>Data Rule</strong>
+        <small>New booking save karne ke baad woh dashboard par bhi dikh jayegi kyun ke data sessionStorage mein store hota hai.</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <span class="kicker">Booking Module</span>
+        <h2>Yahan se transport job create hoti hai aur operational flow start hota hai.</h2>
+        <p>Client ko yeh page dikha kar tum poora booking workflow samjha sakte ho: customer, route, container, truck aur rate.</p>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Create / Update Booking</h3>
+            <p>Form submit karne se data current browser session mein save ho jayega.</p>
+          </div>
+        </div>
+        <form data-booking-form class="form-grid">
+          <div class="field"><label>Booking Date</label><input name="date" type="date" required /></div>
+          <div class="field"><label>Customer / Payer</label><input name="customer" value="Cherat Packaging Ltd" required /></div>
+          <div class="field"><label>Consignee</label><input name="consignee" value="Cherat Packaging Gadoon" required /></div>
+          <div class="field wide"><label>Route</label><input name="route" value="Karachi to Gadoon" required /></div>
+          <div class="field"><label>Origin</label><input name="origin" value="Karachi Port" required /></div>
+          <div class="field"><label>Destination</label><input name="destination" value="Gadoon" required /></div>
+          <div class="field"><label>BL No</label><input name="blNo" value="ONEYSINE22550700" /></div>
+          <div class="field"><label>Container No</label><input name="containerNo" value="TRHU5588410" /></div>
+          <div class="field"><label>Container Size</label><input name="size" value="40 FT" /></div>
+          <div class="field"><label>Truck No</label><input name="truckNo" value="TMT-066" /></div>
+          <div class="field"><label>Goods Type</label><input name="goodsType" value="Plastic Dana" /></div>
+          <div class="field"><label>Quantity</label><input name="quantity" value="990 Bags" /></div>
+          <div class="field"><label>Rate</label><input name="rate" type="number" value="145000" required /></div>
+          <div class="field"><label>Gate Pass Charges</label><input name="gatePass" type="number" value="0" /></div>
+          <div class="field"><label>Detention Charges</label><input name="detention" type="number" value="0" /></div>
+          <div class="field"><label>Status</label><select name="status"><option>Pending Bill</option><option>In Transit</option><option>Delivered</option></select></div>
+          <div class="field full"><label>Remarks</label><textarea name="remarks">PO submitted, dispatch ready.</textarea></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save Booking</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice>Yahan create aur update messages dikhain ge.</div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Booking Ledger</h3>
+            <p>Edit aur delete buttons working hain.</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Job No</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Consignee</th>
+              <th>Route</th>
+              <th>Origin</th>
+              <th>Destination</th>
+              <th>BL No</th>
+              <th>Container</th>
+              <th>Size</th>
+              <th>Truck</th>
+              <th>Goods Type</th>
+              <th>Quantity</th>
+              <th>Rate</th>
+              <th>Gate Pass</th>
+              <th>Detention</th>
+              <th>Status</th>
+              <th>Remarks</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody data-booking-rows></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

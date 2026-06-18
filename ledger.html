@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Customer Ledger</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="ledger">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+        <p>Customer billing and receipt ledger with CRUD functionality.</p>
+      </div>
+      <nav class="nav">
+        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Customer Ledger</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="invoice.html" data-page="invoice">Invoice Screen</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Khata Page</a>
+      </nav>
+      <div class="tip">
+        <strong>Total Received</strong>
+        <small>Current total collections: PKR <span data-ledger-total>0</span></small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <span class="kicker">Customer Ledger</span>
+        <h2>Yeh page client ke liye sab se useful ho sakta hai jab usay account statement dekhni ho.</h2>
+        <p>Bill no, received amount, cheque no aur remarks ka complete customer-wise ledger yahan maintain hoga.</p>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Create / Update Receipt Entry</h3>
+            <p>Nayi receipt add karo ya purani entry edit karo.</p>
+          </div>
+        </div>
+        <form data-ledger-form class="form-grid">
+          <div class="field"><label>Bill No</label><input name="billNo" value="040/24" required /></div>
+          <div class="field"><label>Entry Date</label><input name="date" type="date" required /></div>
+          <div class="field"><label>Customer</label><input name="customer" value="Cherat Packaging Ltd" required /></div>
+          <div class="field"><label>Destination</label><input name="destination" value="Gadoon" /></div>
+          <div class="field"><label>BL No</label><input name="blNo" value="720325454" /></div>
+          <div class="field"><label>Container</label><input name="container" value="8 X 40" /></div>
+          <div class="field wide"><label>Goods</label><input name="goods" value="Plastic Dana" /></div>
+          <div class="field"><label>Received Amount</label><input name="receivedAmount" type="number" value="2271744" required /></div>
+          <div class="field"><label>Received Date</label><input name="receivedDate" type="date" /></div>
+          <div class="field"><label>Cheque No</label><input name="chequeNo" value="15000759" /></div>
+          <div class="field full"><label>Remarks</label><textarea name="remarks">Full Payment Received</textarea></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save Receipt</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice>Yahan receipt CRUD status dikhaya jayega.</div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Customer Statement</h3>
+            <p>Har row ek customer receipt ya settled ledger entry show karti hai.</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Bill No</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Destination</th>
+              <th>BL No</th>
+              <th>Container</th>
+              <th>Goods</th>
+              <th>Received Amount</th>
+              <th>Received Date</th>
+              <th>Cheque No</th>
+              <th>Remarks</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody data-ledger-rows></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

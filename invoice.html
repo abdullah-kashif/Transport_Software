@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Invoice Screen</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="invoice">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+        <p>Invoice module with totals, collections and balance calculations.</p>
+      </div>
+      <nav class="nav">
+        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Customer Ledger</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="invoice.html" data-page="invoice">Invoice Screen</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Khata Page</a>
+      </nav>
+      <div class="tip">
+        <strong>Invoice Logic</strong>
+        <small>Total = road freight + sale tax + other charges. Balance auto calculate hota hai.</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <span class="kicker">Invoice Module</span>
+        <h2>Yahan se bill create, update aur financial balance demonstrate kiya ja sakta hai.</h2>
+        <p>Client ko yeh page dikhane se billing workflow bohat clear ho jayega, khaas taur par agar woh Excel mein bill no aur received amount manually track karta hai.</p>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Create / Update Invoice</h3>
+            <p>Invoice submit karte hi table aur dashboard dono refresh data dikhayenge.</p>
+          </div>
+        </div>
+        <form data-invoice-form class="form-grid">
+          <div class="field"><label>Invoice No</label><input name="invoiceNo" value="INV-104/26" required /></div>
+          <div class="field"><label>Customer</label><input name="customer" value="Cherat Packaging Ltd" required /></div>
+          <div class="field wide"><label>Billing Period</label><input name="period" value="11 Jun 2026 - 20 Jun 2026" required /></div>
+          <div class="field"><label>Units</label><input name="units" value="10 Containers" /></div>
+          <div class="field"><label>Road Freight</label><input name="roadFreight" type="number" value="1820000" required /></div>
+          <div class="field"><label>Sale Tax</label><input name="saleTax" type="number" value="273000" required /></div>
+          <div class="field"><label>Other Charges</label><input name="otherCharges" type="number" value="0" /></div>
+          <div class="field"><label>Received So Far</label><input name="receivedSoFar" type="number" value="0" /></div>
+          <div class="field wide"><label>Last Payment Ref</label><input name="lastPaymentRef" value="Awaiting payment" /></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Create Invoice</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice>Yahan invoice CRUD status dikhaya jayega.</div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Invoice Register</h3>
+            <p>Yahan total aur balance auto calculate ho rahe hain.</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice No</th>
+              <th>Customer</th>
+              <th>Period</th>
+              <th>Units</th>
+              <th>Road Freight</th>
+              <th>Sale Tax</th>
+              <th>Other Charges</th>
+              <th>Total</th>
+              <th>Received</th>
+              <th>Balance</th>
+              <th>Last Payment Ref</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody data-invoice-rows></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
