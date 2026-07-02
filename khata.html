@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Khata Page</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body data-page="khata">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+        <p>EasyKhata-style customer statement with debit, credit and running balance.</p>
+      </div>
+      <nav class="nav">
+        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Customer Ledger</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="invoice.html" data-page="invoice">Invoice Screen</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Khata Page</a>
+      </nav>
+      <div class="tip">
+        <strong>Khata Logic</strong>
+        <small>`Debit (-)` se charge add hota hai, `Credit (+)` se payment adjust hoti hai, aur balance report style mein chalta hai.</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Add Customer</h3>
+            <p>Har client ko alag add karein. Uske baad usi customer ke naam se entries aur statement alag show hongi.</p>
+          </div>
+        </div>
+        <form data-customer-form class="form-grid">
+          <div class="field"><label>Customer Name</label><input name="customer" required /></div>
+          <div class="field"><label>Phone</label><input name="phone" /></div>
+          <div class="field"><label>City</label><input name="city" /></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-customer-submit-label>Save Customer</button>
+            <button class="btn" type="button" data-reset-customer-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-customer-notice>Yahan customer save/update status dikhaya jayega.</div>
+      </section>
+
+      <section class="screen statement-shell">
+        <div class="statement-topbar">
+          <div>
+            <div class="statement-brand">Global Transport And Logistics Services</div>
+            <h2 class="statement-title" data-khata-title>Customer Statement</h2>
+            <div class="statement-sub" data-khata-customer></div>
+            <div class="statement-range" data-khata-range>-</div>
+          </div>
+          <div class="actions statement-actions">
+            <select data-khata-select></select>
+            <button class="btn" type="button" data-print-statement>Print / Save PDF</button>
+            <button class="btn primary" type="button" data-whatsapp-statement>WhatsApp</button>
+          </div>
+        </div>
+        <div class="statement-stats" data-khata-summary></div>
+        <div class="notice" data-export-notice>Selected customer ka full statement yahan se PDF ya WhatsApp flow ke liye prepare hoga.</div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Add Statement Entry</h3>
+            <p>Sample report ki tarah debit charge ya credit payment entry add karein.</p>
+          </div>
+        </div>
+        <form data-khata-form class="form-grid">
+          <input type="hidden" name="accountId" />
+          <div class="field"><label>Date</label><input name="date" type="date" required /></div>
+          <div class="field"><label>Type</label><select name="type"><option>Debit</option><option>Credit</option></select></div>
+          <div class="field wide"><label>Tafseel</label><input name="description" value="Transport billing entry" required /></div>
+          <div class="field"><label>Amount</label><input name="amount" type="number" value="50000" required /></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save Entry</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice>Yahan statement entry status dikhaya jayega.</div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Statement Register</h3>
+            <p>Debit (-)</p>
+          </div>
+        </div>
+        <table class="statement-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Tafseel</th>
+              <th>Debit (-)</th>
+              <th>Credit (+)</th>
+              <th>Balance</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody data-khata-rows></tbody>
+        </table>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>All Customers</h3>
+            <p>Har customer ka summary alag show ho raha hai. `Open` par click karke uska full statement dekhein.</p>
+          </div>
+        </div>
+        <table class="statement-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Phone</th>
+              <th>City</th>
+              <th>Total Debit</th>
+              <th>Total Credit</th>
+              <th>Net Balance</th>
+              <th>Entries</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody data-khata-customers></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

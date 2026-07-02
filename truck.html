@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Truck Details</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="truck">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+        <p>Fleet page with truck profile, finance snapshot and expense CRUD.</p>
+      </div>
+      <nav class="nav">
+        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Customer Ledger</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="invoice.html" data-page="invoice">Invoice Screen</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Khata Page</a>
+      </nav>
+      <div class="tip">
+        <strong>Fleet Demo</strong>
+        <small>Truck switch karne se profile aur expense list change ho jati hai. Expense CRUD live hai.</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <span class="kicker">Truck Details</span>
+        <h2>Yahan truck ko sirf vehicle nahi, balke financial asset ki tarah treat kiya gaya hai.</h2>
+        <p>Profile, down payment, installment completion aur truck-wise expenses client ko clear nazar aayenge.</p>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Select Truck</h3>
+            <p>Expense list aur profile selected truck ke hisaab se change hogi.</p>
+          </div>
+          <div class="actions">
+            <select data-truck-select></select>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="panel span-5">
+            <h3 style="font-size:20px;">Truck Profile</h3>
+            <div class="list" data-truck-profile></div>
+          </div>
+          <div class="panel span-7">
+            <h3 style="font-size:20px;">Finance & Alerts</h3>
+            <div class="list" data-truck-finance></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Create / Update Truck Expense</h3>
+            <p>Vendor, description, payment mode aur invoice no editable hain.</p>
+          </div>
+        </div>
+        <form data-expense-form class="form-grid">
+          <div class="field"><label>Truck No</label><input name="truckNo" readonly /></div>
+          <div class="field"><label>Date</label><input name="date" type="date" required /></div>
+          <div class="field"><label>Vendor</label><input name="vendor" value="General Store" required /></div>
+          <div class="field wide"><label>Work Description</label><input name="description" value="Spare Parts" required /></div>
+          <div class="field"><label>Payment Mode</label><select name="paymentMode"><option>Cheque</option><option>IBFT</option><option>Cash</option></select></div>
+          <div class="field"><label>Invoice No</label><input name="invoiceNo" value="020" /></div>
+          <div class="field"><label>Amount</label><input name="amount" type="number" value="85000" required /></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Add Expense</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice>Yahan truck expense CRUD status dikhaya jayega.</div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Truck Expense Ledger</h3>
+            <p>Edit aur delete buttons active hain.</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Vendor</th>
+              <th>Work Description</th>
+              <th>Payment Mode</th>
+              <th>Invoice No</th>
+              <th>Amount</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody data-expense-rows></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

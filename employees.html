@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Employees</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="employee">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+        <p>Employee management page with staff records, payroll snapshot and status tracking.</p>
+      </div>
+      <nav class="nav">
+        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Customer Ledger</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="invoice.html" data-page="invoice">Invoice Screen</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Khata Page</a>
+      </nav>
+      <div class="tip">
+        <strong>HR Demo</strong>
+        <small>Employee ID auto-generate hoti hai, status color-coded hai, aur active payroll ka quick snapshot bhi milta hai.</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <span class="kicker">Employee Module</span>
+        <h2>Yahan se aap company ke staff ko manage kar sakte hain aur foran dekh sakte hain ke kaun active hai aur kis salary par hai.</h2>
+        <p>Naam, designation, salary, joining date aur active/inactive status ke sath ek simple lekin presentable HR page tayar kiya gaya hai.</p>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Team Snapshot</h3>
+            <p>Active headcount, inactive records aur monthly active payroll yahan auto calculate hota hai.</p>
+          </div>
+        </div>
+        <div class="grid" data-employee-summary></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Create / Update Employee</h3>
+            <p>Naya employee add karein ya purana record update karein. ID automatically generate hogi.</p>
+          </div>
+        </div>
+        <form data-employee-form class="form-grid">
+          <div class="field"><label>Employee Name</label><input name="name" value="Ali Raza" required /></div>
+          <div class="field"><label>Designation</label><input name="designation" value="Dispatcher" required /></div>
+          <div class="field"><label>Department</label><select name="department"><option>Operations</option><option>Finance</option><option>Admin</option><option>Fleet</option><option>HR</option></select></div>
+          <div class="field"><label>Salary</label><input name="salary" type="number" value="65000" required /></div>
+          <div class="field"><label>Joining Date</label><input name="joiningDate" type="date" required /></div>
+          <div class="field"><label>Status</label><select name="status"><option>Active</option><option>Inactive</option></select></div>
+          <div class="field"><label>Phone</label><input name="phone" value="0301-5556677" /></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save Employee</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice>Yahan employee CRUD status dikhaya jayega.</div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Employee Register</h3>
+            <p>Green badge active employee ko aur red badge inactive employee ko show karta hai.</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Designation</th>
+              <th>Department</th>
+              <th>Salary</th>
+              <th>Joining Date</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody data-employee-rows></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
