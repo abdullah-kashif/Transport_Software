@@ -1,10 +1,12 @@
 (function () {
   const KEY = "gtls-transport-demo-data-v1";
+  const ADMIN_AUTH_KEY = "gtls-admin-auth-v1";
 
   const seed = {
     bookings: [
       {
         id: "BK-24061",
+        invoiceNo: "INV-24061",
         date: "2026-06-10",
         category: "Inter City Transport",
         accountFlow: "Awaited",
@@ -29,6 +31,7 @@
       },
       {
         id: "BK-24062",
+        invoiceNo: "INV-24062",
         date: "2026-06-10",
         category: "Inter City Transport",
         accountFlow: "Awaited",
@@ -53,6 +56,7 @@
       },
       {
         id: "BK-24063",
+        invoiceNo: "INV-24063",
         date: "2026-06-09",
         category: "Inter City Transport",
         accountFlow: "Debit",
@@ -228,6 +232,16 @@
         department: "Finance"
       }
     ],
+    adminUsers: [
+      {
+        id: "ADM-1001",
+        name: "Super Admin",
+        email: "admin@gmail.com",
+        password: "transport",
+        role: "Super Admin",
+        status: "Active"
+      }
+    ],
     customerKhatas: [
       {
         id: "CUS-1001",
@@ -307,6 +321,21 @@
       store.employees = structuredClone(seed.employees);
     }
 
+    if (!Array.isArray(store.adminUsers) || store.adminUsers.length === 0) {
+      store.adminUsers = structuredClone(seed.adminUsers);
+    } else {
+      const superAdminIndex = store.adminUsers.findIndex((item) => item.role === "Super Admin");
+      const superAdminRecord = structuredClone(seed.adminUsers[0]);
+      if (superAdminIndex === -1) {
+        store.adminUsers.unshift(superAdminRecord);
+      } else {
+        store.adminUsers[superAdminIndex] = {
+          ...store.adminUsers[superAdminIndex],
+          ...superAdminRecord
+        };
+      }
+    }
+
     if (Array.isArray(store.bookings)) {
       store.bookings = store.bookings.map((booking) => normalizeBookingContainers(booking));
     }
@@ -317,6 +346,29 @@
 
   function saveStore(store) {
     sessionStorage.setItem(KEY, JSON.stringify(store));
+  }
+
+  function getAdminSession() {
+    const raw = sessionStorage.getItem(ADMIN_AUTH_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function setAdminSession(user) {
+    sessionStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    }));
+  }
+
+  function clearAdminSession() {
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
   }
 
   function normalizeContainerLine(line = {}) {
@@ -352,13 +404,14 @@
     const primaryLine = containerLines[0] || normalizeContainerLine();
     return {
       ...booking,
+      invoiceNo: String(booking.invoiceNo || "").trim(),
       containerLines,
       containerNo: primaryLine.containerNo,
       size: primaryLine.size,
       truckNo: primaryLine.truckNo,
-      rate: primaryLine.rate,
-      gatePass: primaryLine.gatePass,
-      detention: primaryLine.detention
+      rate: Number(booking.rate || 0),
+      gatePass: Number(booking.gatePass || 0),
+      detention: Number(booking.detention || 0)
     };
   }
 
@@ -565,26 +618,10 @@
         <td>${text(item.route)}</td>
         <td>${getBookingContainerLines(item).length} Container(s)</td>
         <td>${getBookingContainerLines(item).map((line) => text(line.truckNo)).join(", ")}</td>
-        <td>${money(getBookingContainerLines(item).reduce((sum, line) => sum + Number(line.rate || 0), 0))}</td>
+        <td>${money(item.rate)}</td>
         <td><span class="badge ${item.status === "Submitted" ? "warn" : "good"}">${text(item.status)}</span></td>
       </tr>
     `).join("");
-
-    const invoiceBody = document.querySelector("[data-invoice-preview]");
-    invoiceBody.innerHTML = store.invoices.map((item) => {
-      const totals = calculateInvoiceTotals(item);
-      return `
-        <tr>
-          <td>${text(item.invoiceNo)}</td>
-          <td>${text(item.customer)}</td>
-          <td>${text(item.period)}</td>
-          <td>${money(item.roadFreight)}</td>
-          <td>${money(totals.total)}</td>
-          <td>${money(item.receivedSoFar)}</td>
-          <td>${money(totals.balance)}</td>
-        </tr>
-      `;
-    }).join("");
 
     const employeeBody = document.querySelector("[data-employee-preview]");
     if (employeeBody) {
@@ -605,6 +642,8 @@
     const form = document.querySelector("[data-booking-form]");
     const body = document.querySelector("[data-booking-rows]");
     const notice = document.querySelector("[data-notice]");
+    const customerFilter = document.querySelector("[data-booking-customer-filter]");
+    const bookingCount = document.querySelector("[data-booking-count]");
     const statusField = form.querySelector("[name='status']");
     const dateTextField = form.querySelector("[name='date']");
     const datePickerField = form.querySelector("[name='datePicker']");
@@ -633,18 +672,6 @@
             <label>Truck No</label>
             <input name="truckNo" value="${item.truckNo}" placeholder="Example: TMT-066" />
           </div>
-          <div class="field-lite">
-            <label>Rate</label>
-            <input name="rate" type="number" value="${item.rate}" />
-          </div>
-          <div class="field-lite">
-            <label>Gate Pass</label>
-            <input name="gatePass" type="number" value="${item.gatePass}" />
-          </div>
-          <div class="field-lite">
-            <label>Detention</label>
-            <input name="detention" type="number" value="${item.detention}" />
-          </div>
           <div class="row-action">
             <button class="btn small danger" type="button" data-remove-container-row="${index}">Remove</button>
           </div>
@@ -666,11 +693,8 @@
       const lines = rows.map((row) => normalizeContainerLine({
         containerNo: row.querySelector("[name='containerNo']").value,
         size: row.querySelector("[name='size']").value,
-        truckNo: row.querySelector("[name='truckNo']").value,
-        rate: row.querySelector("[name='rate']").value,
-        gatePass: row.querySelector("[name='gatePass']").value,
-        detention: row.querySelector("[name='detention']").value
-      })).filter((line) => line.containerNo || line.truckNo || line.rate || line.gatePass || line.detention);
+        truckNo: row.querySelector("[name='truckNo']").value
+      })).filter((line) => line.containerNo || line.truckNo);
 
       return lines.length ? lines : [normalizeContainerLine()];
     }
@@ -687,34 +711,64 @@
 
     function resetForm() {
       form.reset();
+      form.elements.invoiceNo.value = "INV-24061";
       syncBookingDate("2026-06-10");
       form.elements.category.value = "Inter City Transport";
       form.elements.accountFlow.value = "Awaited";
       form.elements.paymentTerm.value = "30 Days";
+      form.elements.rate.value = "145000";
+      form.elements.gatePass.value = "0";
+      form.elements.detention.value = "0";
       form.elements.salesTaxAuthority.value = "Sindh Revenue Board";
       statusField.value = "Submitted";
       renderContainerRows([
         {
           containerNo: "TRHU5588410",
           size: "40 FT",
-          truckNo: "TMT-066",
-          rate: 145000,
-          gatePass: 0,
-          detention: 0
+          truckNo: "TMT-066"
         }
       ]);
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Booking";
     }
 
+    function renderCustomerFilter() {
+      const customers = [...new Set(store.bookings.map((item) => String(item.customer || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const currentValue = customerFilter.value;
+      customerFilter.innerHTML = `
+        <option value="">All Customers</option>
+        ${customers.map((customer) => `<option value="${customer}">${customer}</option>`).join("")}
+      `;
+      customerFilter.value = customers.includes(currentValue) ? currentValue : "";
+    }
+
     function render() {
-      body.innerHTML = store.bookings.map((item) => {
+      renderCustomerFilter();
+      const selectedCustomer = customerFilter.value;
+      const bookings = selectedCustomer
+        ? store.bookings.filter((item) => String(item.customer || "").trim() === selectedCustomer)
+        : store.bookings;
+
+      bookingCount.textContent = `${bookings.length} record(s)`;
+
+      if (!bookings.length) {
+        body.innerHTML = `
+          <tr>
+            <td colspan="21">Is customer ka koi record nahi mila.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      body.innerHTML = bookings.map((item) => {
         const lines = getBookingContainerLines(item);
         return `
           <tr>
             <td>${text(item.id)}</td>
             <td>${formatShortDate(item.date)}</td>
+            <td>${text(item.invoiceNo)}</td>
             <td>${text(item.customer)}</td>
+            <td>${text(item.accountFlow)}</td>
             <td>${text(item.consignee)}</td>
             <td>${text(item.route)}</td>
             <td>${text(item.origin)}</td>
@@ -725,9 +779,9 @@
             <td>${renderStackedCell(lines.map((line) => text(line.truckNo)))}</td>
             <td>${text(item.goodsType)}</td>
             <td>${text(item.quantity)}</td>
-            <td>${renderStackedCell(lines.map((line) => money(line.rate)), text)}</td>
-            <td>${renderStackedCell(lines.map((line) => money(line.gatePass)), text)}</td>
-            <td>${renderStackedCell(lines.map((line) => money(line.detention)), text)}</td>
+            <td>${money(item.rate)}</td>
+            <td>${money(item.gatePass)}</td>
+            <td>${money(item.detention)}</td>
             <td><span class="badge ${item.status === "Submitted" ? "warn" : "good"}">${text(item.status)}</span></td>
             <td>${text(item.remarks)}</td>
             <td>
@@ -742,6 +796,7 @@
     }
 
     function fillForm(item) {
+      resetForm();
       Object.keys(item).forEach((key) => {
         if (key === "date") syncBookingDate(item[key]);
         else if (form.elements[key]) form.elements[key].value = item[key];
@@ -765,6 +820,8 @@
       if (!isoValue) return;
       syncBookingDate(isoValue);
     });
+
+    customerFilter.addEventListener("change", render);
 
     addContainerRowButton.addEventListener("click", () => {
       const lines = collectContainerLines();
@@ -800,9 +857,9 @@
         containerNo: primaryLine.containerNo,
         size: primaryLine.size,
         truckNo: primaryLine.truckNo,
-        rate: primaryLine.rate,
-        gatePass: primaryLine.gatePass,
-        detention: primaryLine.detention
+        rate: Number(data.rate || 0),
+        gatePass: Number(data.gatePass || 0),
+        detention: Number(data.detention || 0)
       };
       delete normalized.datePicker;
 
@@ -843,85 +900,58 @@
   }
 
   function ledgerPage(store) {
-    const form = document.querySelector("[data-ledger-form]");
     const body = document.querySelector("[data-ledger-rows]");
-    const notice = document.querySelector("[data-notice]");
-    let editingId = "";
-
-    function resetForm() {
-      form.reset();
-      editingId = "";
-      form.querySelector("[data-submit-label]").textContent = "Save Receipt";
-    }
+    const totalElement = document.querySelector("[data-summary-total]");
+    const countElement = document.querySelector("[data-summary-count]");
 
     function render() {
-      body.innerHTML = store.ledgerEntries.map((item) => `
+      const debitBookings = store.bookings
+        .filter((item) => String(item.accountFlow || "").trim().toLowerCase() === "debit")
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+
+      const grouped = new Map();
+
+      debitBookings.forEach((item) => {
+        const customer = String(item.customer || "").trim() || "Unknown Customer";
+        const pendingAmount = Number(item.rate || 0) + Number(item.gatePass || 0) + Number(item.detention || 0);
+        if (!grouped.has(customer)) {
+          grouped.set(customer, {
+            customer,
+            dates: [],
+            categories: [],
+            totalRate: 0
+          });
+        }
+
+        const entry = grouped.get(customer);
+        if (item.date && !entry.dates.includes(item.date)) entry.dates.push(item.date);
+        if (item.category && !entry.categories.includes(item.category)) entry.categories.push(item.category);
+        entry.totalRate += pendingAmount;
+      });
+
+      const summaryRows = [...grouped.values()];
+      totalElement.textContent = money(summaryRows.reduce((sum, item) => sum + item.totalRate, 0));
+      countElement.textContent = `${summaryRows.length} customer(s)`;
+
+      if (!summaryRows.length) {
+        body.innerHTML = `
+          <tr>
+            <td colspan="4">Abhi tak koi debit summary record available nahi hai.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      body.innerHTML = summaryRows.map((item) => `
         <tr>
-          <td>${text(item.billNo)}</td>
-          <td>${formatShortDate(item.date)}</td>
+          <td>${renderStackedCell(item.dates.map((date) => formatShortDate(date)), text)}</td>
+          <td>${renderStackedCell(item.categories.map((category) => text(category)), text)}</td>
           <td>${text(item.customer)}</td>
-          <td>${text(item.destination)}</td>
-          <td>${text(item.blNo)}</td>
-          <td>${text(item.container)}</td>
-          <td>${text(item.goods)}</td>
-          <td>${money(item.receivedAmount)}</td>
-          <td>${text(item.receivedDate)}</td>
-          <td>${text(item.chequeNo)}</td>
-          <td>${text(item.remarks)}</td>
-          <td>
-            <div class="table-actions">
-              <button class="btn small" data-edit-ledger="${item.id}">Edit</button>
-              <button class="btn small danger" data-delete-ledger="${item.id}">Delete</button>
-            </div>
-          </td>
+          <td>${money(item.totalRate)}</td>
         </tr>
       `).join("");
-
-      const total = store.ledgerEntries.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0);
-      document.querySelector("[data-ledger-total]").textContent = money(total);
     }
 
-    function fillForm(item) {
-      Object.keys(item).forEach((key) => {
-        if (form.elements[key]) form.elements[key].value = item[key];
-      });
-      editingId = item.id;
-      form.querySelector("[data-submit-label]").textContent = "Update Receipt";
-    }
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const data = Object.fromEntries(new FormData(form).entries());
-      const normalized = { ...data, receivedAmount: Number(data.receivedAmount || 0) };
-      if (!editingId) {
-        normalized.id = `LED-${Date.now().toString().slice(-6)}`;
-        store.ledgerEntries.unshift(normalized);
-        notice.textContent = "New customer receipt save ho gayi hai.";
-      } else {
-        const index = store.ledgerEntries.findIndex((item) => item.id === editingId);
-        normalized.id = editingId;
-        store.ledgerEntries[index] = normalized;
-        notice.textContent = `Receipt ${editingId} update ho gayi hai.`;
-      }
-      saveStore(store);
-      render();
-      resetForm();
-    });
-
-    body.addEventListener("click", (event) => {
-      const editId = event.target.getAttribute("data-edit-ledger");
-      const deleteId = event.target.getAttribute("data-delete-ledger");
-      if (editId) fillForm(store.ledgerEntries.find((item) => item.id === editId));
-      if (deleteId) {
-        store.ledgerEntries = store.ledgerEntries.filter((item) => item.id !== deleteId);
-        saveStore(store);
-        render();
-        notice.textContent = `Receipt ${deleteId} delete ho gayi hai.`;
-        if (editingId === deleteId) resetForm();
-      }
-    });
-
-    document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     render();
   }
 
@@ -1038,98 +1068,6 @@
     resetForm();
   }
 
-  function invoicePage(store) {
-    const form = document.querySelector("[data-invoice-form]");
-    const body = document.querySelector("[data-invoice-rows]");
-    const notice = document.querySelector("[data-notice]");
-    let editingId = "";
-
-    function resetForm() {
-      form.reset();
-      form.elements.receivedSoFar.value = 0;
-      form.elements.otherCharges.value = 0;
-      editingId = "";
-      form.querySelector("[data-submit-label]").textContent = "Create Invoice";
-    }
-
-    function render() {
-      body.innerHTML = store.invoices.map((item) => {
-        const totals = calculateInvoiceTotals(item);
-        return `
-          <tr>
-            <td>${text(item.invoiceNo)}</td>
-            <td>${text(item.customer)}</td>
-            <td>${text(item.period)}</td>
-            <td>${text(item.units)}</td>
-            <td>${money(item.roadFreight)}</td>
-            <td>${money(item.saleTax)}</td>
-            <td>${money(item.otherCharges)}</td>
-            <td>${money(totals.total)}</td>
-            <td>${money(item.receivedSoFar)}</td>
-            <td>${money(totals.balance)}</td>
-            <td>${text(item.lastPaymentRef)}</td>
-            <td>
-              <div class="table-actions">
-                <button class="btn small" data-edit-invoice="${item.id}">Edit</button>
-                <button class="btn small danger" data-delete-invoice="${item.id}">Delete</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join("");
-    }
-
-    function fillForm(item) {
-      Object.keys(item).forEach((key) => {
-        if (form.elements[key]) form.elements[key].value = item[key];
-      });
-      editingId = item.id;
-      form.querySelector("[data-submit-label]").textContent = "Update Invoice";
-    }
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const data = Object.fromEntries(new FormData(form).entries());
-      const normalized = {
-        ...data,
-        roadFreight: Number(data.roadFreight || 0),
-        saleTax: Number(data.saleTax || 0),
-        otherCharges: Number(data.otherCharges || 0),
-        receivedSoFar: Number(data.receivedSoFar || 0)
-      };
-      if (!editingId) {
-        normalized.id = `INV-${Date.now().toString().slice(-6)}`;
-        store.invoices.unshift(normalized);
-        notice.textContent = "Invoice create ho gayi hai aur session mein save ho chuki hai.";
-      } else {
-        const index = store.invoices.findIndex((item) => item.id === editingId);
-        normalized.id = editingId;
-        store.invoices[index] = normalized;
-        notice.textContent = `Invoice ${editingId} update ho gayi hai.`;
-      }
-      saveStore(store);
-      render();
-      resetForm();
-    });
-
-    body.addEventListener("click", (event) => {
-      const editId = event.target.getAttribute("data-edit-invoice");
-      const deleteId = event.target.getAttribute("data-delete-invoice");
-      if (editId) fillForm(store.invoices.find((item) => item.id === editId));
-      if (deleteId) {
-        store.invoices = store.invoices.filter((item) => item.id !== deleteId);
-        saveStore(store);
-        render();
-        notice.textContent = `Invoice ${deleteId} delete ho gayi hai.`;
-        if (editingId === deleteId) resetForm();
-      }
-    });
-
-    document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
-    render();
-    resetForm();
-  }
-
   function employeePage(store) {
     const form = document.querySelector("[data-employee-form]");
     const body = document.querySelector("[data-employee-rows]");
@@ -1237,6 +1175,254 @@
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
+    render();
+    resetForm();
+  }
+
+  function adminLoginPage(store) {
+    if (getAdminSession()) {
+      window.location.href = "admin.html";
+      return;
+    }
+
+    const form = document.querySelector("[data-admin-login-form]");
+    const notice = document.querySelector("[data-notice]");
+    const passwordField = form.querySelector("[name='password']");
+    const passwordToggle = form.querySelector("[data-password-toggle]");
+
+    function passwordToggleIcon(isVisible) {
+      return isVisible
+        ? `
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 3l18 18"></path>
+            <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7"></path>
+            <path d="M9.4 5.5A10.8 10.8 0 0 1 12 5c5.2 0 8.8 4.3 10 7-0.5 1.1-1.5 2.7-3 4.1"></path>
+            <path d="M6.2 6.3C4.3 7.6 3 9.6 2 12c1.2 2.7 4.8 7 10 7 1.7 0 3.3-0.4 4.7-1"></path>
+          </svg>
+        `
+        : `
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        `;
+    }
+
+    function syncPasswordToggle() {
+      const isVisible = passwordField.type === "text";
+      passwordToggle.innerHTML = passwordToggleIcon(isVisible);
+      passwordToggle.setAttribute("aria-label", isVisible ? "Hide password" : "Show password");
+      passwordToggle.setAttribute("title", isVisible ? "Hide password" : "Show password");
+    }
+
+    passwordToggle.addEventListener("click", () => {
+      passwordField.type = passwordField.type === "password" ? "text" : "password";
+      syncPasswordToggle();
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      const email = String(data.email || "").trim().toLowerCase();
+      const password = String(data.password || "").trim();
+      const user = store.adminUsers.find((item) =>
+        String(item.email || "").trim().toLowerCase() === email &&
+        String(item.password || "").trim() === password &&
+        String(item.status || "").trim() === "Active"
+      );
+
+      if (!user) {
+        notice.hidden = false;
+        notice.textContent = "Email ya password sahi nahi hai.";
+        return;
+      }
+
+      setAdminSession(user);
+      window.location.href = "admin.html";
+    });
+
+    syncPasswordToggle();
+  }
+
+  function adminPage(store) {
+    const session = getAdminSession();
+    if (!session) {
+      window.location.href = "admin-login.html";
+      return;
+    }
+
+    const form = document.querySelector("[data-admin-form]");
+    const body = document.querySelector("[data-admin-rows]");
+    const notice = document.querySelector("[data-notice]");
+    const summary = document.querySelector("[data-admin-summary]");
+    const passwordField = form.querySelector("[name='password']");
+    const passwordToggle = form.querySelector("[data-password-toggle]");
+    const logoutButton = document.querySelector("[data-admin-logout]");
+    let editingId = "";
+    const visiblePasswords = new Set();
+
+    function setNotice(message = "") {
+      notice.textContent = message;
+      notice.hidden = !message;
+    }
+
+    function passwordToggleIcon(isVisible) {
+      return isVisible
+        ? `
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 3l18 18"></path>
+            <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7"></path>
+            <path d="M9.4 5.5A10.8 10.8 0 0 1 12 5c5.2 0 8.8 4.3 10 7-0.5 1.1-1.5 2.7-3 4.1"></path>
+            <path d="M6.2 6.3C4.3 7.6 3 9.6 2 12c1.2 2.7 4.8 7 10 7 1.7 0 3.3-0.4 4.7-1"></path>
+          </svg>
+        `
+        : `
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        `;
+    }
+
+    function updateSummary() {
+      const totalUsers = store.adminUsers.length;
+      const superAdmins = store.adminUsers.filter((item) => item.role === "Super Admin").length;
+      const activeUsers = store.adminUsers.filter((item) => item.status === "Active").length;
+
+      summary.innerHTML = `
+        <div class="card span-4"><span class="badge warn">Super Admin</span><strong>${superAdmins}</strong></div>
+        <div class="card span-4"><span class="badge good">Active Users</span><strong>${activeUsers}</strong></div>
+        <div class="card span-4"><span class="badge">Total Users</span><strong>${totalUsers}</strong></div>
+      `;
+    }
+
+    function syncPasswordToggle() {
+      const isVisible = passwordField.type === "text";
+      passwordToggle.innerHTML = passwordToggleIcon(isVisible);
+      passwordToggle.setAttribute("aria-label", isVisible ? "Hide password" : "Show password");
+      passwordToggle.setAttribute("title", isVisible ? "Hide password" : "Show password");
+    }
+
+    function resetForm() {
+      form.reset();
+      form.elements.status.value = "Active";
+      form.elements.role.value = "Admin";
+      passwordField.type = "password";
+      syncPasswordToggle();
+      editingId = "";
+      form.querySelector("[data-submit-label]").textContent = "Save User";
+    }
+
+    function render() {
+      body.innerHTML = store.adminUsers.map((item) => `
+        <tr>
+          <td>${text(item.id)}</td>
+          <td>${text(item.name)}</td>
+          <td>${text(item.email)}</td>
+          <td>
+            ${item.role === "Super Admin" ? `<span class="muted">-</span>` : `
+              <div class="password-display">
+                <span>${visiblePasswords.has(item.id) ? text(item.password) : "........"}</span>
+                <button class="password-toggle inline" type="button" data-toggle-admin-password="${item.id}" aria-label="${visiblePasswords.has(item.id) ? "Hide password" : "Show password"}" title="${visiblePasswords.has(item.id) ? "Hide password" : "Show password"}">
+                  ${passwordToggleIcon(visiblePasswords.has(item.id))}
+                </button>
+              </div>
+            `}
+          </td>
+          <td>${text(item.role)}</td>
+          <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
+          <td>
+            <div class="table-actions">
+              <button class="btn small" data-edit-admin="${item.id}">Edit</button>
+              ${item.role === "Super Admin" ? "" : `<button class="btn small danger" data-delete-admin="${item.id}">Delete</button>`}
+            </div>
+          </td>
+        </tr>
+      `).join("");
+      updateSummary();
+    }
+
+    function fillForm(item) {
+      if (!item) return;
+      Object.keys(item).forEach((key) => {
+        if (form.elements[key]) form.elements[key].value = item[key];
+      });
+      passwordField.type = "password";
+      syncPasswordToggle();
+      editingId = item.id;
+      form.querySelector("[data-submit-label]").textContent = "Update User";
+    }
+
+    passwordToggle.addEventListener("click", () => {
+      passwordField.type = passwordField.type === "password" ? "text" : "password";
+      syncPasswordToggle();
+    });
+
+    if (logoutButton) {
+      logoutButton.addEventListener("click", () => {
+        clearAdminSession();
+        window.location.href = "admin-login.html";
+      });
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      const normalized = {
+        ...data,
+        name: String(data.name || "").trim(),
+        email: String(data.email || "").trim(),
+        password: String(data.password || "").trim()
+      };
+
+      if (!editingId) {
+        const nextNumber = store.adminUsers.reduce((max, item) => {
+          const current = Number(String(item.id).replace("ADM-", "")) || 0;
+          return Math.max(max, current);
+        }, 1000) + 1;
+        normalized.id = `ADM-${nextNumber}`;
+        store.adminUsers.unshift(normalized);
+        setNotice(`User ${normalized.name} successfully add ho gaya hai.`);
+      } else {
+        const index = store.adminUsers.findIndex((item) => item.id === editingId);
+        if (index === -1) {
+          setNotice("User record nahi mila, dubara try karein.");
+          return;
+        }
+        normalized.id = editingId;
+        store.adminUsers[index] = normalized;
+        setNotice(`User ${normalized.name} update ho gaya hai.`);
+      }
+
+      saveStore(store);
+      render();
+      resetForm();
+    });
+
+    body.addEventListener("click", (event) => {
+      const editId = event.target.getAttribute("data-edit-admin");
+      const deleteId = event.target.getAttribute("data-delete-admin");
+      const togglePasswordButton = event.target.closest("[data-toggle-admin-password]");
+      const toggleId = togglePasswordButton?.getAttribute("data-toggle-admin-password");
+
+      if (editId) fillForm(store.adminUsers.find((item) => item.id === editId));
+      if (toggleId) {
+        if (visiblePasswords.has(toggleId)) visiblePasswords.delete(toggleId);
+        else visiblePasswords.add(toggleId);
+        render();
+        return;
+      }
+      if (deleteId) {
+        store.adminUsers = store.adminUsers.filter((item) => item.id !== deleteId);
+        saveStore(store);
+        render();
+        setNotice(`User ${deleteId} delete ho gaya hai.`);
+        if (editingId === deleteId) resetForm();
+      }
+    });
+
+    document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
+    setNotice("");
     render();
     resetForm();
   }
@@ -1706,8 +1892,9 @@
     if (page === "booking") bookingPage(store);
     if (page === "ledger") ledgerPage(store);
     if (page === "truck") truckPage(store);
-    if (page === "invoice") invoicePage(store);
     if (page === "employee") employeePage(store);
+    if (page === "admin-login") adminLoginPage(store);
+    if (page === "admin") adminPage(store);
     if (page === "khata") khataPage(store);
   });
 })();

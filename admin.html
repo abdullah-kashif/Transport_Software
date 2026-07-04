@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="admin">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+        <p>Super admin yahan se new users add kar sakta hai aur access control manage kar sakta hai.</p>
+      </div>
+      <nav class="nav">
+        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Summary Page</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Khata Page</a>
+        <a href="admin.html" data-page="admin">Admin</a>
+      </nav>
+      <div class="tip">
+        <strong>Access Rule</strong>
+        <small>Super Admin default se available hai. Yahan se new user add, update aur manage kiye ja sakte hain.</small>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Admin</h3>
+          </div>
+          <button class="btn" type="button" data-admin-logout>Sign Out</button>
+        </div>
+        <div class="grid" data-admin-summary></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>Create / Update User</h3>
+            <p>Super admin yahan se naya user bana sakta hai. Password eye button se show/hide ho jayega.</p>
+          </div>
+        </div>
+        <form data-admin-form class="form-grid">
+          <div class="field"><label>User Name</label><input name="name" value="Operations Admin" required /></div>
+          <div class="field"><label>Email</label><input name="email" type="email" value="ops.admin@gtls.com" required /></div>
+          <div class="field">
+            <label>Password</label>
+            <div class="password-input-group">
+              <input name="password" type="password" value="GTLS@456" required />
+              <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" title="Show password">&#128065;</button>
+            </div>
+          </div>
+          <div class="field"><label>Role</label><select name="role"><option>Admin</option><option>Super Admin</option></select></div>
+          <div class="field"><label>Status</label><select name="status"><option>Active</option><option>Inactive</option></select></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save User</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice hidden></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div>
+            <h3>User Register</h3>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Password</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody data-admin-rows></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

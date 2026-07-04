@@ -25,11 +25,11 @@
       <nav class="nav">
         <a href="index.html" data-page="dashboard">Dashboard</a>
         <a href="booking.html" data-page="booking">Booking Form</a>
-        <a href="ledger.html" data-page="ledger">Customer Ledger</a>
+        <a href="ledger.html" data-page="ledger">Summary Page</a>
         <a href="truck.html" data-page="truck">Truck Details</a>
-        <a href="invoice.html" data-page="invoice">Invoice Screen</a>
         <a href="employees.html" data-page="employee">Employees</a>
         <a href="khata.html" data-page="khata">Khata Page</a>
+        <a href="admin-login.html" data-page="admin-login">Admin</a>
       </nav>
       <div class="tip">
         <strong>Data Rule</strong>
@@ -38,12 +38,6 @@
     </aside>
 
     <main class="main">
-      <section class="hero">
-        <span class="kicker">Booking Module</span>
-        <h2>Yahan se transport job create hoti hai aur operational flow start hota hai.</h2>
-        <p>Client ko yeh page dikha kar tum poora booking workflow samjha sakte ho: customer, route, container, truck aur rate.</p>
-      </section>
-
       <section class="screen">
         <div class="screen-head">
           <div>
@@ -52,6 +46,7 @@
           </div>
         </div>
         <form data-booking-form class="form-grid">
+          <div class="field quarter"><label>Invoice</label><input name="invoiceNo" value="INV-24061" placeholder="Example: INV-24061" /></div>
           <div class="field quarter">
             <label>Booking Date</label>
             <div class="date-input-group">
@@ -63,11 +58,14 @@
             </div>
           </div>
           <div class="field quarter"><label>BL No</label><input name="blNo" value="ONEYSINE22550700" /></div>
+          <div class="field quarter"><label>Gate Pass</label><input name="gatePass" type="number" value="0" /></div>
           <div class="field quarter"><label>Customer / Payer</label><input name="customer" value="Cherat Packaging Ltd" required /></div>
           <div class="field quarter"><label>Consignee</label><input name="consignee" value="Cherat Packaging Gadoon" required /></div>
           <div class="field quarter"><label>Route</label><input name="route" value="Karachi to Gadoon" required /></div>
           <div class="field quarter"><label>Origin</label><input name="origin" value="Karachi Port" required /></div>
           <div class="field quarter"><label>Destination</label><input name="destination" value="Gadoon" required /></div>
+          <div class="field quarter"><label>Goods Type</label><input name="goodsType" value="Plastic Dana" /></div>
+          <div class="field quarter"><label>Quantity</label><input name="quantity" value="990 Bags" /></div>
           <div class="field quarter">
             <label>Category</label>
             <select name="category">
@@ -78,15 +76,10 @@
               <option>Cranes Lifted Services</option>
             </select>
           </div>
-          <div class="field quarter">
-            <label>Account Flow</label>
-            <select name="accountFlow">
-              <option selected>Awaited</option>
-              <option>Debit</option>
-              <option>Credit</option>
-            </select>
-          </div>
+          <div class="field quarter"><label>Rate</label><input name="rate" type="number" value="145000" /></div>
+          <div class="field quarter"><label>Detention</label><input name="detention" type="number" value="0" /></div>
           <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days" placeholder="Example: 30 Days" /></div>
+          <div class="field quarter"><label>Status</label><select name="status"><option>Submitted</option><option>In Transit</option></select></div>
           <div class="field quarter">
             <label>Sales Tax Authority</label>
             <select name="salesTaxAuthority">
@@ -96,18 +89,20 @@
               <option>Balochistan Revenue Authority</option>
             </select>
           </div>
-          <div class="field"><label>Goods Type</label><input name="goodsType" value="Plastic Dana" /></div>
-          <div class="field"><label>Quantity</label><input name="quantity" value="990 Bags" /></div>
-          <div class="field"><label>Status</label><select name="status"><option>Submitted</option><option>In Transit</option></select></div>
+          <div class="field quarter">
+            <label>Account Flow</label>
+            <select name="accountFlow">
+              <option selected>Awaited</option>
+              <option>Debit</option>
+              <option>Credit</option>
+            </select>
+          </div>
           <div class="field full">
             <div class="container-block">
               <div class="container-table-head" aria-hidden="true">
                 <span>Container No</span>
                 <span>Container Size</span>
                 <span>Truck No</span>
-                <span>Rate</span>
-                <span>Gate Pass</span>
-                <span>Detention</span>
                 <span>Action</span>
               </div>
               <div data-container-rows class="container-rows"></div>
@@ -129,6 +124,15 @@
             <h3>Booking Ledger</h3>
             <p>Edit aur delete buttons working hain.</p>
           </div>
+          <div class="ledger-filter">
+            <div class="ledger-filter-control">
+              <label for="booking-customer-filter">Customer</label>
+              <select id="booking-customer-filter" data-booking-customer-filter>
+                <option value="">All Customers</option>
+              </select>
+            </div>
+            <span class="ledger-count" data-booking-count>0 record(s)</span>
+          </div>
         </div>
         <div class="table-wrap">
           <table class="ledger-table">
@@ -136,7 +140,9 @@
               <tr>
                 <th>Job No</th>
                 <th>Date</th>
+                <th>Invoice</th>
                 <th>Customer</th>
+                <th>Account Flow</th>
                 <th>Consignee</th>
                 <th>Route</th>
                 <th>Origin</th>

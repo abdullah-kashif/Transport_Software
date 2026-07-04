@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GTLS Transport - Summary Page</title>
+  <title>GTLS Transport - Admin Sign In</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body data-page="ledger">
+<body data-page="admin-login">
   <div class="app">
     <div class="mobile-topbar">
       <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
@@ -20,7 +20,7 @@
       </div>
       <div class="brand">
         <h1>GTLS Transport</h1>
-        <p>Debit account-flow bookings ki grouped customer summary yahan dikhayi jayegi.</p>
+        <p>Admin sign in ke through super admin aur added admin users panel access kar sakte hain.</p>
       </div>
       <nav class="nav">
         <a href="index.html" data-page="dashboard">Dashboard</a>
@@ -32,39 +32,33 @@
         <a href="admin-login.html" data-page="admin-login">Admin</a>
       </nav>
       <div class="tip">
-        <strong>Pending Summary</strong>
-        <small>Debit flow bookings ka total pending: PKR <span data-summary-total>0</span></small>
+        <strong>Admin Access</strong>
+        <small>Super admin aur added admin users yahan se secure sign in kar sakte hain.</small>
       </div>
     </aside>
 
     <main class="main">
-      <section class="hero">
-        <span class="kicker">Summary Page</span>
-        <h2>Yahan sirf woh customer summary aayegi jinki booking `Account Flow = Debit` hai.</h2>
-        <p>Booking form se date, category, customer aur pending rate ko group karke ek clean summary view banaya gaya hai.</p>
-      </section>
-
       <section class="screen">
         <div class="screen-head">
           <div>
-            <h3>Customer Summary</h3>
-            <p>Sirf debit records show ho rahe hain aur same customer ki bookings grouped form me nazar aa rahi hain.</p>
+            <h3>Admin Sign In</h3>
+            <p>Super admin aur jo users admin panel me add honge woh yahan se login kar sakte hain.</p>
           </div>
-          <span class="ledger-count" data-summary-count>0 customer(s)</span>
         </div>
-        <div class="table-wrap">
-          <table class="statement-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Customer</th>
-                <th>Rate</th>
-              </tr>
-            </thead>
-            <tbody data-ledger-rows></tbody>
-          </table>
-        </div>
+        <form data-admin-login-form class="form-grid">
+          <div class="field"><label>Email</label><input name="email" type="email" placeholder="Enter admin email" required /></div>
+          <div class="field">
+            <label>Password</label>
+            <div class="password-input-group">
+              <input name="password" type="password" placeholder="Enter password" required />
+              <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" title="Show password"></button>
+            </div>
+          </div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit">Sign In</button>
+          </div>
+        </form>
+        <div class="notice" data-notice hidden></div>
       </section>
     </main>
   </div>
