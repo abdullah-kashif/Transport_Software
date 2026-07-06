@@ -322,6 +322,17 @@ textarea {
   color: var(--ink);
 }
 
+.manual-number-input::-webkit-outer-spin-button,
+.manual-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.manual-number-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .date-input-group {
   position: relative;
 }

@@ -77,23 +77,24 @@
             </select>
           </div>
           <div class="field quarter"><label>Rate</label><input name="rate" type="number" value="145000" /></div>
-          <div class="field quarter"><label>Detention</label><input name="detention" type="number" value="0" /></div>
-          <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days" placeholder="Example: 30 Days" /></div>
-          <div class="field quarter"><label>Status</label><select name="status"><option>Submitted</option><option>In Transit</option></select></div>
           <div class="field quarter">
             <label>Sales Tax Authority</label>
             <select name="salesTaxAuthority">
-              <option selected>Sindh Revenue Board</option>
-              <option>Punjab Revenue Authority</option>
-              <option>Khyber Pakhtunkhwa Revenue Authority</option>
-              <option>Balochistan Revenue Authority</option>
+              <option value="Sindh Revenue Board" selected>Sindh Revenue Board (15%)</option>
+              <option value="Punjab Revenue Authority">Punjab Revenue Authority (15%)</option>
+              <option value="Khyber Pakhtunkhwa Revenue Authority">Khyber Pakhtunkhwa Revenue Authority (15%)</option>
+              <option value="Balochistan Revenue Authority">Balochistan Revenue Authority (15%)</option>
+              <option>Other</option>
             </select>
           </div>
+          <div class="field quarter"><label>Total Amount</label><input name="totalAmount" type="text" value="166750" readonly /></div>
+          <div class="field quarter"><label>Detention</label><input name="detention" type="number" inputmode="numeric" class="manual-number-input" value="0" /></div>
+          <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days" placeholder="Example: 30 Days" /></div>
+          <div class="field quarter"><label>Status</label><select name="status"><option>Submitted</option><option>In Transit</option></select></div>
           <div class="field quarter">
-            <label>Account Flow</label>
+            <label>Payment Status</label>
             <select name="accountFlow">
               <option selected>Awaited</option>
-              <option>Debit</option>
               <option>Credit</option>
             </select>
           </div>
@@ -142,7 +143,7 @@
                 <th>Date</th>
                 <th>Invoice</th>
                 <th>Customer</th>
-                <th>Account Flow</th>
+                <th>Payment Status</th>
                 <th>Consignee</th>
                 <th>Route</th>
                 <th>Origin</th>

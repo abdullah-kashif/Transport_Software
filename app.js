@@ -12,6 +12,7 @@
         accountFlow: "Awaited",
         paymentTerm: "30 Days",
         salesTaxAuthority: "Sindh Revenue Board",
+        totalAmount: 166750,
         customer: "Cherat Packaging Ltd",
         consignee: "Cherat Packaging Gadoon",
         route: "Karachi to Gadoon",
@@ -37,6 +38,7 @@
         accountFlow: "Awaited",
         paymentTerm: "15 Days",
         salesTaxAuthority: "Sindh Revenue Board",
+        totalAmount: 388700,
         customer: "AICT",
         consignee: "AICT Lahore Terminal",
         route: "Port Qasim to Lahore",
@@ -59,9 +61,10 @@
         invoiceNo: "INV-24063",
         date: "2026-06-09",
         category: "Inter City Transport",
-        accountFlow: "Debit",
+        accountFlow: "Awaited",
         paymentTerm: "Immediate",
         salesTaxAuthority: "Punjab Revenue Authority",
+        totalAmount: 216200,
         customer: "DAMCO Pakistan",
         consignee: "Sadaqat Ltd",
         route: "Karachi to Faisalabad",
@@ -402,14 +405,17 @@
   function normalizeBookingContainers(booking = {}) {
     const containerLines = getBookingContainerLines(booking);
     const primaryLine = containerLines[0] || normalizeContainerLine();
+    const accountFlow = String(booking.accountFlow || "").trim() === "Debit" ? "Awaited" : String(booking.accountFlow || "").trim() || "Awaited";
     return {
       ...booking,
       invoiceNo: String(booking.invoiceNo || "").trim(),
+      accountFlow,
       containerLines,
       containerNo: primaryLine.containerNo,
       size: primaryLine.size,
       truckNo: primaryLine.truckNo,
       rate: Number(booking.rate || 0),
+      totalAmount: Number(booking.totalAmount || calculateBookingTotalAmount(booking.rate, booking.salesTaxAuthority)),
       gatePass: Number(booking.gatePass || 0),
       detention: Number(booking.detention || 0)
     };
@@ -451,6 +457,22 @@
     const total = Number(invoice.roadFreight) + Number(invoice.saleTax) + Number(invoice.otherCharges);
     const balance = total - Number(invoice.receivedSoFar || 0);
     return { total, balance };
+  }
+
+  function shouldApplySalesTax(authority) {
+    const taxableAuthorities = new Set([
+      "Sindh Revenue Board",
+      "Punjab Revenue Authority",
+      "Khyber Pakhtunkhwa Revenue Authority",
+      "Balochistan Revenue Authority"
+    ]);
+    return taxableAuthorities.has(String(authority || "").trim());
+  }
+
+  function calculateBookingTotalAmount(rate, authority) {
+    const numericRate = Number(rate || 0);
+    if (!shouldApplySalesTax(authority)) return numericRate;
+    return Math.round(numericRate * 1.15 * 100) / 100;
   }
 
   function calculateKhataSummary(account) {
@@ -645,6 +667,9 @@
     const customerFilter = document.querySelector("[data-booking-customer-filter]");
     const bookingCount = document.querySelector("[data-booking-count]");
     const statusField = form.querySelector("[name='status']");
+    const rateField = form.querySelector("[name='rate']");
+    const salesTaxAuthorityField = form.querySelector("[name='salesTaxAuthority']");
+    const totalAmountField = form.querySelector("[name='totalAmount']");
     const dateTextField = form.querySelector("[name='date']");
     const datePickerField = form.querySelector("[name='datePicker']");
     const datePickerButton = form.querySelector("[data-open-date-picker]");
@@ -709,6 +734,10 @@
       datePickerField.value = isoValue;
     }
 
+    function syncTotalAmount() {
+      totalAmountField.value = String(calculateBookingTotalAmount(rateField.value, salesTaxAuthorityField.value));
+    }
+
     function resetForm() {
       form.reset();
       form.elements.invoiceNo.value = "INV-24061";
@@ -720,6 +749,7 @@
       form.elements.gatePass.value = "0";
       form.elements.detention.value = "0";
       form.elements.salesTaxAuthority.value = "Sindh Revenue Board";
+      syncTotalAmount();
       statusField.value = "Submitted";
       renderContainerRows([
         {
@@ -801,6 +831,7 @@
         if (key === "date") syncBookingDate(item[key]);
         else if (form.elements[key]) form.elements[key].value = item[key];
       });
+      syncTotalAmount();
       renderContainerRows(getBookingContainerLines(item));
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Booking";
@@ -820,6 +851,9 @@
       if (!isoValue) return;
       syncBookingDate(isoValue);
     });
+
+    rateField.addEventListener("input", syncTotalAmount);
+    salesTaxAuthorityField.addEventListener("change", syncTotalAmount);
 
     customerFilter.addEventListener("change", render);
 
@@ -853,6 +887,7 @@
       const normalized = {
         ...data,
         date: bookingDate,
+        totalAmount: calculateBookingTotalAmount(data.rate, data.salesTaxAuthority),
         containerLines,
         containerNo: primaryLine.containerNo,
         size: primaryLine.size,
@@ -906,14 +941,14 @@
 
     function render() {
       const debitBookings = store.bookings
-        .filter((item) => String(item.accountFlow || "").trim().toLowerCase() === "debit")
+        .filter((item) => String(item.accountFlow || "").trim().toLowerCase() === "awaited")
         .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 
       const grouped = new Map();
 
       debitBookings.forEach((item) => {
         const customer = String(item.customer || "").trim() || "Unknown Customer";
-        const pendingAmount = Number(item.rate || 0) + Number(item.gatePass || 0) + Number(item.detention || 0);
+        const pendingAmount = Number(item.totalAmount || calculateBookingTotalAmount(item.rate, item.salesTaxAuthority)) + Number(item.gatePass || 0) + Number(item.detention || 0);
         if (!grouped.has(customer)) {
           grouped.set(customer, {
             customer,
@@ -936,7 +971,7 @@
       if (!summaryRows.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="4">Abhi tak koi debit summary record available nahi hai.</td>
+            <td colspan="4">Abhi tak koi awaited summary record available nahi hai.</td>
           </tr>
         `;
         return;
