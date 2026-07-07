@@ -23,7 +23,7 @@
         <p>Super admin yahan se new users add kar sakta hai aur access control manage kar sakta hai.</p>
       </div>
       <nav class="nav">
-        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
         <a href="booking.html" data-page="booking">Booking Form</a>
         <a href="ledger.html" data-page="ledger">Summary Page</a>
         <a href="truck.html" data-page="truck">Truck Details</a>
@@ -67,6 +67,18 @@
           </div>
           <div class="field"><label>Role</label><select name="role"><option>Admin</option><option>Super Admin</option></select></div>
           <div class="field"><label>Status</label><select name="status"><option>Active</option><option>Inactive</option></select></div>
+          <div class="field full">
+            <label>Module Access</label>
+            <div class="access-grid" data-access-grid>
+              <label class="access-option"><input type="checkbox" name="access" value="dashboard" checked /> <span>Dashboard</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="booking" checked /> <span>Booking Form</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="ledger" checked /> <span>Summary Page</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="truck" checked /> <span>Truck Details</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="employee" checked /> <span>Employees</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="khata" checked /> <span>Khata Page</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="admin" /> <span>Admin</span></label>
+            </div>
+          </div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save User</button>
             <button class="btn" type="button" data-reset-form>Clear Form</button>
@@ -90,6 +102,7 @@
               <th>Password</th>
               <th>Role</th>
               <th>Status</th>
+              <th>Access</th>
               <th></th>
             </tr>
           </thead>

@@ -1,6 +1,16 @@
 (function () {
   const KEY = "gtls-transport-demo-data-v1";
   const ADMIN_AUTH_KEY = "gtls-admin-auth-v1";
+  const ACCESS_OPTIONS = [
+    { value: "dashboard", label: "Dashboard" },
+    { value: "booking", label: "Booking Form" },
+    { value: "ledger", label: "Summary Page" },
+    { value: "truck", label: "Truck Details" },
+    { value: "employee", label: "Employees" },
+    { value: "khata", label: "Khata Page" },
+    { value: "admin", label: "Admin" }
+  ];
+  const DEFAULT_USER_ACCESS = ACCESS_OPTIONS.map((item) => item.value).filter((item) => item !== "admin");
 
   const seed = {
     bookings: [
@@ -242,7 +252,8 @@
         email: "admin@gmail.com",
         password: "transport",
         role: "Super Admin",
-        status: "Active"
+        status: "Active",
+        access: ACCESS_OPTIONS.map((item) => item.value)
       }
     ],
     customerKhatas: [
@@ -327,6 +338,7 @@
     if (!Array.isArray(store.adminUsers) || store.adminUsers.length === 0) {
       store.adminUsers = structuredClone(seed.adminUsers);
     } else {
+      store.adminUsers = store.adminUsers.map((item) => normalizeAdminUser(item));
       const superAdminIndex = store.adminUsers.findIndex((item) => item.role === "Super Admin");
       const superAdminRecord = structuredClone(seed.adminUsers[0]);
       if (superAdminIndex === -1) {
@@ -334,7 +346,8 @@
       } else {
         store.adminUsers[superAdminIndex] = {
           ...store.adminUsers[superAdminIndex],
-          ...superAdminRecord
+          ...superAdminRecord,
+          access: ACCESS_OPTIONS.map((item) => item.value)
         };
       }
     }
@@ -349,6 +362,33 @@
 
   function saveStore(store) {
     sessionStorage.setItem(KEY, JSON.stringify(store));
+  }
+
+  function normalizeAdminAccess(access, role = "Admin") {
+    const allowedValues = new Set(ACCESS_OPTIONS.map((item) => item.value));
+    if (role === "Super Admin") return ACCESS_OPTIONS.map((item) => item.value);
+
+    const values = Array.isArray(access)
+      ? access
+      : typeof access === "string" && access
+        ? [access]
+        : structuredClone(DEFAULT_USER_ACCESS);
+
+    const normalized = [...new Set(values
+      .map((item) => String(item || "").trim())
+      .filter((item) => allowedValues.has(item))
+    )];
+
+    return normalized.length ? normalized : structuredClone(DEFAULT_USER_ACCESS);
+  }
+
+  function normalizeAdminUser(user = {}) {
+    const role = String(user.role || "Admin").trim() || "Admin";
+    return {
+      ...user,
+      role,
+      access: normalizeAdminAccess(user.access, role)
+    };
   }
 
   function getAdminSession() {
@@ -366,12 +406,147 @@
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      access: normalizeAdminAccess(user.access, user.role)
     }));
+  }
+
+  function getPageFile(page) {
+    return `${page === "employee" ? "employees" : page}.html`;
   }
 
   function clearAdminSession() {
     sessionStorage.removeItem(ADMIN_AUTH_KEY);
+  }
+
+  function getPasswordToggleIcon(isVisible) {
+    return isVisible
+      ? `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 3l18 18"></path>
+          <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7"></path>
+          <path d="M9.4 5.5A10.8 10.8 0 0 1 12 5c5.2 0 8.8 4.3 10 7-0.5 1.1-1.5 2.7-3 4.1"></path>
+          <path d="M6.2 6.3C4.3 7.6 3 9.6 2 12c1.2 2.7 4.8 7 10 7 1.7 0 3.3-0.4 4.7-1"></path>
+        </svg>
+      `
+      : `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      `;
+  }
+
+  function authenticateSoftwareUser(store, email, password) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedPassword = String(password || "").trim();
+    return store.adminUsers.find((item) =>
+      String(item.email || "").trim().toLowerCase() === normalizedEmail &&
+      String(item.password || "").trim() === normalizedPassword &&
+      String(item.status || "").trim() === "Active"
+    ) || null;
+  }
+
+  function bindPasswordToggle(passwordField, passwordToggle) {
+    function sync() {
+      const isVisible = passwordField.type === "text";
+      passwordToggle.innerHTML = getPasswordToggleIcon(isVisible);
+      passwordToggle.setAttribute("aria-label", isVisible ? "Hide password" : "Show password");
+      passwordToggle.setAttribute("title", isVisible ? "Hide password" : "Show password");
+    }
+
+    passwordToggle.addEventListener("click", () => {
+      passwordField.type = passwordField.type === "password" ? "text" : "password";
+      sync();
+    });
+
+    sync();
+  }
+
+  function softwareLoginPage(store) {
+    if (getAdminSession()) {
+      window.location.href = getPageFile("dashboard");
+      return;
+    }
+
+    const form = document.querySelector("[data-software-login-form]");
+    const notice = document.querySelector("[data-notice]");
+    const passwordField = form.querySelector("[name='password']");
+    const passwordToggle = form.querySelector("[data-password-toggle]");
+
+    bindPasswordToggle(passwordField, passwordToggle);
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      const user = authenticateSoftwareUser(store, data.email, data.password);
+      if (!user) {
+        notice.hidden = false;
+        notice.textContent = "Email ya password sahi nahi hai.";
+        return;
+      }
+
+      setAdminSession(user);
+      const firstPage = normalizeAdminAccess(user.access, user.role)[0] || "dashboard";
+      window.location.href = getPageFile(firstPage);
+    });
+  }
+
+  function enforceSoftwareAccess(page) {
+    const publicPages = new Set(["signin", "admin-login"]);
+    const session = getAdminSession();
+    const hasSession = Boolean(session);
+
+    if (page === "signin" && hasSession) {
+      const firstPage = session.access?.[0] || "dashboard";
+      window.location.href = getPageFile(firstPage);
+      return false;
+    }
+
+    if (!publicPages.has(page) && !hasSession) {
+      window.location.href = "index.html";
+      return false;
+    }
+
+    if (!publicPages.has(page) && session && session.role !== "Super Admin") {
+      const allowed = new Set(normalizeAdminAccess(session.access, session.role));
+      if (!allowed.has(page)) {
+        const fallback = allowed.has("dashboard") ? "dashboard" : allowed.values().next().value || "dashboard";
+        window.location.href = getPageFile(fallback);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function applySessionAccess() {
+    const session = getAdminSession();
+    if (!session) return;
+
+    const allowed = new Set(normalizeAdminAccess(session.access, session.role));
+    document.querySelectorAll(".nav a").forEach((link) => {
+      const page = link.dataset.page;
+      if (!page) return;
+      const isAllowed = session.role === "Super Admin" || allowed.has(page);
+      link.hidden = !isAllowed;
+    });
+  }
+
+  function bindSoftwareSignOut() {
+    const sidebarTip = document.querySelector(".sidebar .tip");
+    if (!sidebarTip || document.querySelector("[data-software-signout]")) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "actions";
+    wrapper.style.marginTop = "12px";
+    wrapper.innerHTML = `<button class="btn small" type="button" data-software-signout>Sign Out</button>`;
+    sidebarTip.appendChild(wrapper);
+
+    wrapper.querySelector("[data-software-signout]").addEventListener("click", () => {
+      clearAdminSession();
+      window.location.href = "index.html";
+    });
   }
 
   function normalizeContainerLine(line = {}) {
@@ -380,7 +555,7 @@
       size: String(line.size || "40 FT").trim() || "40 FT",
       truckNo: String(line.truckNo || "").trim(),
       rate: Number(line.rate || 0),
-      gatePass: Number(line.gatePass || 0),
+      gatePass: String(line.gatePass || "").trim(),
       detention: Number(line.detention || 0)
     };
   }
@@ -406,6 +581,9 @@
     const containerLines = getBookingContainerLines(booking);
     const primaryLine = containerLines[0] || normalizeContainerLine();
     const accountFlow = String(booking.accountFlow || "").trim() === "Debit" ? "Awaited" : String(booking.accountFlow || "").trim() || "Awaited";
+    const rate = Number(booking.rate || 0);
+    const detention = Number(booking.detention || 0);
+    const taxBreakdown = calculateBookingTaxBreakdown(rate, detention, booking.salesTaxAuthority);
     return {
       ...booking,
       invoiceNo: String(booking.invoiceNo || "").trim(),
@@ -414,10 +592,15 @@
       containerNo: primaryLine.containerNo,
       size: primaryLine.size,
       truckNo: primaryLine.truckNo,
-      rate: Number(booking.rate || 0),
-      totalAmount: Number(booking.totalAmount || calculateBookingTotalAmount(booking.rate, booking.salesTaxAuthority)),
-      gatePass: Number(booking.gatePass || 0),
-      detention: Number(booking.detention || 0)
+      rate,
+      salesTaxAmount: Number(booking.salesTaxAmount ?? taxBreakdown.salesTaxAmount),
+      totalAmount: Number(booking.totalAmount ?? taxBreakdown.totalAmount),
+      incomeTaxAmount: Number(booking.incomeTaxAmount ?? taxBreakdown.incomeTaxAmount),
+      salesTaxWithheldAmount: Number(booking.salesTaxWithheldAmount ?? taxBreakdown.salesTaxWithheldAmount),
+      salesTaxByUsAmount: Number(booking.salesTaxByUsAmount ?? taxBreakdown.salesTaxByUsAmount),
+      receivableAmount: Number(booking.receivableAmount ?? taxBreakdown.receivableAmount),
+      gatePass: String(booking.gatePass || "").trim(),
+      detention
     };
   }
 
@@ -459,6 +642,10 @@
     return { total, balance };
   }
 
+  function roundAmount(value) {
+    return Math.round(Number(value || 0) * 100) / 100;
+  }
+
   function shouldApplySalesTax(authority) {
     const taxableAuthorities = new Set([
       "Sindh Revenue Board",
@@ -469,10 +656,32 @@
     return taxableAuthorities.has(String(authority || "").trim());
   }
 
-  function calculateBookingTotalAmount(rate, authority) {
-    const numericRate = Number(rate || 0);
-    if (!shouldApplySalesTax(authority)) return numericRate;
-    return Math.round(numericRate * 1.15 * 100) / 100;
+  function calculateBookingTaxBreakdown(rate, detention, authority) {
+    const roadHaulageCharges = Number(rate || 0);
+    const detentionCharges = Number(detention || 0);
+    const taxableBase = roundAmount(roadHaulageCharges + detentionCharges);
+    const salesTaxAmount = shouldApplySalesTax(authority) ? roundAmount(taxableBase * 0.15) : 0;
+    const totalAmount = roundAmount(taxableBase + salesTaxAmount);
+    const incomeTaxAmount = roundAmount(totalAmount * 0.06);
+    const salesTaxWithheldAmount = roundAmount(salesTaxAmount * 0.20);
+    const salesTaxByUsAmount = roundAmount(salesTaxAmount * 0.80);
+    const receivableAmount = roundAmount(totalAmount - incomeTaxAmount - salesTaxWithheldAmount);
+
+    return {
+      roadHaulageCharges,
+      detentionCharges,
+      taxableBase,
+      salesTaxAmount,
+      totalAmount,
+      incomeTaxAmount,
+      salesTaxWithheldAmount,
+      salesTaxByUsAmount,
+      receivableAmount
+    };
+  }
+
+  function calculateBookingTotalAmount(rate, detention, authority) {
+    return calculateBookingTaxBreakdown(rate, detention, authority).totalAmount;
   }
 
   function calculateKhataSummary(account) {
@@ -668,8 +877,14 @@
     const bookingCount = document.querySelector("[data-booking-count]");
     const statusField = form.querySelector("[name='status']");
     const rateField = form.querySelector("[name='rate']");
+    const detentionField = form.querySelector("[name='detention']");
     const salesTaxAuthorityField = form.querySelector("[name='salesTaxAuthority']");
+    const salesTaxAmountField = form.querySelector("[name='salesTaxAmount']");
     const totalAmountField = form.querySelector("[name='totalAmount']");
+    const incomeTaxAmountField = form.querySelector("[name='incomeTaxAmount']");
+    const salesTaxWithheldAmountField = form.querySelector("[name='salesTaxWithheldAmount']");
+    const salesTaxByUsAmountField = form.querySelector("[name='salesTaxByUsAmount']");
+    const receivableAmountField = form.querySelector("[name='receivableAmount']");
     const dateTextField = form.querySelector("[name='date']");
     const datePickerField = form.querySelector("[name='datePicker']");
     const datePickerButton = form.querySelector("[data-open-date-picker]");
@@ -735,7 +950,13 @@
     }
 
     function syncTotalAmount() {
-      totalAmountField.value = String(calculateBookingTotalAmount(rateField.value, salesTaxAuthorityField.value));
+      const breakdown = calculateBookingTaxBreakdown(rateField.value, detentionField.value, salesTaxAuthorityField.value);
+      salesTaxAmountField.value = String(breakdown.salesTaxAmount);
+      totalAmountField.value = String(breakdown.totalAmount);
+      incomeTaxAmountField.value = String(breakdown.incomeTaxAmount);
+      salesTaxWithheldAmountField.value = String(breakdown.salesTaxWithheldAmount);
+      salesTaxByUsAmountField.value = String(breakdown.salesTaxByUsAmount);
+      receivableAmountField.value = String(breakdown.receivableAmount);
     }
 
     function resetForm() {
@@ -746,7 +967,7 @@
       form.elements.accountFlow.value = "Awaited";
       form.elements.paymentTerm.value = "30 Days";
       form.elements.rate.value = "145000";
-      form.elements.gatePass.value = "0";
+      form.elements.gatePass.value = "GP-001";
       form.elements.detention.value = "0";
       form.elements.salesTaxAuthority.value = "Sindh Revenue Board";
       syncTotalAmount();
@@ -784,7 +1005,7 @@
       if (!bookings.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="21">Is customer ka koi record nahi mila.</td>
+            <td colspan="22">Is customer ka koi record nahi mila.</td>
           </tr>
         `;
         return;
@@ -810,8 +1031,9 @@
             <td>${text(item.goodsType)}</td>
             <td>${text(item.quantity)}</td>
             <td>${money(item.rate)}</td>
-            <td>${money(item.gatePass)}</td>
+            <td>${text(item.gatePass)}</td>
             <td>${money(item.detention)}</td>
+            <td>${money(item.receivableAmount)}</td>
             <td><span class="badge ${item.status === "Submitted" ? "warn" : "good"}">${text(item.status)}</span></td>
             <td>${text(item.remarks)}</td>
             <td>
@@ -853,6 +1075,7 @@
     });
 
     rateField.addEventListener("input", syncTotalAmount);
+    detentionField.addEventListener("input", syncTotalAmount);
     salesTaxAuthorityField.addEventListener("change", syncTotalAmount);
 
     customerFilter.addEventListener("change", render);
@@ -887,14 +1110,19 @@
       const normalized = {
         ...data,
         date: bookingDate,
-        totalAmount: calculateBookingTotalAmount(data.rate, data.salesTaxAuthority),
         containerLines,
         containerNo: primaryLine.containerNo,
         size: primaryLine.size,
         truckNo: primaryLine.truckNo,
         rate: Number(data.rate || 0),
-        gatePass: Number(data.gatePass || 0),
-        detention: Number(data.detention || 0)
+        gatePass: String(data.gatePass || "").trim(),
+        detention: Number(data.detention || 0),
+        salesTaxAmount: Number(data.salesTaxAmount || 0),
+        totalAmount: Number(data.totalAmount || 0),
+        incomeTaxAmount: Number(data.incomeTaxAmount || 0),
+        salesTaxWithheldAmount: Number(data.salesTaxWithheldAmount || 0),
+        salesTaxByUsAmount: Number(data.salesTaxByUsAmount || 0),
+        receivableAmount: Number(data.receivableAmount || 0)
       };
       delete normalized.datePicker;
 
@@ -948,7 +1176,7 @@
 
       debitBookings.forEach((item) => {
         const customer = String(item.customer || "").trim() || "Unknown Customer";
-        const pendingAmount = Number(item.totalAmount || calculateBookingTotalAmount(item.rate, item.salesTaxAuthority)) + Number(item.gatePass || 0) + Number(item.detention || 0);
+        const pendingAmount = Number(item.receivableAmount || calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount);
         if (!grouped.has(customer)) {
           grouped.set(customer, {
             customer,
@@ -1224,47 +1452,12 @@
     const notice = document.querySelector("[data-notice]");
     const passwordField = form.querySelector("[name='password']");
     const passwordToggle = form.querySelector("[data-password-toggle]");
-
-    function passwordToggleIcon(isVisible) {
-      return isVisible
-        ? `
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M3 3l18 18"></path>
-            <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7"></path>
-            <path d="M9.4 5.5A10.8 10.8 0 0 1 12 5c5.2 0 8.8 4.3 10 7-0.5 1.1-1.5 2.7-3 4.1"></path>
-            <path d="M6.2 6.3C4.3 7.6 3 9.6 2 12c1.2 2.7 4.8 7 10 7 1.7 0 3.3-0.4 4.7-1"></path>
-          </svg>
-        `
-        : `
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-        `;
-    }
-
-    function syncPasswordToggle() {
-      const isVisible = passwordField.type === "text";
-      passwordToggle.innerHTML = passwordToggleIcon(isVisible);
-      passwordToggle.setAttribute("aria-label", isVisible ? "Hide password" : "Show password");
-      passwordToggle.setAttribute("title", isVisible ? "Hide password" : "Show password");
-    }
-
-    passwordToggle.addEventListener("click", () => {
-      passwordField.type = passwordField.type === "password" ? "text" : "password";
-      syncPasswordToggle();
-    });
+    bindPasswordToggle(passwordField, passwordToggle);
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(form).entries());
-      const email = String(data.email || "").trim().toLowerCase();
-      const password = String(data.password || "").trim();
-      const user = store.adminUsers.find((item) =>
-        String(item.email || "").trim().toLowerCase() === email &&
-        String(item.password || "").trim() === password &&
-        String(item.status || "").trim() === "Active"
-      );
+      const user = authenticateSoftwareUser(store, data.email, data.password);
 
       if (!user) {
         notice.hidden = false;
@@ -1275,8 +1468,6 @@
       setAdminSession(user);
       window.location.href = "admin.html";
     });
-
-    syncPasswordToggle();
   }
 
   function adminPage(store) {
@@ -1292,6 +1483,8 @@
     const summary = document.querySelector("[data-admin-summary]");
     const passwordField = form.querySelector("[name='password']");
     const passwordToggle = form.querySelector("[data-password-toggle]");
+    const roleField = form.querySelector("[name='role']");
+    const accessCheckboxes = Array.from(form.querySelectorAll("input[name='access']"));
     const logoutButton = document.querySelector("[data-admin-logout]");
     let editingId = "";
     const visiblePasswords = new Set();
@@ -1299,24 +1492,6 @@
     function setNotice(message = "") {
       notice.textContent = message;
       notice.hidden = !message;
-    }
-
-    function passwordToggleIcon(isVisible) {
-      return isVisible
-        ? `
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M3 3l18 18"></path>
-            <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7"></path>
-            <path d="M9.4 5.5A10.8 10.8 0 0 1 12 5c5.2 0 8.8 4.3 10 7-0.5 1.1-1.5 2.7-3 4.1"></path>
-            <path d="M6.2 6.3C4.3 7.6 3 9.6 2 12c1.2 2.7 4.8 7 10 7 1.7 0 3.3-0.4 4.7-1"></path>
-          </svg>
-        `
-        : `
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-        `;
     }
 
     function updateSummary() {
@@ -1333,15 +1508,28 @@
 
     function syncPasswordToggle() {
       const isVisible = passwordField.type === "text";
-      passwordToggle.innerHTML = passwordToggleIcon(isVisible);
+      passwordToggle.innerHTML = getPasswordToggleIcon(isVisible);
       passwordToggle.setAttribute("aria-label", isVisible ? "Hide password" : "Show password");
       passwordToggle.setAttribute("title", isVisible ? "Hide password" : "Show password");
+    }
+
+    function syncAccessState(roleValue) {
+      const isSuperAdmin = roleValue === "Super Admin";
+      const selected = new Set(isSuperAdmin ? ACCESS_OPTIONS.map((item) => item.value) : []);
+      accessCheckboxes.forEach((checkbox) => {
+        if (isSuperAdmin) checkbox.checked = selected.has(checkbox.value);
+        checkbox.disabled = isSuperAdmin;
+      });
     }
 
     function resetForm() {
       form.reset();
       form.elements.status.value = "Active";
       form.elements.role.value = "Admin";
+      accessCheckboxes.forEach((checkbox) => {
+        checkbox.checked = DEFAULT_USER_ACCESS.includes(checkbox.value);
+        checkbox.disabled = false;
+      });
       passwordField.type = "password";
       syncPasswordToggle();
       editingId = "";
@@ -1359,13 +1547,14 @@
               <div class="password-display">
                 <span>${visiblePasswords.has(item.id) ? text(item.password) : "........"}</span>
                 <button class="password-toggle inline" type="button" data-toggle-admin-password="${item.id}" aria-label="${visiblePasswords.has(item.id) ? "Hide password" : "Show password"}" title="${visiblePasswords.has(item.id) ? "Hide password" : "Show password"}">
-                  ${passwordToggleIcon(visiblePasswords.has(item.id))}
+                  ${getPasswordToggleIcon(visiblePasswords.has(item.id))}
                 </button>
               </div>
             `}
           </td>
           <td>${text(item.role)}</td>
           <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
+          <td>${normalizeAdminAccess(item.access, item.role).map((access) => `<span class="badge">${text(ACCESS_OPTIONS.find((option) => option.value === access)?.label || access)}</span>`).join(" ")}</td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-edit-admin="${item.id}">Edit</button>
@@ -1379,9 +1568,14 @@
 
     function fillForm(item) {
       if (!item) return;
-      Object.keys(item).forEach((key) => {
-        if (form.elements[key]) form.elements[key].value = item[key];
+      ["name", "email", "password", "role", "status"].forEach((key) => {
+        if (form.elements[key]) form.elements[key].value = item[key] || "";
       });
+      const selectedAccess = new Set(normalizeAdminAccess(item.access, item.role));
+      accessCheckboxes.forEach((checkbox) => {
+        checkbox.checked = selectedAccess.has(checkbox.value);
+      });
+      syncAccessState(item.role);
       passwordField.type = "password";
       syncPasswordToggle();
       editingId = item.id;
@@ -1393,21 +1587,27 @@
       syncPasswordToggle();
     });
 
+    roleField.addEventListener("change", () => {
+      syncAccessState(roleField.value);
+    });
+
     if (logoutButton) {
       logoutButton.addEventListener("click", () => {
         clearAdminSession();
-        window.location.href = "admin-login.html";
+        window.location.href = "index.html";
       });
     }
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const data = Object.fromEntries(new FormData(form).entries());
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
       const normalized = {
         ...data,
         name: String(data.name || "").trim(),
         email: String(data.email || "").trim(),
-        password: String(data.password || "").trim()
+        password: String(data.password || "").trim(),
+        access: normalizeAdminAccess(formData.getAll("access"), data.role)
       };
 
       if (!editingId) {
@@ -1729,8 +1929,14 @@
       statementTitle.textContent = `${account.customer} Statement`;
       statementRange.textContent = `${statement.startDate} - ${statement.endDate}`;
       customerCard.innerHTML = `
-        <div class="khata-mini"><strong>Phone</strong><div class="muted">${text(account.phone)}</div></div>
-        <div class="khata-mini"><strong>City</strong><div class="muted">${text(account.city)}</div></div>
+        <div class="khata-mini">
+          <span class="khata-mini-label">Phone</span>
+          <strong class="khata-mini-value">${text(account.phone)}</strong>
+        </div>
+        <div class="khata-mini">
+          <span class="khata-mini-label">City</span>
+          <strong class="khata-mini-value">${text(account.city)}</strong>
+        </div>
       `;
 
       summary.innerHTML = `
@@ -1919,10 +2125,14 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     const store = loadStore();
+    const page = document.body.dataset.page;
+    if (!enforceSoftwareAccess(page)) return;
+    applySessionAccess();
     setActiveNav();
     bindMobileNav();
     bindReset();
-    const page = document.body.dataset.page;
+    if (page !== "signin" && page !== "admin-login") bindSoftwareSignOut();
+    if (page === "signin") softwareLoginPage(store);
     if (page === "dashboard") dashboardPage(store);
     if (page === "booking") bookingPage(store);
     if (page === "ledger") ledgerPage(store);

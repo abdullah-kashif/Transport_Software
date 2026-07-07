@@ -25,7 +25,7 @@
         <p>EasyKhata-style customer statement with debit, credit and running balance.</p>
       </div>
       <nav class="nav">
-        <a href="index.html" data-page="dashboard">Dashboard</a>
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
         <a href="booking.html" data-page="booking">Booking Form</a>
         <a href="ledger.html" data-page="ledger">Summary Page</a>
         <a href="truck.html" data-page="truck">Truck Details</a>
@@ -44,7 +44,6 @@
         <div class="screen-head">
           <div>
             <h3>Add Customer</h3>
-            <p>Har client ko alag add karein. Uske baad usi customer ke naam se entries aur statement alag show hongi.</p>
           </div>
         </div>
         <form data-customer-form class="form-grid">
@@ -56,7 +55,7 @@
             <button class="btn" type="button" data-reset-customer-form>Clear Form</button>
           </div>
         </form>
-        <div class="notice" data-customer-notice>Yahan customer save/update status dikhaya jayega.</div>
+        <div class="notice" data-customer-notice hidden></div>
       </section>
 
       <section class="screen statement-shell">
@@ -69,12 +68,14 @@
           </div>
           <div class="actions statement-actions">
             <select data-khata-select></select>
-            <button class="btn" type="button" data-print-statement>Print / Save PDF</button>
-            <button class="btn primary" type="button" data-whatsapp-statement>WhatsApp</button>
+            <div class="statement-action-buttons">
+              <button class="btn" type="button" data-print-statement>Print / Save PDF</button>
+              <button class="btn primary" type="button" data-whatsapp-statement>WhatsApp</button>
+            </div>
           </div>
         </div>
         <div class="statement-stats" data-khata-summary></div>
-        <div class="notice" data-export-notice>Selected customer ka full statement yahan se PDF ya WhatsApp flow ke liye prepare hoga.</div>
+        <div class="notice" data-export-notice hidden></div>
       </section>
 
       <section class="screen">
@@ -95,7 +96,7 @@
             <button class="btn" type="button" data-reset-form>Clear Form</button>
           </div>
         </form>
-        <div class="notice" data-notice>Yahan statement entry status dikhaya jayega.</div>
+        <div class="notice" data-notice hidden></div>
       </section>
 
       <section class="screen">
