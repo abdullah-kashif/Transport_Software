@@ -659,13 +659,13 @@
   function calculateBookingTaxBreakdown(rate, detention, authority) {
     const roadHaulageCharges = Number(rate || 0);
     const detentionCharges = Number(detention || 0);
-    const taxableBase = roundAmount(roadHaulageCharges + detentionCharges);
+    const taxableBase = roundAmount(roadHaulageCharges);
     const salesTaxAmount = shouldApplySalesTax(authority) ? roundAmount(taxableBase * 0.15) : 0;
     const totalAmount = roundAmount(taxableBase + salesTaxAmount);
-    const incomeTaxAmount = roundAmount(totalAmount * 0.06);
+    const incomeTaxAmount = roundAmount(totalAmount * 0.07);
     const salesTaxWithheldAmount = roundAmount(salesTaxAmount * 0.20);
     const salesTaxByUsAmount = roundAmount(salesTaxAmount * 0.80);
-    const receivableAmount = roundAmount(totalAmount - incomeTaxAmount - salesTaxWithheldAmount);
+    const receivableAmount = roundAmount(totalAmount - incomeTaxAmount - salesTaxWithheldAmount + detentionCharges);
 
     return {
       roadHaulageCharges,
