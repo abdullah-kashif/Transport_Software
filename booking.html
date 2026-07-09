@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Booking Form</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body data-page="booking">
   <div class="app">
@@ -20,7 +22,6 @@
       </div>
       <div class="brand">
         <h1>GTLS Transport</h1>
-        <p>Booking module with create, read, update and delete behavior.</p>
       </div>
       <nav class="nav">
         <a href="dashboard.html" data-page="dashboard">Dashboard</a>
@@ -31,18 +32,17 @@
         <a href="khata.html" data-page="khata">Khata Page</a>
         <a href="admin-login.html" data-page="admin-login">Admin</a>
       </nav>
-      <div class="tip">
-        <strong>Data Rule</strong>
-        <small>New booking save karne ke baad woh dashboard par bhi dikh jayegi kyun ke data sessionStorage mein store hota hai.</small>
-      </div>
+      <div class="tip"></div>
     </aside>
 
     <main class="main">
+      <section class="hero">
+        <h2>Booking Form</h2>
+      </section>
       <section class="screen">
         <div class="screen-head">
           <div>
             <h3>Create / Update Booking</h3>
-            <p>Form submit karne se data current browser session mein save ho jayega.</p>
           </div>
         </div>
         <form data-booking-form class="form-grid">
@@ -95,7 +95,7 @@
           <div class="field quarter"><label>Sale Tax 80% by us</label><input name="salesTaxByUsAmount" type="text" value="17400" readonly /></div>
           <div class="field quarter"><label>Receivable Amount</label><input name="receivableAmount" type="text" value="150727.5" readonly /></div>
           <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days" placeholder="Example: 30 Days" /></div>
-          <div class="field quarter"><label>Status</label><select name="status"><option>Submitted</option><option>In Transit</option></select></div>
+          <div class="field quarter"><label>Status</label><select name="status"><option>Delivered</option><option>In Transit</option></select></div>
           <div class="field quarter">
             <label>Payment Status</label>
             <select name="accountFlow">
@@ -121,14 +121,13 @@
             <button class="btn" type="button" data-reset-form>Clear Form</button>
           </div>
         </form>
-        <div class="notice" data-notice>Yahan create aur update messages dikhain ge.</div>
+        <div class="notice" data-notice hidden></div>
       </section>
 
       <section class="screen">
         <div class="screen-head">
           <div>
             <h3>Booking Ledger</h3>
-            <p>Edit aur delete buttons working hain.</p>
           </div>
           <div class="ledger-filter">
             <div class="ledger-filter-control">
@@ -153,6 +152,7 @@
                 <th>Route</th>
                 <th>Origin</th>
                 <th>Destination</th>
+                <th>Category</th>
                 <th>BL No</th>
                 <th>Container</th>
                 <th>Size</th>
@@ -160,9 +160,16 @@
                 <th>Goods Type</th>
                 <th>Quantity</th>
                 <th>Road Haulage Charges</th>
+                <th>Sales Tax Authority</th>
+                <th>15% Sales Tax</th>
+                <th>Total Amount</th>
+                <th>Income Tax 7%</th>
+                <th>Sales Tax With Held 20%</th>
+                <th>Sales Tax 80% by us</th>
                 <th>Gate Pass</th>
                 <th>Detention</th>
                 <th>Receivable Amount</th>
+                <th>Payment Term</th>
                 <th>Status</th>
                 <th>Remarks</th>
                 <th>Actions</th>

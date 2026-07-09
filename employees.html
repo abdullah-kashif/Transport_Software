@@ -20,7 +20,6 @@
       </div>
       <div class="brand">
         <h1>GTLS Transport</h1>
-        <p>Employee management page with staff records, payroll snapshot and status tracking.</p>
       </div>
       <nav class="nav">
         <a href="dashboard.html" data-page="dashboard">Dashboard</a>
@@ -31,24 +30,18 @@
         <a href="khata.html" data-page="khata">Khata Page</a>
         <a href="admin-login.html" data-page="admin-login">Admin</a>
       </nav>
-      <div class="tip">
-        <strong>HR Demo</strong>
-        <small>Employee ID auto-generate hoti hai, status color-coded hai, aur active payroll ka quick snapshot bhi milta hai.</small>
-      </div>
+      <div class="tip"></div>
     </aside>
 
     <main class="main">
       <section class="hero">
-        <span class="kicker">Employee Module</span>
-        <h2>Yahan se aap company ke staff ko manage kar sakte hain aur foran dekh sakte hain ke kaun active hai aur kis salary par hai.</h2>
-        <p>Naam, designation, salary, joining date aur active/inactive status ke sath ek simple lekin presentable HR page tayar kiya gaya hai.</p>
+        <h2>Employees</h2>
       </section>
 
       <section class="screen">
         <div class="screen-head">
           <div>
             <h3>Team Snapshot</h3>
-            <p>Active headcount, inactive records aur monthly active payroll yahan auto calculate hota hai.</p>
           </div>
         </div>
         <div class="grid" data-employee-summary></div>
@@ -58,7 +51,6 @@
         <div class="screen-head">
           <div>
             <h3>Create / Update Employee</h3>
-            <p>Naya employee add karein ya purana record update karein. ID automatically generate hogi.</p>
           </div>
         </div>
         <form data-employee-form class="form-grid">
@@ -74,14 +66,13 @@
             <button class="btn" type="button" data-reset-form>Clear Form</button>
           </div>
         </form>
-        <div class="notice" data-notice>Yahan employee CRUD status dikhaya jayega.</div>
+        <div class="notice" data-notice hidden></div>
       </section>
 
       <section class="screen">
         <div class="screen-head">
           <div>
             <h3>Employee Register</h3>
-            <p>Green badge active employee ko aur red badge inactive employee ko show karta hai.</p>
           </div>
         </div>
         <table>

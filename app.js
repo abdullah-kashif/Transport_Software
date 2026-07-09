@@ -38,7 +38,7 @@
         gatePass: 0,
         detention: 0,
         remarks: "PO submitted, dispatch ready.",
-        status: "Submitted"
+        status: "Delivered"
       },
       {
         id: "BK-24062",
@@ -89,8 +89,8 @@
         rate: 188000,
         gatePass: 0,
         detention: 0,
-        remarks: "Submitted and ready for invoice.",
-        status: "Submitted"
+        remarks: "Delivered and ready for invoice.",
+        status: "Delivered"
       }
     ],
     ledgerEntries: [
@@ -415,6 +415,19 @@
     return `${page === "employee" ? "employees" : page}.html`;
   }
 
+  function navigateWithTransition(url, options = {}) {
+    if (!url) return;
+    window.location.href = url;
+  }
+
+  function markPageReady() {
+    return;
+  }
+
+  function bindPageTransitions() {
+    return;
+  }
+
   function clearAdminSession() {
     sessionStorage.removeItem(ADMIN_AUTH_KEY);
   }
@@ -465,7 +478,7 @@
 
   function softwareLoginPage(store) {
     if (getAdminSession()) {
-      window.location.href = getPageFile("dashboard");
+      navigateWithTransition(getPageFile("dashboard"), { immediate: true });
       return;
     }
 
@@ -482,13 +495,13 @@
       const user = authenticateSoftwareUser(store, data.email, data.password);
       if (!user) {
         notice.hidden = false;
-        notice.textContent = "Email ya password sahi nahi hai.";
+        notice.textContent = "Incorrect email or password.";
         return;
       }
 
       setAdminSession(user);
       const firstPage = normalizeAdminAccess(user.access, user.role)[0] || "dashboard";
-      window.location.href = getPageFile(firstPage);
+      navigateWithTransition(getPageFile(firstPage));
     });
   }
 
@@ -499,12 +512,12 @@
 
     if (page === "signin" && hasSession) {
       const firstPage = session.access?.[0] || "dashboard";
-      window.location.href = getPageFile(firstPage);
+      navigateWithTransition(getPageFile(firstPage), { immediate: true });
       return false;
     }
 
     if (!publicPages.has(page) && !hasSession) {
-      window.location.href = "index.html";
+      navigateWithTransition("index.html", { immediate: true });
       return false;
     }
 
@@ -512,7 +525,7 @@
       const allowed = new Set(normalizeAdminAccess(session.access, session.role));
       if (!allowed.has(page)) {
         const fallback = allowed.has("dashboard") ? "dashboard" : allowed.values().next().value || "dashboard";
-        window.location.href = getPageFile(fallback);
+        navigateWithTransition(getPageFile(fallback), { immediate: true });
         return false;
       }
     }
@@ -537,15 +550,11 @@
     const sidebarTip = document.querySelector(".sidebar .tip");
     if (!sidebarTip || document.querySelector("[data-software-signout]")) return;
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "actions";
-    wrapper.style.marginTop = "12px";
-    wrapper.innerHTML = `<button class="btn small" type="button" data-software-signout>Sign Out</button>`;
-    sidebarTip.appendChild(wrapper);
+    sidebarTip.innerHTML = `<div class="actions"><button class="btn small" type="button" data-software-signout>Sign Out</button></div>`;
 
-    wrapper.querySelector("[data-software-signout]").addEventListener("click", () => {
+    sidebarTip.querySelector("[data-software-signout]").addEventListener("click", () => {
       clearAdminSession();
-      window.location.href = "index.html";
+      navigateWithTransition("index.html");
     });
   }
 
@@ -581,6 +590,8 @@
     const containerLines = getBookingContainerLines(booking);
     const primaryLine = containerLines[0] || normalizeContainerLine();
     const accountFlow = String(booking.accountFlow || "").trim() === "Debit" ? "Awaited" : String(booking.accountFlow || "").trim() || "Awaited";
+    const statusValue = String(booking.status || "").trim();
+    const status = statusValue === "Submitted" ? "Delivered" : (statusValue || "Delivered");
     const rate = Number(booking.rate || 0);
     const detention = Number(booking.detention || 0);
     const taxBreakdown = calculateBookingTaxBreakdown(rate, detention, booking.salesTaxAuthority);
@@ -588,6 +599,7 @@
       ...booking,
       invoiceNo: String(booking.invoiceNo || "").trim(),
       accountFlow,
+      status,
       containerLines,
       containerNo: primaryLine.containerNo,
       size: primaryLine.size,
@@ -634,6 +646,15 @@
 
   function text(value) {
     return value === null || value === undefined || value === "" ? "-" : String(value);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function calculateInvoiceTotals(invoice) {
@@ -778,12 +799,137 @@
     });
   }
 
+  let invoiceTemplateDataUrlPromise = null;
+
+  function loadInvoiceTemplateDataUrl() {
+    if (invoiceTemplateDataUrlPromise) return invoiceTemplateDataUrlPromise;
+    invoiceTemplateDataUrlPromise = fetch("assets/Invoice.jpg")
+      .then((response) => {
+        if (!response.ok) throw new Error("Invoice template could not be loaded.");
+        return response.blob();
+      })
+      .then((blob) => blobToDataUrl(blob))
+      .catch(() => null);
+    return invoiceTemplateDataUrlPromise;
+  }
+
+  async function buildBookingInvoicePdf(booking) {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error("The PDF library could not be loaded.");
+    }
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("p", "pt", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const left = 34;
+    const right = pageWidth - 34;
+    const brandImage = await loadInvoiceTemplateDataUrl();
+    const tax = calculateBookingTaxBreakdown(booking.rate, booking.detention, booking.salesTaxAuthority);
+    const lines = getBookingContainerLines(booking);
+    const containerText = lines.map((line) => text(line.containerNo)).join(", ") || "-";
+    const sizeText = lines.map((line) => text(line.size)).join(", ") || "-";
+    const truckText = lines.map((line) => text(line.truckNo)).join(", ") || "-";
+
+    if (brandImage) {
+      pdf.addImage(brandImage, "JPEG", 0, 0, pageWidth, pageHeight);
+    }
+
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text("INVOICE", right, 154, { align: "right" });
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.setTextColor(80, 96, 115);
+    pdf.text(`Invoice No: ${text(booking.invoiceNo || booking.id)}`, right, 178, { align: "right" });
+    pdf.text(`Invoice Date: ${formatShortDate(booking.date)}`, right, 194, { align: "right" });
+    pdf.text(`Payment Term: ${text(booking.paymentTerm)}`, right, 210, { align: "right" });
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(32, 48, 68);
+    pdf.text("Bill To", left, 170);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text(text(booking.customer), left, 190);
+    pdf.text(`Consignee: ${text(booking.consignee)}`, left, 208);
+    pdf.text(`Route: ${text(booking.route)}`, left, 226);
+    pdf.text(`Origin / Destination: ${text(booking.origin)} / ${text(booking.destination)}`, left, 244);
+
+    pdf.autoTable({
+      startY: 276,
+      theme: "grid",
+      margin: { left, right: left },
+      head: [["Description", "Reference", "Amount (PKR)"]],
+      body: [
+        ["Road Haulage Charges", `${text(booking.blNo)} | ${text(booking.goodsType)}`, money(booking.rate)],
+        [`Sales Tax ${shouldApplySalesTax(booking.salesTaxAuthority) ? "(15%)" : "(0%)"}`, text(booking.salesTaxAuthority), money(tax.salesTaxAmount)],
+        ["Total Amount", "Freight + Sales Tax", money(tax.totalAmount)],
+        ["Income Tax 7%", "Auto Deduction", money(tax.incomeTaxAmount)],
+        ["Sales Tax With Held 20%", "From Sales Tax", money(tax.salesTaxWithheldAmount)],
+        ["Detention", "Receivable Only", money(booking.detention)],
+        ["Receivable Amount", "Net Payable", money(tax.receivableAmount)]
+      ],
+      styles: {
+        fontSize: 10,
+        cellPadding: 8,
+        lineColor: [230, 221, 209],
+        lineWidth: 0.7,
+        textColor: [31, 41, 55]
+      },
+      headStyles: {
+        fillColor: [247, 241, 234],
+        textColor: [23, 54, 93],
+        fontStyle: "bold"
+      },
+      columnStyles: {
+        2: { halign: "right" }
+      }
+    });
+
+    const detailsTop = pdf.lastAutoTable.finalY + 28;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(32, 48, 68);
+    pdf.text("Shipment Reference", left, detailsTop);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.setTextColor(80, 96, 115);
+    pdf.text(`BL No: ${text(booking.blNo)}`, left, detailsTop + 18);
+    pdf.text(`Container: ${containerText}`, left, detailsTop + 34);
+    pdf.text(`Container Size: ${sizeText}`, left, detailsTop + 50);
+    pdf.text(`Truck No: ${truckText}`, left, detailsTop + 66);
+    pdf.text(`Gate Pass: ${text(booking.gatePass)}`, left, detailsTop + 82);
+    pdf.text(`Quantity: ${text(booking.quantity)}`, right, detailsTop + 18, { align: "right" });
+    pdf.text(`Category: ${text(booking.category)}`, right, detailsTop + 34, { align: "right" });
+    pdf.text(`Status: ${text(booking.status)}`, right, detailsTop + 50, { align: "right" });
+
+    if (booking.remarks) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(32, 48, 68);
+      pdf.text("Remarks", left, detailsTop + 114);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.setTextColor(80, 96, 115);
+      const wrappedRemarks = pdf.splitTextToSize(String(booking.remarks), pageWidth - 68);
+      pdf.text(wrappedRemarks, left, detailsTop + 132);
+    }
+
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(9);
+    pdf.setTextColor(110, 120, 132);
+    pdf.text("This is a computer generated transport invoice.", left, pageHeight - 54);
+
+    pdf.save(`${String(booking.invoiceNo || booking.id || "invoice").replace(/[^\w-]+/g, "_")}.pdf`);
+  }
+
   function setActiveNav() {
     const page = document.body.dataset.page;
     document.querySelectorAll(".nav a").forEach((link) => {
-      if (link.dataset.page === page) {
-        link.classList.add("active");
-      }
+      link.classList.toggle("active", link.dataset.page === page);
     });
   }
 
@@ -812,33 +958,18 @@
     });
   }
 
-  function bindReset() {
-    const btn = document.querySelector("[data-reset-demo]");
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      sessionStorage.setItem(KEY, JSON.stringify(seed));
-      window.location.reload();
-    });
-  }
-
   function dashboardPage(store) {
     const activeTrips = store.bookings.filter((b) => b.status === "In Transit").length;
-    const pendingBills = store.bookings.filter((b) => b.status === "Submitted").length;
-    const delivered = 0;
-    const trucks = store.trucks.length;
+    const pendingBills = store.bookings.filter((b) => String(b.accountFlow || "").trim() === "Awaited").length;
+    const delivered = store.bookings.filter((b) => b.status === "Delivered").length;
     const activeEmployees = store.employees.filter((employee) => employee.status === "Active").length;
     const totalReceipts = store.ledgerEntries.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0);
-    const totalExpenses = store.truckExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const alerts = store.trucks.filter((truck) => truck.documentAlert).length;
 
     document.querySelector("[data-kpi='activeTrips']").textContent = activeTrips;
     document.querySelector("[data-kpi='pendingBills']").textContent = pendingBills;
-    document.querySelector("[data-kpi='trucks']").textContent = trucks;
-    document.querySelector("[data-kpi='alerts']").textContent = alerts;
     document.querySelector("[data-kpi='delivered']").textContent = delivered;
     document.querySelector("[data-kpi='employees']").textContent = activeEmployees;
     document.querySelector("[data-kpi='receipts']").textContent = money(totalReceipts);
-    document.querySelector("[data-kpi='expenses']").textContent = money(totalExpenses);
 
     const bookingsBody = document.querySelector("[data-bookings-preview]");
     bookingsBody.innerHTML = store.bookings.map((item) => `
@@ -850,7 +981,7 @@
         <td>${getBookingContainerLines(item).length} Container(s)</td>
         <td>${getBookingContainerLines(item).map((line) => text(line.truckNo)).join(", ")}</td>
         <td>${money(item.rate)}</td>
-        <td><span class="badge ${item.status === "Submitted" ? "warn" : "good"}">${text(item.status)}</span></td>
+        <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
       </tr>
     `).join("");
 
@@ -971,7 +1102,7 @@
       form.elements.detention.value = "0";
       form.elements.salesTaxAuthority.value = "Sindh Revenue Board";
       syncTotalAmount();
-      statusField.value = "Submitted";
+      statusField.value = "Delivered";
       renderContainerRows([
         {
           containerNo: "TRHU5588410",
@@ -1005,7 +1136,7 @@
       if (!bookings.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="22">Is customer ka koi record nahi mila.</td>
+            <td colspan="30">No records found for this customer.</td>
           </tr>
         `;
         return;
@@ -1024,6 +1155,7 @@
             <td>${text(item.route)}</td>
             <td>${text(item.origin)}</td>
             <td>${text(item.destination)}</td>
+            <td>${text(item.category)}</td>
             <td>${text(item.blNo)}</td>
             <td>${renderStackedCell(lines.map((line) => text(line.containerNo)))}</td>
             <td>${renderStackedCell(lines.map((line) => text(line.size)))}</td>
@@ -1031,13 +1163,21 @@
             <td>${text(item.goodsType)}</td>
             <td>${text(item.quantity)}</td>
             <td>${money(item.rate)}</td>
+            <td>${text(item.salesTaxAuthority)}</td>
+            <td>${money(item.salesTaxAmount)}</td>
+            <td>${money(item.totalAmount)}</td>
+            <td>${money(item.incomeTaxAmount)}</td>
+            <td>${money(item.salesTaxWithheldAmount)}</td>
+            <td>${money(item.salesTaxByUsAmount)}</td>
             <td>${text(item.gatePass)}</td>
             <td>${money(item.detention)}</td>
             <td>${money(item.receivableAmount)}</td>
-            <td><span class="badge ${item.status === "Submitted" ? "warn" : "good"}">${text(item.status)}</span></td>
+            <td>${text(item.paymentTerm)}</td>
+            <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
             <td>${text(item.remarks)}</td>
             <td>
               <div class="table-actions">
+                <button class="btn small" data-download-invoice="${item.id}">Invoice</button>
                 <button class="btn small" data-edit-booking="${item.id}">Edit</button>
                 <button class="btn small danger" data-delete-booking="${item.id}">Delete</button>
               </div>
@@ -1129,12 +1269,12 @@
       if (!editingId) {
         normalized.id = `BK-${Date.now().toString().slice(-6)}`;
         store.bookings.unshift(normalizeBookingContainers(normalized));
-        notice.textContent = "New booking save ho gayi hai aur sessionStorage mein store ho chuki hai.";
+        notice.textContent = "New booking saved successfully in the current browser session.";
       } else {
         const index = store.bookings.findIndex((item) => item.id === editingId);
         normalized.id = editingId;
         store.bookings[index] = normalizeBookingContainers(normalized);
-        notice.textContent = `Booking ${editingId} update ho gayi hai.`;
+        notice.textContent = `Booking ${editingId} updated successfully.`;
       }
       saveStore(store);
       render();
@@ -1142,8 +1282,17 @@
     });
 
     body.addEventListener("click", (event) => {
+      const invoiceId = event.target.getAttribute("data-download-invoice");
       const editId = event.target.getAttribute("data-edit-booking");
       const deleteId = event.target.getAttribute("data-delete-booking");
+      if (invoiceId) {
+        const item = store.bookings.find((entry) => entry.id === invoiceId);
+        if (!item) return;
+        buildBookingInvoicePdf(item).catch(() => {
+          notice.textContent = "Invoice download failed. Please try again.";
+        });
+        return;
+      }
       if (editId) {
         const item = store.bookings.find((entry) => entry.id === editId);
         if (item) fillForm(item);
@@ -1152,7 +1301,7 @@
         store.bookings = store.bookings.filter((entry) => entry.id !== deleteId);
         saveStore(store);
         render();
-        notice.textContent = `Booking ${deleteId} delete kar di gayi hai.`;
+        notice.textContent = `Booking ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
     });
@@ -1166,11 +1315,32 @@
     const body = document.querySelector("[data-ledger-rows]");
     const totalElement = document.querySelector("[data-summary-total]");
     const countElement = document.querySelector("[data-summary-count]");
+    const customerFilter = document.querySelector("[data-summary-customer-filter]");
+    if (!body || !countElement) return;
+
+    function getPendingBookings() {
+      return store.bookings
+        .filter((item) => {
+          const paymentStatus = String(item.accountFlow || "").trim().toLowerCase();
+          return !paymentStatus || paymentStatus === "awaited" || paymentStatus === "debit";
+        });
+    }
+
+    function renderCustomerOptions() {
+      if (!customerFilter) return;
+      const customers = [...new Set(getPendingBookings().map((item) => String(item.customer || "").trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+      customerFilter.innerHTML = `
+        <option value="">All Customers</option>
+        ${customers.map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}
+      `;
+    }
 
     function render() {
-      const debitBookings = store.bookings
-        .filter((item) => String(item.accountFlow || "").trim().toLowerCase() === "awaited")
-        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+      const selectedCustomer = customerFilter ? String(customerFilter.value || "").trim() : "";
+      const debitBookings = getPendingBookings()
+        .filter((item) => !selectedCustomer || String(item.customer || "").trim() === selectedCustomer)
+        .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
 
       const grouped = new Map();
 
@@ -1193,13 +1363,15 @@
       });
 
       const summaryRows = [...grouped.values()];
-      totalElement.textContent = money(summaryRows.reduce((sum, item) => sum + item.totalRate, 0));
+      if (totalElement) {
+        totalElement.textContent = money(summaryRows.reduce((sum, item) => sum + item.totalRate, 0));
+      }
       countElement.textContent = `${summaryRows.length} customer(s)`;
 
       if (!summaryRows.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="4">Abhi tak koi awaited summary record available nahi hai.</td>
+            <td colspan="4">No awaited summary records are available yet.</td>
           </tr>
         `;
         return;
@@ -1215,6 +1387,10 @@
       `).join("");
     }
 
+    if (customerFilter) {
+      customerFilter.addEventListener("change", render);
+    }
+    renderCustomerOptions();
     render();
   }
 
@@ -1300,12 +1476,12 @@
       if (!editingId) {
         normalized.id = `EXP-${Date.now().toString().slice(-6)}`;
         store.truckExpenses.unshift(normalized);
-        notice.textContent = "Truck expense save ho gaya hai.";
+        notice.textContent = "Truck expense saved successfully.";
       } else {
         const index = store.truckExpenses.findIndex((item) => item.id === editingId);
         normalized.id = editingId;
         store.truckExpenses[index] = normalized;
-        notice.textContent = `Expense ${editingId} update ho gaya hai.`;
+        notice.textContent = `Expense ${editingId} updated successfully.`;
       }
       saveStore(store);
       renderExpenses(select.value);
@@ -1320,7 +1496,7 @@
         store.truckExpenses = store.truckExpenses.filter((item) => item.id !== deleteId);
         saveStore(store);
         renderExpenses(select.value);
-        notice.textContent = `Expense ${deleteId} delete ho gaya hai.`;
+        notice.textContent = `Expense ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
     });
@@ -1407,16 +1583,16 @@
         }, 1000) + 1;
         normalized.id = `EMP-${nextNumber}`;
         store.employees.unshift(normalized);
-        notice.textContent = `Employee ${normalized.id} save ho gaya hai.`;
+        notice.textContent = `Employee ${normalized.id} saved successfully.`;
       } else {
         const index = store.employees.findIndex((item) => item.id === editingId);
         if (index === -1) {
-          notice.textContent = "Employee record nahi mila, dubara try karein.";
+          notice.textContent = "Employee record not found. Please try again.";
           return;
         }
         normalized.id = editingId;
         store.employees[index] = normalized;
-        notice.textContent = `Employee ${editingId} update ho gaya hai.`;
+        notice.textContent = `Employee ${editingId} updated successfully.`;
       }
 
       saveStore(store);
@@ -1432,7 +1608,7 @@
         store.employees = store.employees.filter((item) => item.id !== deleteId);
         saveStore(store);
         render();
-        notice.textContent = `Employee ${deleteId} delete ho gaya hai.`;
+        notice.textContent = `Employee ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
     });
@@ -1444,7 +1620,7 @@
 
   function adminLoginPage(store) {
     if (getAdminSession()) {
-      window.location.href = "admin.html";
+      navigateWithTransition("admin.html", { immediate: true });
       return;
     }
 
@@ -1461,19 +1637,19 @@
 
       if (!user) {
         notice.hidden = false;
-        notice.textContent = "Email ya password sahi nahi hai.";
+        notice.textContent = "Incorrect email or password.";
         return;
       }
 
       setAdminSession(user);
-      window.location.href = "admin.html";
+      navigateWithTransition("admin.html");
     });
   }
 
   function adminPage(store) {
     const session = getAdminSession();
     if (!session) {
-      window.location.href = "admin-login.html";
+      navigateWithTransition("admin-login.html", { immediate: true });
       return;
     }
 
@@ -1594,7 +1770,7 @@
     if (logoutButton) {
       logoutButton.addEventListener("click", () => {
         clearAdminSession();
-        window.location.href = "index.html";
+        navigateWithTransition("index.html");
       });
     }
 
@@ -1617,16 +1793,16 @@
         }, 1000) + 1;
         normalized.id = `ADM-${nextNumber}`;
         store.adminUsers.unshift(normalized);
-        setNotice(`User ${normalized.name} successfully add ho gaya hai.`);
+        setNotice(`User ${normalized.name} was added successfully.`);
       } else {
         const index = store.adminUsers.findIndex((item) => item.id === editingId);
         if (index === -1) {
-          setNotice("User record nahi mila, dubara try karein.");
+          setNotice("User record not found. Please try again.");
           return;
         }
         normalized.id = editingId;
         store.adminUsers[index] = normalized;
-        setNotice(`User ${normalized.name} update ho gaya hai.`);
+        setNotice(`User ${normalized.name} updated successfully.`);
       }
 
       saveStore(store);
@@ -1651,7 +1827,7 @@
         store.adminUsers = store.adminUsers.filter((item) => item.id !== deleteId);
         saveStore(store);
         render();
-        setNotice(`User ${deleteId} delete ho gaya hai.`);
+        setNotice(`User ${deleteId} deleted successfully.`);
         if (editingId === deleteId) resetForm();
       }
     });
@@ -1713,33 +1889,36 @@
 
     async function buildStatementPdfFile(account) {
       if (!window.jspdf || !window.jspdf.jsPDF) {
-        throw new Error("PDF library load nahi hui.");
+        throw new Error("The PDF library could not be loaded.");
       }
 
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF("p", "pt", "a4");
       const statement = getStatementData(account);
-      const left = 18;
+      const left = 34;
       const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       const contentWidth = pageWidth - (left * 2);
+      const brandImage = await loadInvoiceTemplateDataUrl();
 
-      pdf.setFillColor(245, 247, 250);
-      pdf.rect(0, 0, pageWidth, 40, "F");
+      if (brandImage) {
+        pdf.addImage(brandImage, "JPEG", 0, 0, pageWidth, pageHeight);
+      }
+
+      pdf.setTextColor(24, 48, 77);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.setTextColor(70, 70, 70);
-      pdf.text("Global Transport And Logistics Services", left, 25);
+      pdf.setFontSize(17);
+      pdf.text("CUSTOMER STATEMENT", pageWidth - left, 154, { align: "right" });
 
-      pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(18);
-      pdf.text(`${account.customer} Statement`, left, 72);
+      pdf.text(`${account.customer} Statement`, left, 170);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
       pdf.setTextColor(75, 75, 75);
-      pdf.text(account.phone || "-", left, 88);
-      pdf.text(`${statement.startDate} - ${statement.endDate}`, left, 103);
+      pdf.text(account.phone || "-", left, 188);
+      pdf.text(`${statement.startDate} - ${statement.endDate}`, left, 204);
 
-      const statsTop = 126;
+      const statsTop = 236;
       const statWidth = contentWidth / 3;
       pdf.setDrawColor(228, 232, 238);
       pdf.setLineWidth(1);
@@ -1767,7 +1946,7 @@
       pdf.text(statement.totals.closingBalance > 0 ? "Debit (-)" : statement.totals.closingBalance < 0 ? "Credit (+)" : "-", left + (statWidth * 2) + 18, statsTop + 34);
 
       pdf.autoTable({
-        startY: 178,
+        startY: 288,
         head: [["Date", "Tafseel", "Debit (-)", "Credit (+)", "Balance"]],
         body: statement.rows.map((row) => [row.date, row.description, row.debit, row.credit, row.balance]),
         styles: {
@@ -1805,11 +1984,9 @@
 
       const finalY = pdf.lastAutoTable.finalY || 330;
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.setTextColor(70, 70, 70);
-      pdf.text("Global Transport And Logistics Services", left, finalY + 24);
-      pdf.text("Mezzanine Floor B-9 Nagina Center Keamari Karachi. (+92 21 32862568)", left, finalY + 40);
-      pdf.text(`Report Generated on ${statement.today}`, left, finalY + 56);
+      pdf.setFontSize(9);
+      pdf.setTextColor(110, 120, 132);
+      pdf.text(`Report Generated on ${statement.today}`, left, Math.min(finalY + 28, pageHeight - 70));
 
       const blob = pdf.output("blob");
       return new File([blob], `${account.customer.replace(/\s+/g, "_")}_statement.pdf`, { type: "application/pdf" });
@@ -1820,9 +1997,9 @@
         const file = await buildStatementPdfFile(account);
         const url = URL.createObjectURL(file);
         window.open(url, "_blank", "noopener,noreferrer");
-        exportNotice.textContent = "PDF preview new tab mein open ho gayi hai. Wahan se print ya Save as PDF kar sakte hain.";
+        exportNotice.textContent = "The PDF preview opened in a new tab. You can print or save it as a PDF from there.";
       } catch (error) {
-        exportNotice.textContent = "PDF generate nahi ho saki. Dobara try karein.";
+        exportNotice.textContent = "The PDF could not be generated. Please try again.";
       }
     }
 
@@ -1839,7 +2016,7 @@
 
     async function shareStatementOnWhatsapp(account) {
       const phone = normalizeWhatsappNumber(account.phone);
-      const message = encodeURIComponent(`${account.customer} ka updated statement ready hai.`);
+      const message = encodeURIComponent(`The updated statement for ${account.customer} is ready.`);
 
       try {
         const file = await buildStatementPdfFile(account);
@@ -1847,9 +2024,9 @@
           await navigator.share({
             files: [file],
             title: `${account.customer} Statement`,
-            text: `${account.customer} ka statement`
+            text: `${account.customer} statement`
           });
-          exportNotice.textContent = "Share sheet open ho gayi hai. WhatsApp select karke statement direct bhej dein.";
+          exportNotice.textContent = "The share sheet is open. Select WhatsApp to send the statement directly.";
           return;
         }
 
@@ -1865,10 +2042,10 @@
           : `${baseUrl}${phone}&text=${message}`;
         window.open(whatsappUrl, "_blank", "noopener,noreferrer");
         exportNotice.textContent = isMobileDevice()
-          ? "Agar device share-sheet support nahi karti to WhatsApp chat open ho gayi hai. PDF download ho chuki hai; attach karke send kar dein."
-          : "WhatsApp Web chat open ho gayi hai aur PDF download ho chuki hai. Ab downloaded PDF us chat mein attach karke send kar dein.";
+          ? "WhatsApp chat is open. The PDF has been downloaded; attach it and send it."
+          : "WhatsApp Web is open and the PDF has been downloaded. Attach the downloaded PDF in the chat and send it.";
       } else {
-        exportNotice.textContent = "Customer ka valid WhatsApp number nahi mila.";
+        exportNotice.textContent = "A valid WhatsApp number was not found for this customer.";
       }
     }
 
@@ -2020,24 +2197,24 @@
       };
 
       if (!normalized.customer) {
-        customerNotice.textContent = "Customer name required hai.";
+        customerNotice.textContent = "Customer name is required.";
         return;
       }
 
       if (!editingCustomerId) {
         normalized.id = `CUS-${Date.now().toString().slice(-6)}`;
         store.customerKhatas.unshift(normalized);
-        customerNotice.textContent = `Customer ${normalized.customer} add ho gaya hai.`;
+        customerNotice.textContent = `Customer ${normalized.customer} was added successfully.`;
       } else {
         const index = store.customerKhatas.findIndex((item) => item.id === editingCustomerId);
         if (index === -1) {
-          customerNotice.textContent = "Customer record nahi mila.";
+          customerNotice.textContent = "Customer record not found.";
           return;
         }
         normalized.id = editingCustomerId;
         normalized.entries = store.customerKhatas[index].entries || [];
         store.customerKhatas[index] = normalized;
-        customerNotice.textContent = `Customer ${normalized.customer} update ho gaya hai.`;
+        customerNotice.textContent = `Customer ${normalized.customer} updated successfully.`;
       }
 
       saveStore(store);
@@ -2063,15 +2240,15 @@
       if (!editingId) {
         normalized.id = `KHT-${Date.now().toString().slice(-6)}`;
         account.entries.unshift(normalized);
-        notice.textContent = `Khata entry ${normalized.id} save ho gayi hai.`;
+        notice.textContent = `Khata entry ${normalized.id} saved successfully.`;
       } else {
         const index = account.entries.findIndex((entry) => entry.id === editingId);
         if (index === -1) {
-          notice.textContent = "Entry nahi mili, dubara try karein.";
+          notice.textContent = "Entry not found. Please try again.";
           return;
         }
         account.entries[index] = normalized;
-        notice.textContent = `Khata entry ${editingId} update ho gayi hai.`;
+        notice.textContent = `Khata entry ${editingId} updated successfully.`;
       }
 
       saveStore(store);
@@ -2090,7 +2267,7 @@
         account.entries = account.entries.filter((entry) => entry.id !== deleteId);
         saveStore(store);
         renderAccount(account.id);
-        notice.textContent = `Khata entry ${deleteId} delete ho gayi hai.`;
+        notice.textContent = `Khata entry ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
     });
@@ -2127,11 +2304,11 @@
     const store = loadStore();
     const page = document.body.dataset.page;
     if (!enforceSoftwareAccess(page)) return;
+    bindPageTransitions();
     applySessionAccess();
     setActiveNav();
     bindMobileNav();
-    bindReset();
-    if (page !== "signin" && page !== "admin-login") bindSoftwareSignOut();
+    if (page !== "signin") bindSoftwareSignOut();
     if (page === "signin") softwareLoginPage(store);
     if (page === "dashboard") dashboardPage(store);
     if (page === "booking") bookingPage(store);
@@ -2141,5 +2318,6 @@
     if (page === "admin-login") adminLoginPage(store);
     if (page === "admin") adminPage(store);
     if (page === "khata") khataPage(store);
+    markPageReady();
   });
 })();

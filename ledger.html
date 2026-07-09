@@ -20,7 +20,6 @@
       </div>
       <div class="brand">
         <h1>GTLS Transport</h1>
-        <p>Awaited payment-status bookings ki grouped customer summary yahan dikhayi jayegi.</p>
       </div>
       <nav class="nav">
         <a href="dashboard.html" data-page="dashboard">Dashboard</a>
@@ -31,19 +30,27 @@
         <a href="khata.html" data-page="khata">Khata Page</a>
         <a href="admin-login.html" data-page="admin-login">Admin</a>
       </nav>
-      <div class="tip">
-        <strong>Pending Summary</strong>
-        <small>Awaited bookings ka total pending: PKR <span data-summary-total>0</span></small>
-      </div>
+      <div class="tip"></div>
     </aside>
 
     <main class="main">
+      <section class="hero">
+        <h2>Summary Page</h2>
+      </section>
       <section class="screen">
         <div class="screen-head">
           <div>
             <h3>Customer Summary</h3>
           </div>
-          <span class="ledger-count" data-summary-count>0 customer(s)</span>
+          <div class="ledger-filter">
+            <div class="ledger-filter-control">
+              <label for="summary-customer-filter">Customer</label>
+              <select id="summary-customer-filter" data-summary-customer-filter>
+                <option value="">All Customers</option>
+              </select>
+            </div>
+            <span class="ledger-count" data-summary-count>0 customer(s)</span>
+          </div>
         </div>
         <div class="table-wrap">
           <table class="statement-table">
@@ -52,7 +59,7 @@
                 <th>Date</th>
                 <th>Category</th>
                 <th>Customer</th>
-                <th>Rate</th>
+                <th>Receivable Amount</th>
               </tr>
             </thead>
             <tbody data-ledger-rows></tbody>

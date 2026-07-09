@@ -20,7 +20,6 @@
       </div>
       <div class="brand">
         <h1>GTLS Transport</h1>
-        <p>Fleet page with truck profile, finance snapshot and expense CRUD.</p>
       </div>
       <nav class="nav">
         <a href="dashboard.html" data-page="dashboard">Dashboard</a>
@@ -31,24 +30,18 @@
         <a href="khata.html" data-page="khata">Khata Page</a>
         <a href="admin-login.html" data-page="admin-login">Admin</a>
       </nav>
-      <div class="tip">
-        <strong>Fleet Demo</strong>
-        <small>Truck switch karne se profile aur expense list change ho jati hai. Expense CRUD live hai.</small>
-      </div>
+      <div class="tip"></div>
     </aside>
 
     <main class="main">
       <section class="hero">
-        <span class="kicker">Truck Details</span>
-        <h2>Yahan truck ko sirf vehicle nahi, balke financial asset ki tarah treat kiya gaya hai.</h2>
-        <p>Profile, down payment, installment completion aur truck-wise expenses client ko clear nazar aayenge.</p>
+        <h2>Truck Details</h2>
       </section>
 
       <section class="screen">
         <div class="screen-head">
           <div>
             <h3>Select Truck</h3>
-            <p>Expense list aur profile selected truck ke hisaab se change hogi.</p>
           </div>
           <div class="actions">
             <select data-truck-select></select>
@@ -70,7 +63,6 @@
         <div class="screen-head">
           <div>
             <h3>Create / Update Truck Expense</h3>
-            <p>Vendor, description, payment mode aur invoice no editable hain.</p>
           </div>
         </div>
         <form data-expense-form class="form-grid">
@@ -86,14 +78,13 @@
             <button class="btn" type="button" data-reset-form>Clear Form</button>
           </div>
         </form>
-        <div class="notice" data-notice>Yahan truck expense CRUD status dikhaya jayega.</div>
+        <div class="notice" data-notice hidden></div>
       </section>
 
       <section class="screen">
         <div class="screen-head">
           <div>
             <h3>Truck Expense Ledger</h3>
-            <p>Edit aur delete buttons active hain.</p>
           </div>
         </div>
         <table>
