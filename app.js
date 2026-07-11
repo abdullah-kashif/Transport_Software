@@ -612,6 +612,8 @@
       salesTaxByUsAmount: Number(booking.salesTaxByUsAmount ?? taxBreakdown.salesTaxByUsAmount),
       receivableAmount: Number(booking.receivableAmount ?? taxBreakdown.receivableAmount),
       gatePass: String(booking.gatePass || "").trim(),
+      paymentReceivedDate: String(booking.paymentReceivedDate || "").trim(),
+      chequeNumber: String(booking.chequeNumber || "").trim(),
       detention
     };
   }
@@ -822,106 +824,111 @@
     const pdf = new jsPDF("p", "pt", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const left = 34;
-    const right = pageWidth - 34;
+    const left = 36;
+    const right = pageWidth - 36;
     const brandImage = await loadInvoiceTemplateDataUrl();
     const tax = calculateBookingTaxBreakdown(booking.rate, booking.detention, booking.salesTaxAuthority);
     const lines = getBookingContainerLines(booking);
     const containerText = lines.map((line) => text(line.containerNo)).join(", ") || "-";
     const sizeText = lines.map((line) => text(line.size)).join(", ") || "-";
-    const truckText = lines.map((line) => text(line.truckNo)).join(", ") || "-";
+    const customerName = String(booking.customer || "").trim() || "-";
+    const consigneeText = String(booking.consignee || "").trim() || "-";
+    const descriptionText = [booking.goodsType, booking.quantity].filter(Boolean).join(", ") || "-";
+    const taxAuthorityLabelMap = {
+      "Sindh Revenue Board": "Sindh Sales Tax @ 15 %",
+      "Punjab Revenue Authority": "Punjab Sales Tax @ 15 %",
+      "Khyber Pakhtunkhwa Revenue Authority": "KPK Sales Tax @ 15 %",
+      "Balochistan Revenue Authority": "Balochistan Sales Tax @ 15 %"
+    };
+    const taxLineLabel = taxAuthorityLabelMap[String(booking.salesTaxAuthority || "").trim()] || "Sales Tax @ 0 %";
 
     if (brandImage) {
       pdf.addImage(brandImage, "JPEG", 0, 0, pageWidth, pageHeight);
     }
 
-    pdf.setTextColor(24, 48, 77);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text("INVOICE", right, 154, { align: "right" });
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(22, 118, pageWidth - 44, pageHeight - 172, "F");
 
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-    pdf.setTextColor(80, 96, 115);
-    pdf.text(`Invoice No: ${text(booking.invoiceNo || booking.id)}`, right, 178, { align: "right" });
-    pdf.text(`Invoice Date: ${formatShortDate(booking.date)}`, right, 194, { align: "right" });
-    pdf.text(`Payment Term: ${text(booking.paymentTerm)}`, right, 210, { align: "right" });
-
+    pdf.setTextColor(24, 24, 24);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.setTextColor(32, 48, 68);
-    pdf.text("Bill To", left, 170);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(11);
-    pdf.text(text(booking.customer), left, 190);
-    pdf.text(`Consignee: ${text(booking.consignee)}`, left, 208);
-    pdf.text(`Route: ${text(booking.route)}`, left, 226);
-    pdf.text(`Origin / Destination: ${text(booking.origin)} / ${text(booking.destination)}`, left, 244);
+    pdf.setTextColor(32, 32, 32);
+    pdf.text(`M/s ${customerName.toUpperCase()}`, left, 204);
+    pdf.text(consigneeText, left, 222);
+    pdf.text(`NTN NO : ${text(booking.gatePass || "-")}`, left, 240);
+    pdf.text(`Date: ${formatShortDate(booking.date)}`, right, 222, { align: "right" });
+    pdf.text(`NTN No : ${text(booking.gatePass || "-")}`, right, 240, { align: "right" });
 
     pdf.autoTable({
-      startY: 276,
+      startY: 274,
       theme: "grid",
-      margin: { left, right: left },
-      head: [["Description", "Reference", "Amount (PKR)"]],
+      margin: { left, right: pageWidth - 356 },
+      tableWidth: 320,
       body: [
-        ["Road Haulage Charges", `${text(booking.blNo)} | ${text(booking.goodsType)}`, money(booking.rate)],
-        [`Sales Tax ${shouldApplySalesTax(booking.salesTaxAuthority) ? "(15%)" : "(0%)"}`, text(booking.salesTaxAuthority), money(tax.salesTaxAmount)],
-        ["Total Amount", "Freight + Sales Tax", money(tax.totalAmount)],
-        ["Income Tax 7%", "Auto Deduction", money(tax.incomeTaxAmount)],
-        ["Sales Tax With Held 20%", "From Sales Tax", money(tax.salesTaxWithheldAmount)],
-        ["Detention", "Receivable Only", money(booking.detention)],
-        ["Receivable Amount", "Net Payable", money(tax.receivableAmount)]
+        ["Invoice No", text(booking.invoiceNo || booking.id)],
+        ["BL No", text(booking.blNo)],
+        ["Container No", sizeText],
+        ["Description", descriptionText],
+        ["Consignee", customerName],
+        ["Destination", text(booking.destination)],
+        ["Category", text(booking.category)]
       ],
       styles: {
         fontSize: 10,
-        cellPadding: 8,
-        lineColor: [230, 221, 209],
-        lineWidth: 0.7,
-        textColor: [31, 41, 55]
-      },
-      headStyles: {
-        fillColor: [247, 241, 234],
-        textColor: [23, 54, 93],
-        fontStyle: "bold"
+        cellPadding: 5,
+        lineColor: [70, 70, 70],
+        lineWidth: 0.8,
+        textColor: [32, 32, 32]
       },
       columnStyles: {
-        2: { halign: "right" }
+        0: { cellWidth: 98, fontStyle: "bold" },
+        1: { cellWidth: 222 }
       }
     });
 
-    const detailsTop = pdf.lastAutoTable.finalY + 28;
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.setTextColor(32, 48, 68);
-    pdf.text("Shipment Reference", left, detailsTop);
+    const chargesStartY = pdf.lastAutoTable.finalY + 24;
+    pdf.autoTable({
+      startY: chargesStartY,
+      theme: "grid",
+      margin: { left, right: left },
+      head: [["S.No", "Particular", "Amount In Pak Rs."]],
+      body: [
+        ["1", "Road Haulage Charges", money(booking.rate)],
+        ["2", taxLineLabel, money(tax.salesTaxAmount)],
+        ["", "Total", money(tax.totalAmount)]
+      ],
+      styles: {
+        fontSize: 10,
+        cellPadding: 6,
+        lineColor: [70, 70, 70],
+        lineWidth: 0.8,
+        textColor: [32, 32, 32]
+      },
+      headStyles: {
+        fillColor: [255, 235, 59],
+        textColor: [0, 0, 0],
+        fontStyle: "bold"
+      },
+      columnStyles: {
+        0: { cellWidth: 42, halign: "center" },
+        1: { cellWidth: 349 },
+        2: { cellWidth: 132, halign: "right" }
+      }
+    });
+
+    const signatureY = pdf.lastAutoTable.finalY + 34;
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-    pdf.setTextColor(80, 96, 115);
-    pdf.text(`BL No: ${text(booking.blNo)}`, left, detailsTop + 18);
-    pdf.text(`Container: ${containerText}`, left, detailsTop + 34);
-    pdf.text(`Container Size: ${sizeText}`, left, detailsTop + 50);
-    pdf.text(`Truck No: ${truckText}`, left, detailsTop + 66);
-    pdf.text(`Gate Pass: ${text(booking.gatePass)}`, left, detailsTop + 82);
-    pdf.text(`Quantity: ${text(booking.quantity)}`, right, detailsTop + 18, { align: "right" });
-    pdf.text(`Category: ${text(booking.category)}`, right, detailsTop + 34, { align: "right" });
-    pdf.text(`Status: ${text(booking.status)}`, right, detailsTop + 50, { align: "right" });
+    pdf.setFontSize(11);
+    pdf.setTextColor(32, 32, 32);
+    pdf.text("For Global Transport & Logistics Services", right, signatureY, { align: "right" });
 
-    if (booking.remarks) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.setTextColor(32, 48, 68);
-      pdf.text("Remarks", left, detailsTop + 114);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.setTextColor(80, 96, 115);
-      const wrappedRemarks = pdf.splitTextToSize(String(booking.remarks), pageWidth - 68);
-      pdf.text(wrappedRemarks, left, detailsTop + 132);
-    }
-
-    pdf.setFont("helvetica", "italic");
-    pdf.setFontSize(9);
-    pdf.setTextColor(110, 120, 132);
-    pdf.text("This is a computer generated transport invoice.", left, pageHeight - 54);
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(18, pageHeight - 112, pageWidth - 36, 86, "F");
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
+    pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
 
     pdf.save(`${String(booking.invoiceNo || booking.id || "invoice").replace(/[^\w-]+/g, "_")}.pdf`);
   }
@@ -1173,6 +1180,8 @@
             <td>${money(item.detention)}</td>
             <td>${money(item.receivableAmount)}</td>
             <td>${text(item.paymentTerm)}</td>
+            <td>${text(item.paymentReceivedDate ? formatShortDate(item.paymentReceivedDate) : "-")}</td>
+            <td>${text(item.chequeNumber || "-")}</td>
             <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
             <td>${text(item.remarks)}</td>
             <td>
@@ -1262,7 +1271,9 @@
         incomeTaxAmount: Number(data.incomeTaxAmount || 0),
         salesTaxWithheldAmount: Number(data.salesTaxWithheldAmount || 0),
         salesTaxByUsAmount: Number(data.salesTaxByUsAmount || 0),
-        receivableAmount: Number(data.receivableAmount || 0)
+        receivableAmount: Number(data.receivableAmount || 0),
+        paymentReceivedDate: String(data.paymentReceivedDate || "").trim(),
+        chequeNumber: String(data.chequeNumber || "").trim()
       };
       delete normalized.datePicker;
 

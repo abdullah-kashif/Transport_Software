@@ -58,24 +58,25 @@
             </div>
           </div>
           <div class="field quarter"><label>BL No</label><input name="blNo" value="ONEYSINE22550700" /></div>
-          <div class="field quarter"><label>Gate Pass</label><input name="gatePass" type="text" value="GP-001" placeholder="Example: GP-001" /></div>
+          <div class="field quarter"><label>NTN</label><input name="gatePass" type="text" value="GP-001" placeholder="Example: 1234567-8" /></div>
           <div class="field quarter"><label>Customer / Payer</label><input name="customer" value="Cherat Packaging Ltd" required /></div>
-          <div class="field quarter"><label>Consignee</label><input name="consignee" value="Cherat Packaging Gadoon" required /></div>
+          <div class="field quarter"><label>Consignee Address</label><input name="consignee" value="Cherat Packaging Gadoon" required /></div>
           <div class="field quarter"><label>Route</label><input name="route" value="Karachi to Gadoon" required /></div>
           <div class="field quarter"><label>Origin</label><input name="origin" value="Karachi Port" required /></div>
           <div class="field quarter"><label>Destination</label><input name="destination" value="Gadoon" required /></div>
-          <div class="field quarter"><label>Goods Type</label><input name="goodsType" value="Plastic Dana" /></div>
-          <div class="field quarter"><label>Quantity</label><input name="quantity" value="990 Bags" /></div>
           <div class="field quarter">
             <label>Category</label>
             <select name="category">
+              <option>Transport</option>
               <option>Transport Custom Clearance</option>
               <option>Sea Freight</option>
-              <option>Gross Stuff</option>
+              <option>Cross Stuff</option>
               <option selected>Inter City Transport</option>
-              <option>Cranes Lifted Services</option>
+              <option>Crane Lifter Services</option>
             </select>
           </div>
+          <div class="field quarter"><label>Goods Type</label><input name="goodsType" value="Plastic Dana" /></div>
+          <div class="field quarter"><label>Quantity</label><input name="quantity" value="990 Bags" /></div>
           <div class="field quarter"><label>Road Haulage Charges</label><input name="rate" type="number" value="145000" /></div>
           <div class="field quarter">
             <label>Sales Tax Authority</label>
@@ -95,6 +96,8 @@
           <div class="field quarter"><label>Sale Tax 80% by us</label><input name="salesTaxByUsAmount" type="text" value="17400" readonly /></div>
           <div class="field quarter"><label>Receivable Amount</label><input name="receivableAmount" type="text" value="150727.5" readonly /></div>
           <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days" placeholder="Example: 30 Days" /></div>
+          <div class="field quarter"><label>Payment Received Date</label><input name="paymentReceivedDate" type="date" /></div>
+          <div class="field quarter"><label>Cheque Number</label><input name="chequeNumber" placeholder="Example: 1005782261" /></div>
           <div class="field quarter"><label>Status</label><select name="status"><option>Delivered</option><option>In Transit</option></select></div>
           <div class="field quarter">
             <label>Payment Status</label>
@@ -148,7 +151,7 @@
                 <th>Invoice</th>
                 <th>Customer</th>
                 <th>Payment Status</th>
-                <th>Consignee</th>
+                <th>Consignee Address</th>
                 <th>Route</th>
                 <th>Origin</th>
                 <th>Destination</th>
@@ -166,10 +169,12 @@
                 <th>Income Tax 7%</th>
                 <th>Sales Tax With Held 20%</th>
                 <th>Sales Tax 80% by us</th>
-                <th>Gate Pass</th>
+                <th>NTN</th>
                 <th>Detention</th>
                 <th>Receivable Amount</th>
                 <th>Payment Term</th>
+                <th>Payment Received Date</th>
+                <th>Cheque Number</th>
                 <th>Status</th>
                 <th>Remarks</th>
                 <th>Actions</th>
