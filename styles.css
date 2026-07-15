@@ -400,6 +400,7 @@ body[data-page="ledger"] .hero .kicker {
 
 .field { grid-column: span 4; }
 .field.quarter { grid-column: span 3; }
+.field.half { grid-column: span 6; }
 .field.wide { grid-column: span 6; }
 .field.full { grid-column: span 12; }
 
@@ -544,6 +545,8 @@ textarea {
 }
 
 .date-picker-btn {
+  display: grid;
+  place-items: center;
   position: absolute;
   top: 50%;
   right: 10px;
@@ -799,6 +802,60 @@ body[data-page="booking"] .ledger-table {
   width: max-content;
   table-layout: auto;
   font-size: 11.5px;
+}
+
+body[data-page="truck"] .truck-trip-table {
+  min-width: 6100px;
+  width: max-content;
+  table-layout: auto;
+  font-size: 11.5px;
+}
+
+body[data-page="truck-summary"] .truck-summary-table {
+  min-width: 1750px;
+}
+
+body[data-page="truck-summary"] .truck-summary-table th {
+  white-space: nowrap;
+  background: #b7dce8;
+  color: #111;
+  border-color: #222;
+}
+
+body[data-page="truck-summary"] .truck-summary-table th,
+body[data-page="truck-summary"] .truck-summary-table td {
+  vertical-align: middle;
+}
+
+body[data-page="ledger"] .statement-table th {
+  white-space: nowrap;
+  background: #b7dce8;
+  color: #111;
+  border-color: #222;
+}
+
+body[data-page="ledger"] .statement-table th,
+body[data-page="ledger"] .statement-table td {
+  vertical-align: middle;
+}
+
+.summary-remarks {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 260px;
+}
+
+body[data-page="truck"] .truck-trip-table th,
+body[data-page="truck"] .truck-trip-table td {
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+body[data-page="truck"] .truck-trip-table td:nth-last-child(2) {
+  min-width: 260px;
+  white-space: normal;
 }
 
 body[data-page="booking"] .ledger-table thead th {
@@ -1063,7 +1120,7 @@ body[data-page="booking"] .ledger-table .table-actions {
     display: block;
   }
   .span-3, .span-4, .span-5, .span-6, .span-7, .span-8, .span-12,
-  .field, .field.quarter, .field.wide, .field.full { grid-column: span 12; }
+  .field, .field.quarter, .field.half, .field.wide, .field.full { grid-column: span 12; }
   .container-table-head {
     display: none;
   }

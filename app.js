@@ -4,8 +4,9 @@
   const ACCESS_OPTIONS = [
     { value: "dashboard", label: "Dashboard" },
     { value: "booking", label: "Booking Form" },
-    { value: "ledger", label: "Summary Page" },
+    { value: "ledger", label: "Booking Summary" },
     { value: "truck", label: "Truck Details" },
+    { value: "truck-summary", label: "Truck Summary" },
     { value: "employee", label: "Employees" },
     { value: "khata", label: "Khata Page" },
     { value: "admin", label: "Admin" }
@@ -866,6 +867,7 @@
       margin: { left, right: pageWidth - 356 },
       tableWidth: 320,
       body: [
+        ["Booking No", text(booking.bookingNo || booking.id)],
         ["Invoice No", text(booking.invoiceNo || booking.id)],
         ["BL No", text(booking.blNo)],
         ["Container No", sizeText],
@@ -930,7 +932,107 @@
     pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
     pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
 
-    pdf.save(`${String(booking.invoiceNo || booking.id || "invoice").replace(/[^\w-]+/g, "_")}.pdf`);
+    pdf.save(`${String(booking.customer || "customer").replace(/[^\w-]+/g, "_")}_invoice.pdf`);
+  }
+
+  function formatContainerSizeSummary(booking) {
+    const counts = new Map();
+    getBookingContainerLines(booking).forEach((line) => {
+      const rawSize = String(line.size || "").trim();
+      if (!rawSize) return;
+      const size = rawSize.replace(/\s*ft\.?$/i, "").trim();
+      counts.set(size, (counts.get(size) || 0) + 1);
+    });
+    return [...counts.entries()].map(([size, count]) => `${count}x${size}`).join(", ") || "-";
+  }
+
+  function cropImageDataUrl(dataUrl, cropTop, cropHeight) {
+    return new Promise((resolve) => {
+      if (!dataUrl) return resolve(null);
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = Math.min(cropHeight, image.naturalHeight - cropTop);
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, cropTop, image.naturalWidth, canvas.height, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.92));
+      };
+      image.onerror = () => resolve(null);
+      image.src = dataUrl;
+    });
+  }
+
+  async function buildSummaryRecordPdf(customer, bookings) {
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("l", "pt", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const letterhead = await loadInvoiceTemplateDataUrl();
+    const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    const totals = bookings.reduce((summary, item) => {
+      const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+      summary.roadHaulage += Number(item.rate || 0);
+      summary.salesTax += Number(item.salesTaxAmount || tax.salesTaxAmount || 0);
+      summary.totalAmount += Number(item.totalAmount || tax.totalAmount || 0);
+      return summary;
+    }, { roadHaulage: 0, salesTax: 0, totalAmount: 0 });
+    if (letterheadHeader) {
+      pdf.addImage(letterheadHeader, "JPEG", 20, 10, pageWidth - 40, 126);
+    }
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text("CUSTOMER SUMMARY", 36, 150);
+    pdf.setFontSize(12);
+    pdf.text(String(customer || "Unknown Customer"), 36, 170);
+    pdf.autoTable({
+      startY: 184,
+      theme: "grid",
+      head: [["S.No", "Date", "Booking No", "Customer", "Container", "NTN", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
+      body: bookings.map((item, index) => {
+        const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+        return [
+        String(index + 1),
+        formatShortDate(item.date),
+        text(item.bookingNo || item.id),
+        text(item.customer || customer || "-"),
+        formatContainerSizeSummary(item),
+        text(item.gatePass || "-"),
+        money(item.rate),
+        money(item.salesTaxAmount || tax.salesTaxAmount),
+        money(item.totalAmount || tax.totalAmount),
+        text(item.remarks || "-")
+      ];
+      }),
+      foot: [["", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
+      styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
+      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold" },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 58 },
+        2: { cellWidth: 72 },
+        3: { cellWidth: 92 },
+        4: { cellWidth: 58 },
+        5: { cellWidth: 62 },
+        6: { cellWidth: 88 },
+        7: { cellWidth: 72 },
+        8: { cellWidth: 78 },
+        9: { cellWidth: 116 }
+      }
+    });
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(18, pageHeight - 60, pageWidth - 36, 46, "F");
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 48, pageWidth - 28, pageHeight - 48);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.setTextColor(32, 32, 32);
+    pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 30, { align: "center" });
+    pdf.save(`${String(customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
   }
 
   function setActiveNav() {
@@ -1099,6 +1201,7 @@
 
     function resetForm() {
       form.reset();
+      form.elements.bookingNo.value = "BKG-24061";
       form.elements.invoiceNo.value = "INV-24061";
       syncBookingDate("2026-06-10");
       form.elements.category.value = "Inter City Transport";
@@ -1143,7 +1246,7 @@
       if (!bookings.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="30">No records found for this customer.</td>
+            <td colspan="33">No records found for this customer.</td>
           </tr>
         `;
         return;
@@ -1154,10 +1257,10 @@
         return `
           <tr>
             <td>${text(item.id)}</td>
+            <td>${text(item.bookingNo || item.id)}</td>
             <td>${formatShortDate(item.date)}</td>
             <td>${text(item.invoiceNo)}</td>
             <td>${text(item.customer)}</td>
-            <td>${text(item.accountFlow)}</td>
             <td>${text(item.consignee)}</td>
             <td>${text(item.route)}</td>
             <td>${text(item.origin)}</td>
@@ -1183,6 +1286,7 @@
             <td>${text(item.paymentReceivedDate ? formatShortDate(item.paymentReceivedDate) : "-")}</td>
             <td>${text(item.chequeNumber || "-")}</td>
             <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
+            <td><span class="badge ${item.accountFlow === "Credit" ? "good" : "bad"}">${text(item.accountFlow || "Awaited")}</span></td>
             <td>${text(item.remarks)}</td>
             <td>
               <div class="table-actions">
@@ -1361,14 +1465,19 @@
         if (!grouped.has(customer)) {
           grouped.set(customer, {
             customer,
+            bookings: [],
             dates: [],
+            bookingNumbers: [],
             categories: [],
             totalRate: 0
           });
         }
 
         const entry = grouped.get(customer);
+        entry.bookings.push(item);
         if (item.date && !entry.dates.includes(item.date)) entry.dates.push(item.date);
+        const bookingNumber = String(item.bookingNo || item.id || "").trim();
+        if (bookingNumber && !entry.bookingNumbers.includes(bookingNumber)) entry.bookingNumbers.push(bookingNumber);
         if (item.category && !entry.categories.includes(item.category)) entry.categories.push(item.category);
         entry.totalRate += pendingAmount;
       });
@@ -1382,7 +1491,7 @@
       if (!summaryRows.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="4">No awaited summary records are available yet.</td>
+            <td colspan="6">No awaited summary records are available yet.</td>
           </tr>
         `;
         return;
@@ -1391,9 +1500,11 @@
       body.innerHTML = summaryRows.map((item) => `
         <tr>
           <td>${renderStackedCell(item.dates.map((date) => formatShortDate(date)), text)}</td>
+          <td>${renderStackedCell(item.bookingNumbers, text)}</td>
           <td>${renderStackedCell(item.categories.map((category) => text(category)), text)}</td>
           <td>${text(item.customer)}</td>
           <td>${money(item.totalRate)}</td>
+          <td><button class="btn small" type="button" data-download-summary="${escapeHtml(item.customer)}">Download PDF</button></td>
         </tr>
       `).join("");
     }
@@ -1401,66 +1512,141 @@
     if (customerFilter) {
       customerFilter.addEventListener("change", render);
     }
+    body.addEventListener("click", (event) => {
+      const customer = event.target.getAttribute("data-download-summary");
+      if (!customer) return;
+      const bookings = getPendingBookings().filter((item) => (String(item.customer || "").trim() || "Unknown Customer") === customer);
+      buildSummaryRecordPdf(customer, bookings).catch(() => {});
+    });
     renderCustomerOptions();
     render();
   }
 
+  async function buildTruckTripInvoicePdf(trip, tripType) {
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const isImport = tripType === "import";
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("p", "pt", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const letterhead = await loadInvoiceTemplateDataUrl();
+    if (letterhead) pdf.addImage(letterhead, "JPEG", 0, 0, pageWidth, pageHeight);
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(22, 118, pageWidth - 44, pageHeight - 172, "F");
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text(`${isImport ? "IMPORT" : "EXPORT / BACK LOAD"} INVOICE`, 36, 158);
+    pdf.setFontSize(12);
+    pdf.text(`Job No: ${text(trip.jobNo)}`, 36, 182);
+    pdf.text(`Customer/Payer: ${text(trip.customer || "-")}`, 36, 202);
+
+    const details = isImport ? {
+      date: trip.date, truckNo: trip.truckNo, origin: trip.origin, destination: trip.destination,
+      size: trip.size, weight: trip.weight, freight: trip.importFreight, broker: trip.importBroker,
+      commission: trip.importBrokerCommission, received: trip.importReceivedAmount,
+      instrument: trip.importChequeDetails, paymentDate: trip.importPaymentDate, status: trip.importPaymentStatus
+    } : {
+      date: trip.exportLoadDate, truckNo: trip.exportTruckNo || trip.truckNo, origin: trip.exportOrigin, destination: trip.exportDestination,
+      size: trip.exportSize, weight: trip.exportWeight, freight: trip.exportFreight, broker: trip.exportBroker,
+      commission: trip.exportBrokerCommission, received: trip.exportReceivedAmount,
+      instrument: trip.exportChequeDetails, paymentDate: trip.exportPaymentDate, status: trip.exportPaymentStatus
+    };
+
+    pdf.autoTable({
+      startY: 226,
+      theme: "grid",
+      body: [
+        ["Date", details.date ? formatShortDate(details.date) : "-"],
+        ["Truck Registration No", text(details.truckNo || "-")],
+        ["Route", `${text(details.origin || "-")} to ${text(details.destination || "-")}`],
+        ["Size / Weight", `${text(details.size || "-")} / ${text(details.weight || "-")}`],
+        ["Cargo Description", text(trip.cargoDescription || "-")],
+        ["Broker", text(details.broker || "-")],
+        ["Freight", money(details.freight)],
+        ["Broker Commission", money(details.commission)],
+        ["Received Amount", money(details.received)],
+        ["Cheque / Instrument", text(details.instrument || "-")],
+        ["Payment Received Date", details.paymentDate ? formatShortDate(details.paymentDate) : "-"],
+        ["Payment Status", text(details.status || "Awaited")],
+        ["Remarks", text((isImport ? trip.importRemarks : trip.exportRemarks) || trip.remarks || "-")]
+      ],
+      styles: { fontSize: 10, cellPadding: 6, lineColor: [226, 210, 193], textColor: [25, 40, 58] },
+      columnStyles: { 0: { cellWidth: 150, fontStyle: "bold" }, 1: { cellWidth: 355 } }
+    });
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(18, pageHeight - 112, pageWidth - 36, 86, "F");
+    pdf.setDrawColor(0, 0, 0);
+    pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
+    pdf.save(`${String(trip.customer || "customer").replace(/[^\w-]+/g, "_")}_${isImport ? "import" : "export"}_invoice.pdf`);
+  }
+
   function truckPage(store) {
-    const select = document.querySelector("[data-truck-select]");
-    const profile = document.querySelector("[data-truck-profile]");
-    const finance = document.querySelector("[data-truck-finance]");
-    const body = document.querySelector("[data-expense-rows]");
-    const form = document.querySelector("[data-expense-form]");
+    const body = document.querySelector("[data-truck-trip-rows]");
+    const form = document.querySelector("[data-truck-trip-form]");
     const notice = document.querySelector("[data-notice]");
+    const count = document.querySelector("[data-truck-trip-count]");
+    const customerFilter = document.querySelector("[data-truck-customer-filter]");
+    if (!body || !form) return;
     let editingId = "";
 
-    function renderTruckOptions() {
-      select.innerHTML = store.trucks.map((truck) => `
-        <option value="${truck.registrationNo}">${truck.registrationNo}</option>
-      `).join("");
-    }
+    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount", "balanceReceivable", "grandTotal", "roundTripExpense", "profitLoss"];
 
-    function renderTruckDetails(truckNo) {
-      const truck = store.trucks.find((item) => item.registrationNo === truckNo) || store.trucks[0];
-      if (!truck) return;
-      profile.innerHTML = `
-        <div class="item"><strong>Registration No</strong><div class="muted">${text(truck.registrationNo)}</div></div>
-        <div class="item"><strong>Chassis No</strong><div class="muted">${text(truck.chassisNo)}</div></div>
-        <div class="item"><strong>Engine No</strong><div class="muted">${text(truck.engineNo)}</div></div>
-        <div class="item"><strong>Make / Model</strong><div class="muted">${text(truck.make)} / ${text(truck.model)}</div></div>
-      `;
-      const percent = Math.round((Number(truck.installmentPaid) / Number(truck.installmentTotal || 1)) * 100);
-      finance.innerHTML = `
-        <div class="item"><strong>Purchase Cost</strong><div class="muted">PKR ${money(truck.purchaseCost)}</div></div>
-        <div class="item"><strong>Down Payment</strong><div class="muted">PKR ${money(truck.downPayment)}</div></div>
-        <div class="item"><strong>Installment Completion</strong><div class="muted">${truck.installmentPaid} of ${truck.installmentTotal} installments paid</div><div class="progress"><span style="width:${percent}%"></span></div></div>
-        <div class="item"><strong>Document Alert</strong><div class="muted">${text(truck.documentAlert)}</div></div>
-      `;
-      renderExpenses(truck.registrationNo);
-      form.elements.truckNo.value = truck.registrationNo;
+    function calculateTrip() {
+      const importReceived = Number(form.elements.importFreight.value || 0) - Number(form.elements.importBrokerCommission.value || 0);
+      const exportReceived = Number(form.elements.exportFreight.value || 0) - Number(form.elements.exportBrokerCommission.value || 0);
+      const grandTotal = Number(form.elements.mtyBoxFreight.value || 0) + importReceived + exportReceived;
+      const profitLoss = grandTotal - Number(form.elements.roundTripExpense.value || 0);
+      form.elements.importReceivedAmount.value = String(importReceived);
+      form.elements.exportReceivedAmount.value = String(exportReceived);
+      form.elements.grandTotal.value = String(grandTotal);
+      form.elements.profitLoss.value = String(profitLoss);
     }
 
     function resetForm() {
       form.reset();
-      form.elements.truckNo.value = select.value;
+      form.elements.jobNo.value = "GT-001";
+      form.elements.date.value = "2026-07-04";
+      form.elements.truckNo.value = "JW-5477";
+      form.elements.exportTruckNo.value = "JW-5477";
+      form.elements.importPaymentStatus.value = "Awaited";
+      form.elements.exportPaymentStatus.value = "Awaited";
+      calculateTrip();
       editingId = "";
-      form.querySelector("[data-submit-label]").textContent = "Add Expense";
+      form.querySelector("[data-submit-label]").textContent = "Save Trip";
     }
 
-    function renderExpenses(truckNo) {
-      const rows = store.truckExpenses.filter((item) => item.truckNo === truckNo);
-      body.innerHTML = rows.map((item) => `
+    function render() {
+      const allRows = store.truckExpenses.filter((item) => item.jobNo);
+      const customers = [...new Set(allRows.map((item) => String(item.customer || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const selectedCustomer = String(customerFilter?.value || "").trim();
+      if (customerFilter) {
+        customerFilter.innerHTML = `<option value="">All Customers</option>${customers.map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}`;
+        customerFilter.value = customers.includes(selectedCustomer) ? selectedCustomer : "";
+      }
+      const rows = selectedCustomer ? allRows.filter((item) => String(item.customer || "").trim() === selectedCustomer) : allRows;
+      count.textContent = `${rows.length} record(s)`;
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="40">No truck trip records available yet.</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map((item, index) => `
         <tr>
-          <td>${formatShortDate(item.date)}</td>
-          <td>${text(item.vendor)}</td>
-          <td>${text(item.description)}</td>
-          <td>${text(item.paymentMode)}</td>
-          <td>${text(item.invoiceNo)}</td>
-          <td>${money(item.amount)}</td>
+          <td>${index + 1}</td><td>${text(item.jobNo)}</td><td>${formatShortDate(item.date)}</td><td>${text(item.truckNo)}</td>
+          <td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.customer)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
+          <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
+          <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${text(item.importRemarks || item.remarks || "-")}</td>
+          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${text(item.exportRemarks || item.remarks || "-")}</td>
+          <td>${money(item.balanceReceivable)}</td><td>${money(item.grandTotal)}</td><td>${money(item.roundTripExpense)}</td><td>${money(item.profitLoss)}</td><td>${text(item.remarks)}</td>
           <td>
             <div class="table-actions">
-              <button class="btn small" data-edit-expense="${item.id}">Edit</button>
-              <button class="btn small danger" data-delete-expense="${item.id}">Delete</button>
+              <button class="btn small" data-import-invoice="${item.id}">Import Invoice</button>
+              <button class="btn small" data-export-invoice="${item.id}">Export Invoice</button>
+              <button class="btn small" data-edit-trip="${item.id}">Edit</button>
+              <button class="btn small danger" data-delete-trip="${item.id}">Delete</button>
             </div>
           </td>
         </tr>
@@ -1471,51 +1657,100 @@
       Object.keys(item).forEach((key) => {
         if (form.elements[key]) form.elements[key].value = item[key];
       });
+      calculateTrip();
       editingId = item.id;
-      form.querySelector("[data-submit-label]").textContent = "Update Expense";
+      form.querySelector("[data-submit-label]").textContent = "Update Trip";
     }
 
-    select.addEventListener("change", () => {
-      renderTruckDetails(select.value);
-      resetForm();
+    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission", "roundTripExpense"].forEach((name) => {
+      form.elements[name].addEventListener("input", calculateTrip);
     });
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(form).entries());
-      const normalized = { ...data, amount: Number(data.amount || 0) };
+      calculateTrip();
+      const calculatedData = Object.fromEntries(new FormData(form).entries());
+      const normalized = { ...calculatedData };
+      numberFields.forEach((name) => { normalized[name] = Number(calculatedData[name] || 0); });
       if (!editingId) {
-        normalized.id = `EXP-${Date.now().toString().slice(-6)}`;
+        normalized.id = `TRIP-${Date.now().toString().slice(-6)}`;
         store.truckExpenses.unshift(normalized);
-        notice.textContent = "Truck expense saved successfully.";
+        notice.textContent = `Truck trip ${normalized.jobNo} saved successfully.`;
       } else {
         const index = store.truckExpenses.findIndex((item) => item.id === editingId);
         normalized.id = editingId;
         store.truckExpenses[index] = normalized;
-        notice.textContent = `Expense ${editingId} updated successfully.`;
+        notice.textContent = `Truck trip ${normalized.jobNo} updated successfully.`;
       }
       saveStore(store);
-      renderExpenses(select.value);
+      render();
       resetForm();
     });
 
     body.addEventListener("click", (event) => {
-      const editId = event.target.getAttribute("data-edit-expense");
-      const deleteId = event.target.getAttribute("data-delete-expense");
+      const importInvoiceId = event.target.getAttribute("data-import-invoice");
+      const exportInvoiceId = event.target.getAttribute("data-export-invoice");
+      const editId = event.target.getAttribute("data-edit-trip");
+      const deleteId = event.target.getAttribute("data-delete-trip");
+      if (importInvoiceId || exportInvoiceId) {
+        const item = store.truckExpenses.find((entry) => entry.id === (importInvoiceId || exportInvoiceId));
+        if (item) buildTruckTripInvoicePdf(item, importInvoiceId ? "import" : "export").catch(() => {
+          notice.textContent = "Invoice download failed. Please try again.";
+        });
+        return;
+      }
       if (editId) fillForm(store.truckExpenses.find((item) => item.id === editId));
       if (deleteId) {
         store.truckExpenses = store.truckExpenses.filter((item) => item.id !== deleteId);
         saveStore(store);
-        renderExpenses(select.value);
-        notice.textContent = `Expense ${deleteId} deleted successfully.`;
+        render();
+        notice.textContent = `Truck trip ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
-    renderTruckOptions();
-    renderTruckDetails(store.trucks[0].registrationNo);
+    if (customerFilter) customerFilter.addEventListener("change", render);
     resetForm();
+    render();
+  }
+
+  function truckSummaryPage(store) {
+    const body = document.querySelector("[data-truck-summary-rows]");
+    const count = document.querySelector("[data-truck-summary-count]");
+    const customerFilter = document.querySelector("[data-truck-summary-customer-filter]");
+    if (!body || !count) return;
+
+    function render() {
+      const trips = store.truckExpenses.filter((item) => item.jobNo);
+      const customers = [...new Set(trips.map((item) => String(item.customer || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const selectedCustomer = String(customerFilter?.value || "").trim();
+      if (customerFilter) {
+        customerFilter.innerHTML = `<option value="">All Customers</option>${customers.map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}`;
+        customerFilter.value = customers.includes(selectedCustomer) ? selectedCustomer : "";
+      }
+      const filteredTrips = selectedCustomer ? trips.filter((item) => String(item.customer || "").trim() === selectedCustomer) : trips;
+      const legs = filteredTrips.flatMap((item) => ([
+        { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, broker: item.importBroker, remarks: item.importRemarks || item.remarks },
+        { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, broker: item.exportBroker, remarks: item.exportRemarks || item.remarks }
+      ]));
+      count.textContent = `${legs.length} record(s)`;
+      if (!legs.length) {
+        body.innerHTML = `<tr><td colspan="11">No truck summary records available yet.</td></tr>`;
+        return;
+      }
+      body.innerHTML = legs.map((leg, index) => `<tr><td>${index + 1}</td><td>${leg.date ? formatShortDate(leg.date) : "-"}</td><td>${text(leg.truckNo)}</td><td>${text(leg.origin)}</td><td>${text(leg.destination)}</td><td>${text(leg.size)}</td><td>${text(leg.weight)}</td><td>${text(leg.cargo)}</td><td>${money(leg.freight)}</td><td>${text(leg.broker)}</td><td><div class="summary-remarks"><span>${text(leg.remarks)}</span><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">PDF</button></div></td></tr>`).join("");
+    }
+
+    if (customerFilter) customerFilter.addEventListener("change", render);
+    body.addEventListener("click", (event) => {
+      const tripId = event.target.getAttribute("data-summary-invoice");
+      if (!tripId) return;
+      const trip = store.truckExpenses.find((item) => item.id === tripId);
+      if (trip) buildTruckTripInvoicePdf(trip, event.target.getAttribute("data-summary-type") || "import").catch(() => {});
+    });
+    render();
   }
 
   function employeePage(store) {
@@ -1999,8 +2234,18 @@
       pdf.setTextColor(110, 120, 132);
       pdf.text(`Report Generated on ${statement.today}`, left, Math.min(finalY + 28, pageHeight - 70));
 
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(18, pageHeight - 112, pageWidth - 36, 86, "F");
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.8);
+      pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.setTextColor(32, 32, 32);
+      pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
+
       const blob = pdf.output("blob");
-      return new File([blob], `${account.customer.replace(/\s+/g, "_")}_statement.pdf`, { type: "application/pdf" });
+      return new File([blob], `${account.customer.replace(/[^\w-]+/g, "_")}_invoice.pdf`, { type: "application/pdf" });
     }
 
     async function printStatement(account) {
@@ -2325,6 +2570,7 @@
     if (page === "booking") bookingPage(store);
     if (page === "ledger") ledgerPage(store);
     if (page === "truck") truckPage(store);
+    if (page === "truck-summary") truckSummaryPage(store);
     if (page === "employee") employeePage(store);
     if (page === "admin-login") adminLoginPage(store);
     if (page === "admin") adminPage(store);

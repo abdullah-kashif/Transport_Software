@@ -5,102 +5,75 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Truck Details</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body data-page="truck">
   <div class="app">
-    <div class="mobile-topbar">
-      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
-      <strong>GTLS Transport</strong>
-    </div>
+    <div class="mobile-topbar"><button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button><strong>GTLS Transport</strong></div>
     <div class="nav-overlay" data-nav-overlay></div>
     <aside class="sidebar">
-      <div class="sidebar-mobile-head">
-        <strong>Menu</strong>
-        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
-      </div>
-      <div class="brand">
-        <h1>GTLS Transport</h1>
-      </div>
+      <div class="sidebar-mobile-head"><strong>Menu</strong><button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button></div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
       <nav class="nav">
-        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
-        <a href="booking.html" data-page="booking">Booking Form</a>
-        <a href="ledger.html" data-page="ledger">Summary Page</a>
-        <a href="truck.html" data-page="truck">Truck Details</a>
-        <a href="employees.html" data-page="employee">Employees</a>
-        <a href="khata.html" data-page="khata">Khata Page</a>
-        <a href="admin-login.html" data-page="admin-login">Admin</a>
-      </nav>
-      <div class="tip"></div>
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="booking.html" data-page="booking">Booking Form</a><a href="ledger.html" data-page="ledger">Booking Summary</a><a href="truck.html" data-page="truck">Truck Details</a><a href="truck-summary.html" data-page="truck-summary">Truck Summary</a><a href="employees.html" data-page="employee">Employees</a><a href="khata.html" data-page="khata">Khata Page</a><a href="admin-login.html" data-page="admin-login">Admin</a>
+      </nav><div class="tip"></div>
     </aside>
-
     <main class="main">
-      <section class="hero">
-        <h2>Truck Details</h2>
-      </section>
-
+      <section class="hero"><h2>Truck Details</h2></section>
       <section class="screen">
-        <div class="screen-head">
-          <div>
-            <h3>Select Truck</h3>
-          </div>
-          <div class="actions">
-            <select data-truck-select></select>
-          </div>
-        </div>
-        <div class="grid">
-          <div class="panel span-5">
-            <h3 style="font-size:20px;">Truck Profile</h3>
-            <div class="list" data-truck-profile></div>
-          </div>
-          <div class="panel span-7">
-            <h3 style="font-size:20px;">Finance & Alerts</h3>
-            <div class="list" data-truck-finance></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="screen">
-        <div class="screen-head">
-          <div>
-            <h3>Create / Update Truck Expense</h3>
-          </div>
-        </div>
-        <form data-expense-form class="form-grid">
-          <div class="field"><label>Truck No</label><input name="truckNo" readonly /></div>
-          <div class="field"><label>Date</label><input name="date" type="date" required /></div>
-          <div class="field"><label>Vendor</label><input name="vendor" value="General Store" required /></div>
-          <div class="field wide"><label>Work Description</label><input name="description" value="Spare Parts" required /></div>
-          <div class="field"><label>Payment Mode</label><select name="paymentMode"><option>Cheque</option><option>IBFT</option><option>Cash</option></select></div>
-          <div class="field"><label>Invoice No</label><input name="invoiceNo" value="020" /></div>
-          <div class="field"><label>Amount</label><input name="amount" type="number" value="85000" required /></div>
-          <div class="field full actions">
-            <button class="btn primary" type="submit" data-submit-label>Add Expense</button>
-            <button class="btn" type="button" data-reset-form>Clear Form</button>
-          </div>
+        <div class="screen-head"><div><h3>Create / Update Truck Trip</h3></div></div>
+        <form data-truck-trip-form class="form-grid">
+          <div class="field half"><label>Job No</label><input name="jobNo" value="GT-001" required /></div>
+          <div class="field half"><label>Import Truck Registration No</label><input name="truckNo" value="JW-5477" required /></div>
+          <div class="field full"><h3>Import Details</h3></div>
+          <div class="field quarter"><label>Date</label><input name="date" type="date" value="2026-07-04" required /></div>
+          <div class="field quarter"><label>Customer / Payer</label><input name="customer" value="Cherat" required /></div>
+          <div class="field quarter"><label>Origin</label><input name="origin" value="Karachi" /></div>
+          <div class="field quarter"><label>Destination</label><input name="destination" value="Lahore" /></div>
+          <div class="field quarter"><label>Size</label><input name="size" value="1x40" /></div>
+          <div class="field quarter"><label>Weight</label><input name="weight" value="40 Mton" /></div>
+          <div class="field quarter"><label>Cargo Description</label><input name="cargoDescription" value="Bags" /></div>
+          <div class="field quarter"><label>MTY Box Freight</label><input name="mtyBoxFreight" type="number" value="10000" /></div>
+          <div class="field quarter"><label>MTY Broker</label><input name="mtyBroker" value="Ajmal Mty-0300-8383762" /></div>
+          <div class="field quarter"><label>Import Freight</label><input name="importFreight" type="number" value="370000" /></div>
+          <div class="field quarter"><label>Broker Commission</label><input name="importBrokerCommission" type="number" value="5000" /></div>
+          <div class="field quarter"><label>Import - Broker</label><input name="importBroker" value="Shareef/Faisal-0304-2609790" /></div>
+          <div class="field quarter"><label>Import Received Amount</label><input name="importReceivedAmount" type="text" readonly /></div>
+          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="importChequeDetails" value="IBFT" /></div>
+          <div class="field quarter"><label>Payment Received Date</label><input name="importPaymentDate" type="date" value="2026-07-07" /></div>
+          <div class="field quarter"><label>Payment Status</label><select name="importPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
+          <div class="field full"><label>Import Remarks</label><textarea name="importRemarks">Import Payment Awaited</textarea></div>
+          <div class="field full"><h3>Export Details</h3></div>
+          <div class="field quarter"><label>Export Load Date</label><input name="exportLoadDate" type="date" value="2026-07-08" /></div>
+          <div class="field quarter"><label>Export Truck Registration No</label><input name="exportTruckNo" value="JW-5477" required /></div>
+          <div class="field quarter"><label>Export - Broker</label><input name="exportBroker" value="Tanveer/M Waseem-0300-0990201" /></div>
+          <div class="field quarter"><label>Export Freight</label><input name="exportFreight" type="number" value="100000" /></div>
+          <div class="field quarter"><label>Broker Commission</label><input name="exportBrokerCommission" type="number" value="2000" /></div>
+          <div class="field quarter"><label>Origin</label><input name="exportOrigin" value="Lahore" /></div>
+          <div class="field quarter"><label>Destination</label><input name="exportDestination" value="Karachi" /></div>
+          <div class="field quarter"><label>Size</label><input name="exportSize" value="1x40" /></div>
+          <div class="field quarter"><label>Weight</label><input name="exportWeight" value="20 Mton" /></div>
+          <div class="field quarter"><label>Export Received Amount</label><input name="exportReceivedAmount" type="text" readonly /></div>
+          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="exportChequeDetails" value="MCB-10986541" /></div>
+          <div class="field quarter"><label>Payment Received Date</label><input name="exportPaymentDate" type="date" value="2026-07-11" /></div>
+          <div class="field quarter"><label>Payment Status</label><select name="exportPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
+          <div class="field full"><label>Export Remarks</label><textarea name="exportRemarks">Export Payment Awaited</textarea></div>
+          <div class="field full"><h3>Trip Summary</h3></div>
+          <div class="field quarter"><label>Balance Receivable</label><input name="balanceReceivable" type="number" value="10000" /></div>
+          <div class="field quarter"><label>Grand Total</label><input name="grandTotal" type="text" readonly /></div>
+          <div class="field quarter"><label>Round Trip Expense</label><input name="roundTripExpense" type="number" value="310000" /></div>
+          <div class="field quarter"><label>P&amp;L</label><input name="profitLoss" type="text" readonly /></div>
+          <div class="field full"><label>Remarks</label><textarea name="remarks">Import Payment Awaited; Export Payment Awaited; Box Freight Awaited; Full Payment Received</textarea></div>
+          <div class="field full actions"><button class="btn primary" type="submit" data-submit-label>Save Trip</button><button class="btn" type="button" data-reset-form>Clear Form</button></div>
         </form>
         <div class="notice" data-notice hidden></div>
       </section>
-
       <section class="screen">
-        <div class="screen-head">
-          <div>
-            <h3>Truck Expense Ledger</h3>
-          </div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Vendor</th>
-              <th>Work Description</th>
-              <th>Payment Mode</th>
-              <th>Invoice No</th>
-              <th>Amount</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody data-expense-rows></tbody>
-        </table>
+        <div class="screen-head"><div><h3>Truck Trip Ledger</h3></div><div class="ledger-filter"><div class="ledger-filter-control"><label for="truck-customer-filter">Customer</label><select id="truck-customer-filter" data-truck-customer-filter><option value="">All Customers</option></select></div><span class="ledger-count" data-truck-trip-count>0 record(s)</span></div></div>
+        <div class="table-wrap"><table class="ledger-table truck-trip-table"><thead><tr>
+          <th>S.No</th><th>Job No</th><th>Date</th><th>Import Truck Registration No</th><th>Origin</th><th>Destination</th><th>Customer/Payer</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Received Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Import Payment Status</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export - Broker</th><th>Export Freight</th><th>Broker Commission</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Export Received Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Export Payment Status</th><th>Export Remarks</th><th>Balance Receivable</th><th>Grand Total</th><th>Round Trip Expense</th><th>P&amp;L</th><th>Trip Remarks</th><th>Actions</th>
+        </tr></thead><tbody data-truck-trip-rows></tbody></table></div>
       </section>
     </main>
   </div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GTLS Transport - Summary Page</title>
+  <title>GTLS Transport - Booking Summary</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-page="ledger">
@@ -24,8 +24,9 @@
       <nav class="nav">
         <a href="dashboard.html" data-page="dashboard">Dashboard</a>
         <a href="booking.html" data-page="booking">Booking Form</a>
-        <a href="ledger.html" data-page="ledger">Summary Page</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
         <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Truck Summary</a>
         <a href="employees.html" data-page="employee">Employees</a>
         <a href="khata.html" data-page="khata">Khata Page</a>
         <a href="admin-login.html" data-page="admin-login">Admin</a>
@@ -35,7 +36,7 @@
 
     <main class="main">
       <section class="hero">
-        <h2>Summary Page</h2>
+        <h2>Booking Summary</h2>
       </section>
       <section class="screen">
         <div class="screen-head">
@@ -57,9 +58,11 @@
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Booking No</th>
                 <th>Category</th>
                 <th>Customer</th>
                 <th>Receivable Amount</th>
+                <th>PDF</th>
               </tr>
             </thead>
             <tbody data-ledger-rows></tbody>
@@ -68,6 +71,8 @@
       </section>
     </main>
   </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

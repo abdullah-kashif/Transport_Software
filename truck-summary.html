@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Truck Summary</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body data-page="truck-summary">
+  <div class="app">
+    <div class="mobile-topbar"><button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button><strong>GTLS Transport</strong></div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head"><strong>Menu</strong><button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button></div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="booking.html" data-page="booking">Booking Form</a><a href="ledger.html" data-page="ledger">Booking Summary</a><a href="truck.html" data-page="truck">Truck Details</a><a href="truck-summary.html" data-page="truck-summary">Truck Summary</a><a href="employees.html" data-page="employee">Employees</a><a href="khata.html" data-page="khata">Khata Page</a><a href="admin-login.html" data-page="admin-login">Admin</a>
+      </nav><div class="tip"></div>
+    </aside>
+    <main class="main">
+      <section class="hero"><h2>Truck Summary</h2></section>
+      <section class="screen">
+        <div class="screen-head">
+          <div></div>
+          <div class="ledger-filter"><div class="ledger-filter-control"><label for="truck-summary-customer-filter">Customer</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Customers</option></select></div><span class="ledger-count" data-truck-summary-count>0 record(s)</span></div>
+        </div>
+        <div class="table-wrap"><table class="statement-table truck-summary-table"><thead><tr>
+          <th>S.No</th><th>Date</th><th>Registration No</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>Import Freight</th><th>Import - Brokker</th><th>Remarks</th>
+        </tr></thead><tbody data-truck-summary-rows></tbody></table></div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
