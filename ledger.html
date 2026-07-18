@@ -50,6 +50,13 @@
                 <option value="">All Customers</option>
               </select>
             </div>
+            <div class="ledger-filter-control">
+              <label for="summary-date-sort">Date Order</label>
+              <select id="summary-date-sort" data-summary-date-sort>
+                <option value="desc">Descending (Newest First)</option>
+                <option value="asc">Ascending (Oldest First)</option>
+              </select>
+            </div>
             <span class="ledger-count" data-summary-count>0 customer(s)</span>
           </div>
         </div>
@@ -62,7 +69,7 @@
                 <th>Category</th>
                 <th>Customer</th>
                 <th>Receivable Amount</th>
-                <th>PDF</th>
+                <th>Download PDF</th>
               </tr>
             </thead>
             <tbody data-ledger-rows></tbody>

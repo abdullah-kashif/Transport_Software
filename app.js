@@ -745,6 +745,16 @@
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
+  function compareDateValues(leftValue, rightValue, direction = "desc") {
+    const leftDate = parseDateValue(leftValue);
+    const rightDate = parseDateValue(rightValue);
+    if (!leftDate && !rightDate) return 0;
+    if (!leftDate) return 1;
+    if (!rightDate) return -1;
+    const difference = leftDate.getTime() - rightDate.getTime();
+    return direction === "asc" ? difference : -difference;
+  }
+
   function formatShortDate(value) {
     const date = parseDateValue(value);
     if (!date) return value ? String(value) : "-";
@@ -1114,6 +1124,7 @@
     const body = document.querySelector("[data-booking-rows]");
     const notice = document.querySelector("[data-notice]");
     const customerFilter = document.querySelector("[data-booking-customer-filter]");
+    const dateSort = document.querySelector("[data-booking-date-sort]");
     const bookingCount = document.querySelector("[data-booking-count]");
     const statusField = form.querySelector("[name='status']");
     const rateField = form.querySelector("[name='rate']");
@@ -1237,9 +1248,10 @@
     function render() {
       renderCustomerFilter();
       const selectedCustomer = customerFilter.value;
-      const bookings = selectedCustomer
+      const bookings = (selectedCustomer
         ? store.bookings.filter((item) => String(item.customer || "").trim() === selectedCustomer)
-        : store.bookings;
+        : [...store.bookings])
+        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
 
       bookingCount.textContent = `${bookings.length} record(s)`;
 
@@ -1332,6 +1344,7 @@
     salesTaxAuthorityField.addEventListener("change", syncTotalAmount);
 
     customerFilter.addEventListener("change", render);
+    if (dateSort) dateSort.addEventListener("change", render);
 
     addContainerRowButton.addEventListener("click", () => {
       const lines = collectContainerLines();
@@ -1431,6 +1444,7 @@
     const totalElement = document.querySelector("[data-summary-total]");
     const countElement = document.querySelector("[data-summary-count]");
     const customerFilter = document.querySelector("[data-summary-customer-filter]");
+    const dateSort = document.querySelector("[data-summary-date-sort]");
     if (!body || !countElement) return;
 
     function getPendingBookings() {
@@ -1455,7 +1469,7 @@
       const selectedCustomer = customerFilter ? String(customerFilter.value || "").trim() : "";
       const debitBookings = getPendingBookings()
         .filter((item) => !selectedCustomer || String(item.customer || "").trim() === selectedCustomer)
-        .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
 
       const grouped = new Map();
 
@@ -1512,6 +1526,7 @@
     if (customerFilter) {
       customerFilter.addEventListener("change", render);
     }
+    if (dateSort) dateSort.addEventListener("change", render);
     body.addEventListener("click", (event) => {
       const customer = event.target.getAttribute("data-download-summary");
       if (!customer) return;
@@ -1581,7 +1596,7 @@
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
     pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
-    pdf.save(`${String(trip.customer || "customer").replace(/[^\w-]+/g, "_")}_${isImport ? "import" : "export"}_invoice.pdf`);
+    pdf.save(`${String(trip.customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
   }
 
   function truckPage(store) {
@@ -1590,6 +1605,7 @@
     const notice = document.querySelector("[data-notice]");
     const count = document.querySelector("[data-truck-trip-count]");
     const customerFilter = document.querySelector("[data-truck-customer-filter]");
+    const dateSort = document.querySelector("[data-truck-date-sort]");
     if (!body || !form) return;
     let editingId = "";
 
@@ -1627,7 +1643,8 @@
         customerFilter.innerHTML = `<option value="">All Customers</option>${customers.map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}`;
         customerFilter.value = customers.includes(selectedCustomer) ? selectedCustomer : "";
       }
-      const rows = selectedCustomer ? allRows.filter((item) => String(item.customer || "").trim() === selectedCustomer) : allRows;
+      const rows = (selectedCustomer ? allRows.filter((item) => String(item.customer || "").trim() === selectedCustomer) : [...allRows])
+        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
         body.innerHTML = `<tr><td colspan="40">No truck trip records available yet.</td></tr>`;
@@ -1712,15 +1729,17 @@
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     if (customerFilter) customerFilter.addEventListener("change", render);
+    if (dateSort) dateSort.addEventListener("change", render);
     resetForm();
     render();
   }
 
   function truckSummaryPage(store) {
-    const body = document.querySelector("[data-truck-summary-rows]");
+    const groupsContainer = document.querySelector("[data-truck-summary-groups]");
     const count = document.querySelector("[data-truck-summary-count]");
     const customerFilter = document.querySelector("[data-truck-summary-customer-filter]");
-    if (!body || !count) return;
+    const dateSort = document.querySelector("[data-truck-summary-date-sort]");
+    if (!groupsContainer || !count) return;
 
     function render() {
       const trips = store.truckExpenses.filter((item) => item.jobNo);
@@ -1730,21 +1749,86 @@
         customerFilter.innerHTML = `<option value="">All Customers</option>${customers.map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}`;
         customerFilter.value = customers.includes(selectedCustomer) ? selectedCustomer : "";
       }
-      const filteredTrips = selectedCustomer ? trips.filter((item) => String(item.customer || "").trim() === selectedCustomer) : trips;
-      const legs = filteredTrips.flatMap((item) => ([
-        { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, broker: item.importBroker, remarks: item.importRemarks || item.remarks },
-        { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, broker: item.exportBroker, remarks: item.exportRemarks || item.remarks }
-      ]));
-      count.textContent = `${legs.length} record(s)`;
-      if (!legs.length) {
-        body.innerHTML = `<tr><td colspan="11">No truck summary records available yet.</td></tr>`;
+      const filteredTrips = (selectedCustomer ? trips.filter((item) => String(item.customer || "").trim() === selectedCustomer) : [...trips])
+        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
+      const groupedTrips = new Map();
+
+      filteredTrips.forEach((trip) => {
+        const jobNo = String(trip.jobNo || "").trim() || "Unknown Job";
+        if (!groupedTrips.has(jobNo)) {
+          groupedTrips.set(jobNo, {
+            jobNo,
+            customer: String(trip.customer || "").trim() || "-",
+            trips: []
+          });
+        }
+        groupedTrips.get(jobNo).trips.push(trip);
+      });
+
+      const jobGroups = [...groupedTrips.values()];
+      count.textContent = `${jobGroups.length} job(s)`;
+      if (!jobGroups.length) {
+        groupsContainer.innerHTML = `<div class="truck-summary-empty">No truck summary records available yet.</div>`;
         return;
       }
-      body.innerHTML = legs.map((leg, index) => `<tr><td>${index + 1}</td><td>${leg.date ? formatShortDate(leg.date) : "-"}</td><td>${text(leg.truckNo)}</td><td>${text(leg.origin)}</td><td>${text(leg.destination)}</td><td>${text(leg.size)}</td><td>${text(leg.weight)}</td><td>${text(leg.cargo)}</td><td>${money(leg.freight)}</td><td>${text(leg.broker)}</td><td><div class="summary-remarks"><span>${text(leg.remarks)}</span><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">PDF</button></div></td></tr>`).join("");
+
+      let serialNumber = 0;
+      groupsContainer.innerHTML = jobGroups.map((group) => {
+        const legs = group.trips.flatMap((item) => ([
+          { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, broker: item.importBroker, remarks: item.importRemarks || item.remarks },
+          { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, broker: item.exportBroker, remarks: item.exportRemarks || item.remarks }
+        ]));
+
+        return `
+          <section class="truck-job-group">
+            <div class="truck-job-header">
+              <div class="truck-job-identity">
+                <span>Job No</span>
+                <strong>${escapeHtml(group.jobNo)}</strong>
+              </div>
+              <div class="truck-job-customer">
+                <span>Customer</span>
+                <strong>${escapeHtml(group.customer)}</strong>
+              </div>
+              <span class="truck-job-count">${legs.length} movement(s)</span>
+            </div>
+            <div class="table-wrap">
+              <table class="statement-table truck-summary-table">
+                <thead>
+                  <tr>
+                    <th>S.No</th><th>Type</th><th>Date</th><th>Registration No</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>Freight</th><th>Broker</th><th>Remarks</th><th>Download PDF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${legs.map((leg) => {
+                    serialNumber += 1;
+                    return `<tr>
+                      <td>${serialNumber}</td>
+                      <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${leg.type}</span></td>
+                      <td>${leg.date ? formatShortDate(leg.date) : "-"}</td>
+                      <td>${text(leg.truckNo)}</td>
+                      <td>${text(leg.origin)}</td>
+                      <td>${text(leg.destination)}</td>
+                      <td>${text(leg.size)}</td>
+                      <td>${text(leg.weight)}</td>
+                      <td>${text(leg.cargo)}</td>
+                      <td>${money(leg.freight)}</td>
+                      <td>${text(leg.broker)}</td>
+                      <td>${text(leg.remarks)}</td>
+                      <td><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">Download PDF</button></td>
+                    </tr>`;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        `;
+      }).join("");
     }
 
     if (customerFilter) customerFilter.addEventListener("change", render);
-    body.addEventListener("click", (event) => {
+    if (dateSort) dateSort.addEventListener("change", render);
+    groupsContainer.addEventListener("click", (event) => {
       const tripId = event.target.getAttribute("data-summary-invoice");
       if (!tripId) return;
       const trip = store.truckExpenses.find((item) => item.id === tripId);
@@ -2245,15 +2329,14 @@
       pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
 
       const blob = pdf.output("blob");
-      return new File([blob], `${account.customer.replace(/[^\w-]+/g, "_")}_invoice.pdf`, { type: "application/pdf" });
+      return new File([blob], `${account.customer.replace(/[^\w-]+/g, "_")}_khata.pdf`, { type: "application/pdf" });
     }
 
     async function printStatement(account) {
       try {
         const file = await buildStatementPdfFile(account);
-        const url = URL.createObjectURL(file);
-        window.open(url, "_blank", "noopener,noreferrer");
-        exportNotice.textContent = "The PDF preview opened in a new tab. You can print or save it as a PDF from there.";
+        triggerFileDownload(file);
+        exportNotice.textContent = `${account.customer} khata PDF downloaded successfully.`;
       } catch (error) {
         exportNotice.textContent = "The PDF could not be generated. Please try again.";
       }

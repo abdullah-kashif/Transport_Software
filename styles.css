@@ -37,21 +37,26 @@ body.nav-open {
 
 .auth-page {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #07111f;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .auth-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: block;
 }
 
 .auth-stage {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 34px;
+  padding: clamp(16px, 4vw, 42px);
   overflow: hidden;
 }
 
@@ -61,7 +66,7 @@ body.nav-open {
   inset: 0;
   background:
     linear-gradient(135deg, rgba(8, 17, 31, 0.42), rgba(8, 17, 31, 0.58)),
-    url("assets/Sign in Background Image.jpg") center center / cover no-repeat;
+    url("assets/Sign-in-Background-Image.webp") center center / cover no-repeat;
 }
 
 .auth-stage::after {
@@ -77,8 +82,8 @@ body.nav-open {
 .auth-frame {
   position: relative;
   z-index: 1;
-  width: min(100%, 1280px);
-  min-height: min(760px, calc(100vh - 68px));
+  width: 100%;
+  min-height: calc(100dvh - clamp(32px, 8vw, 84px));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -96,14 +101,17 @@ body.nav-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: min(100%, 520px);
-  min-height: 620px;
+  width: min(100%, 480px);
+  min-height: 0;
   padding: 0;
   background: transparent;
 }
 
 .auth-card {
-  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
   min-height: 500px;
   padding: 46px 34px;
   border-radius: 28px;
@@ -111,6 +119,13 @@ body.nav-open {
   background: rgba(255, 250, 244, 0.12);
   box-shadow: 0 26px 60px rgba(5, 10, 20, 0.28);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.auth-card:hover {
+  border-color: rgba(255, 214, 183, 0.4);
+  box-shadow: 0 30px 70px rgba(5, 10, 20, 0.34);
 }
 
 .auth-brand {
@@ -812,19 +827,112 @@ body[data-page="truck"] .truck-trip-table {
 }
 
 body[data-page="truck-summary"] .truck-summary-table {
-  min-width: 1750px;
+  min-width: 1650px;
 }
 
 body[data-page="truck-summary"] .truck-summary-table th {
   white-space: nowrap;
-  background: #b7dce8;
-  color: #111;
-  border-color: #222;
+  background: #f2e2d1;
+  color: #3f3025;
+  border-color: #a88469;
 }
 
 body[data-page="truck-summary"] .truck-summary-table th,
 body[data-page="truck-summary"] .truck-summary-table td {
   vertical-align: middle;
+}
+
+.truck-summary-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.truck-job-group {
+  overflow: hidden;
+  border: 2px solid #a98468;
+  border-radius: 12px;
+  background: #fffaf4;
+  box-shadow: 0 7px 18px rgba(95, 68, 47, 0.09);
+}
+
+.truck-job-header {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-height: 62px;
+  padding: 11px 16px;
+  border-bottom: 2px solid #a98468;
+  background: #f7eadc;
+}
+
+.truck-job-identity,
+.truck-job-customer {
+  display: grid;
+  gap: 3px;
+}
+
+.truck-job-header span {
+  color: #7b604c;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.truck-job-header strong {
+  color: #5c402d;
+  font-size: 15px;
+}
+
+.truck-job-count {
+  margin-left: auto;
+  padding: 7px 11px;
+  border: 1px solid #ceb49d;
+  border-radius: 999px;
+  background: rgba(255, 250, 244, 0.92);
+  white-space: nowrap;
+}
+
+.truck-job-group .table-wrap {
+  border: 0;
+  border-radius: 0;
+}
+
+.truck-job-group .truck-summary-table {
+  margin: 0;
+  border: 0;
+}
+
+.truck-job-group .truck-summary-table tbody tr + tr td {
+  border-top-color: #d7bfaa;
+}
+
+.truck-leg-type {
+  display: inline-flex;
+  min-width: 62px;
+  justify-content: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.truck-leg-type.import {
+  color: #0b6f63;
+  background: #e2f2ef;
+}
+
+.truck-leg-type.export {
+  color: #9a5b00;
+  background: #fff0d5;
+}
+
+.truck-summary-empty {
+  padding: 28px;
+  border: 1px dashed #aab8c4;
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
 }
 
 body[data-page="ledger"] .statement-table th {
@@ -1046,6 +1154,15 @@ body[data-page="booking"] .ledger-table .table-actions {
   color: #ffffff;
   padding-inline: 18px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  caret-color: #ffffff;
+}
+
+.auth-form input:-webkit-autofill,
+.auth-form input:-webkit-autofill:hover,
+.auth-form input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  box-shadow: 0 0 0 1000px rgba(24, 36, 52, 0.92) inset;
+  transition: background-color 9999s ease-out 0s;
 }
 
 .auth-form input::placeholder {
@@ -1074,6 +1191,18 @@ body[data-page="booking"] .ledger-table .table-actions {
   transform: translateY(-1px);
   box-shadow: 0 20px 36px rgba(255, 102, 59, 0.34);
   filter: saturate(1.03);
+}
+
+.auth-submit:active {
+  transform: translateY(1px) scale(0.995);
+  box-shadow: 0 10px 22px rgba(255, 102, 59, 0.26);
+}
+
+.auth-form input:focus-visible,
+.auth-submit:focus-visible,
+.auth-card .password-toggle:focus-visible {
+  outline: 3px solid rgba(255, 190, 142, 0.5);
+  outline-offset: 2px;
 }
 
 .auth-card .notice {
@@ -1188,34 +1317,36 @@ body[data-page="booking"] .ledger-table .table-actions {
     padding: 20px;
   }
   .auth-frame {
-    min-height: auto;
-    grid-template-columns: 1fr;
-    border-radius: 28px;
-  }
-  .auth-visual {
-    min-height: 300px;
+    min-height: calc(100dvh - 40px);
   }
   .auth-panel {
-    padding: 26px 22px 30px;
+    width: min(100%, 460px);
+    min-height: 0;
+    padding: 0;
   }
   .auth-card {
     width: 100%;
-    padding: 0;
+    min-height: min(500px, calc(100dvh - 40px));
+    padding: clamp(30px, 5vw, 42px) clamp(24px, 5vw, 34px);
   }
 }
 
 @media (max-width: 720px) {
   .auth-stage {
-    padding: 14px;
+    align-items: center;
+    padding: 12px;
   }
   .auth-frame {
-    border-radius: 24px;
-  }
-  .auth-visual {
-    min-height: 220px;
+    min-height: calc(100dvh - 24px);
   }
   .auth-panel {
-    padding: 22px 16px 24px;
+    width: 100%;
+    padding: 0;
+  }
+  .auth-card {
+    min-height: auto;
+    padding: 32px 22px;
+    border-radius: 22px;
   }
   .auth-brand strong {
     font-size: 30px;
@@ -1226,5 +1357,46 @@ body[data-page="booking"] .ledger-table .table-actions {
   }
   .auth-submit {
     min-height: 52px;
+  }
+}
+
+@media (max-height: 650px) {
+  .auth-stage {
+    align-items: flex-start;
+    padding-block: 12px;
+  }
+
+  .auth-frame {
+    min-height: calc(100dvh - 24px);
+  }
+
+  .auth-card {
+    min-height: auto;
+    padding-block: 26px;
+  }
+
+  .auth-brand {
+    margin-bottom: 22px;
+  }
+
+  .auth-brand strong {
+    font-size: 30px;
+  }
+
+  .auth-form input {
+    height: 52px;
+  }
+
+  .auth-submit {
+    min-height: 50px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-card,
+  .auth-form input,
+  .auth-submit,
+  .password-toggle {
+    transition: none;
   }
 }
