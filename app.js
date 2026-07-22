@@ -6,7 +6,8 @@
     { value: "booking", label: "Booking Form" },
     { value: "ledger", label: "Booking Summary" },
     { value: "truck", label: "Truck Details" },
-    { value: "truck-summary", label: "Truck Summary" },
+    { value: "truck-summary", label: "Pending Truck Summary" },
+    { value: "completed-truck-summary", label: "Completed Truck Summary" },
     { value: "employee", label: "Employees" },
     { value: "khata", label: "Khata Page" },
     { value: "admin", label: "Admin" }
@@ -587,6 +588,30 @@
     return fallback.containerNo || fallback.truckNo ? [fallback] : [normalizeContainerLine()];
   }
 
+  function formatInvoiceContainerSizes(lines = []) {
+    const sizeCounts = new Map();
+
+    lines.forEach((line) => {
+      const rawSize = String(line.size || "").trim();
+      if (!rawSize) return;
+
+      const feetMatch = rawSize.toUpperCase().match(/^(\d+)\s*FT$/);
+      const label = feetMatch ? feetMatch[1] : rawSize;
+      sizeCounts.set(label, (sizeCounts.get(label) || 0) + 1);
+    });
+
+    return Array.from(sizeCounts, ([size, count]) => `${count}x${size}`).join(", ") || "-";
+  }
+
+  function getNextBookingJobNo(bookings = []) {
+    const highestJobNumber = bookings.reduce((highest, booking) => {
+      const match = String(booking.id || "").trim().match(/^Job-(\d+)$/i);
+      return match ? Math.max(highest, Number(match[1])) : highest;
+    }, 0);
+
+    return `Job-${String(highestJobNumber + 1).padStart(2, "0")}`;
+  }
+
   function normalizeBookingContainers(booking = {}) {
     const containerLines = getBookingContainerLines(booking);
     const primaryLine = containerLines[0] || normalizeContainerLine();
@@ -683,13 +708,16 @@
   function calculateBookingTaxBreakdown(rate, detention, authority) {
     const roadHaulageCharges = Number(rate || 0);
     const detentionCharges = Number(detention || 0);
+    const withoutIncomeTax = String(authority || "").trim() === "Without Income Tax";
     const taxableBase = roundAmount(roadHaulageCharges);
     const salesTaxAmount = shouldApplySalesTax(authority) ? roundAmount(taxableBase * 0.15) : 0;
     const totalAmount = roundAmount(taxableBase + salesTaxAmount);
-    const incomeTaxAmount = roundAmount(totalAmount * 0.07);
+    const incomeTaxAmount = withoutIncomeTax ? 0 : roundAmount(totalAmount * 0.07);
     const salesTaxWithheldAmount = roundAmount(salesTaxAmount * 0.20);
     const salesTaxByUsAmount = roundAmount(salesTaxAmount * 0.80);
-    const receivableAmount = roundAmount(totalAmount - incomeTaxAmount - salesTaxWithheldAmount + detentionCharges);
+    const receivableAmount = withoutIncomeTax
+      ? taxableBase
+      : roundAmount(totalAmount - incomeTaxAmount - salesTaxWithheldAmount + detentionCharges);
 
     return {
       roadHaulageCharges,
@@ -752,6 +780,17 @@
     if (!leftDate) return 1;
     if (!rightDate) return -1;
     const difference = leftDate.getTime() - rightDate.getTime();
+    return direction === "asc" ? difference : -difference;
+  }
+
+  function compareJobValues(leftValue, rightValue, direction = "desc") {
+    const leftText = String(leftValue || "").trim();
+    const rightText = String(rightValue || "").trim();
+    const leftMatch = leftText.match(/(\d+)$/);
+    const rightMatch = rightText.match(/(\d+)$/);
+    let difference = 0;
+    if (leftMatch && rightMatch) difference = Number(leftMatch[1]) - Number(rightMatch[1]);
+    if (!difference) difference = leftText.localeCompare(rightText, undefined, { numeric: true, sensitivity: "base" });
     return direction === "asc" ? difference : -difference;
   }
 
@@ -840,8 +879,7 @@
     const brandImage = await loadInvoiceTemplateDataUrl();
     const tax = calculateBookingTaxBreakdown(booking.rate, booking.detention, booking.salesTaxAuthority);
     const lines = getBookingContainerLines(booking);
-    const containerText = lines.map((line) => text(line.containerNo)).join(", ") || "-";
-    const sizeText = lines.map((line) => text(line.size)).join(", ") || "-";
+    const sizeText = formatInvoiceContainerSizes(lines);
     const customerName = String(booking.customer || "").trim() || "-";
     const consigneeText = String(booking.consignee || "").trim() || "-";
     const descriptionText = [booking.goodsType, booking.quantity].filter(Boolean).join(", ") || "-";
@@ -862,6 +900,9 @@
 
     pdf.setTextColor(24, 24, 24);
     pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text("SALES TAX INVOICE", pageWidth / 2, 168, { align: "center" });
+
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(11);
     pdf.setTextColor(32, 32, 32);
@@ -869,7 +910,6 @@
     pdf.text(consigneeText, left, 222);
     pdf.text(`NTN NO : ${text(booking.gatePass || "-")}`, left, 240);
     pdf.text(`Date: ${formatShortDate(booking.date)}`, right, 222, { align: "right" });
-    pdf.text(`NTN No : ${text(booking.gatePass || "-")}`, right, 240, { align: "right" });
 
     pdf.autoTable({
       startY: 274,
@@ -880,14 +920,15 @@
         ["Booking No", text(booking.bookingNo || booking.id)],
         ["Invoice No", text(booking.invoiceNo || booking.id)],
         ["BL No", text(booking.blNo)],
-        ["Container No", sizeText],
+        ["No of Container", sizeText],
         ["Description", descriptionText],
         ["Consignee", customerName],
         ["Destination", text(booking.destination)],
         ["Category", text(booking.category)]
       ],
       styles: {
-        fontSize: 10,
+        font: "helvetica",
+        fontSize: 11,
         cellPadding: 5,
         lineColor: [70, 70, 70],
         lineWidth: 0.8,
@@ -936,11 +977,11 @@
     pdf.text("For Global Transport & Logistics Services", right, signatureY, { align: "right" });
 
     pdf.setFillColor(255, 255, 255);
-    pdf.rect(18, pageHeight - 112, pageWidth - 36, 86, "F");
+    pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
     pdf.setDrawColor(0, 0, 0);
     pdf.setLineWidth(0.8);
     pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
-    pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", left, pageHeight - 48);
 
     pdf.save(`${String(booking.customer || "customer").replace(/[^\w-]+/g, "_")}_invoice.pdf`);
   }
@@ -1034,14 +1075,14 @@
       }
     });
     pdf.setFillColor(255, 255, 255);
-    pdf.rect(18, pageHeight - 60, pageWidth - 36, 46, "F");
+    pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
     pdf.setDrawColor(0, 0, 0);
     pdf.setLineWidth(0.8);
-    pdf.line(28, pageHeight - 48, pageWidth - 28, pageHeight - 48);
+    pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
     pdf.setTextColor(32, 32, 32);
-    pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 30, { align: "center" });
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
     pdf.save(`${String(customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
   }
 
@@ -1126,6 +1167,7 @@
     const customerFilter = document.querySelector("[data-booking-customer-filter]");
     const dateSort = document.querySelector("[data-booking-date-sort]");
     const bookingCount = document.querySelector("[data-booking-count]");
+    const bookingTotal = document.querySelector("[data-booking-total]");
     const statusField = form.querySelector("[name='status']");
     const rateField = form.querySelector("[name='rate']");
     const detentionField = form.querySelector("[name='detention']");
@@ -1141,7 +1183,69 @@
     const datePickerButton = form.querySelector("[data-open-date-picker]");
     const containerRows = form.querySelector("[data-container-rows]");
     const addContainerRowButton = form.querySelector("[data-add-container-row]");
+    const biltyInput = form.querySelector("[data-bilty-input]");
+    const removeBiltyButton = form.querySelector("[data-remove-bilty]");
+    const biltyModal = document.querySelector("[data-bilty-modal]");
+    const biltyModalImage = document.querySelector("[data-bilty-modal-image]");
+    const closeBiltyModalButton = document.querySelector("[data-close-bilty-modal]");
     let editingId = "";
+    let biltyImageData = "";
+    let biltyImagePromise = Promise.resolve("");
+
+    function setBiltyPreview(imageData = "") {
+      biltyImageData = String(imageData || "");
+      removeBiltyButton.hidden = !biltyImageData;
+    }
+
+    function compressBiltyImage(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !String(file.type || "").startsWith("image/")) {
+          reject(new Error("Please select a valid image file."));
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("The Bilty image could not be read."));
+        reader.onload = () => {
+          const image = new Image();
+          image.onerror = () => reject(new Error("The Bilty image format is not supported."));
+          image.onload = () => {
+            const maxDimension = 1400;
+            const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const context = canvas.getContext("2d");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            let quality = 0.78;
+            let imageData = canvas.toDataURL("image/jpeg", quality);
+            while (imageData.length > 700000 && quality > 0.46) {
+              quality -= 0.08;
+              imageData = canvas.toDataURL("image/jpeg", quality);
+            }
+            resolve(imageData);
+          };
+          image.src = String(reader.result || "");
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function closeBiltyModal() {
+      biltyModal.hidden = true;
+      biltyModalImage.removeAttribute("src");
+      document.body.classList.remove("bilty-modal-open");
+    }
+
+    function openBiltyModal(imageData) {
+      if (!imageData) return;
+      biltyModalImage.src = imageData;
+      biltyModal.hidden = false;
+      document.body.classList.add("bilty-modal-open");
+      closeBiltyModalButton.focus();
+    }
 
     function createContainerRowMarkup(line = {}, index = 0) {
       const item = normalizeContainerLine(line);
@@ -1212,6 +1316,9 @@
 
     function resetForm() {
       form.reset();
+      biltyInput.value = "";
+      biltyImagePromise = Promise.resolve("");
+      setBiltyPreview("");
       form.elements.bookingNo.value = "BKG-24061";
       form.elements.invoiceNo.value = "INV-24061";
       syncBookingDate("2026-06-10");
@@ -1254,11 +1361,19 @@
         .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
 
       bookingCount.textContent = `${bookings.length} record(s)`;
+      const filteredTotalAmount = bookings.reduce((total, item) => {
+        const storedTotal = item.totalAmount;
+        const amount = storedTotal === null || storedTotal === undefined || storedTotal === ""
+          ? calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).totalAmount
+          : Number(storedTotal || 0);
+        return total + amount;
+      }, 0);
+      bookingTotal.textContent = `PKR ${money(filteredTotalAmount)}`;
 
       if (!bookings.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="33">No records found for this customer.</td>
+            <td colspan="34">No records found for this customer.</td>
           </tr>
         `;
         return;
@@ -1299,6 +1414,11 @@
             <td>${text(item.chequeNumber || "-")}</td>
             <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
             <td><span class="badge ${item.accountFlow === "Credit" ? "good" : "bad"}">${text(item.accountFlow || "Awaited")}</span></td>
+            <td>${item.biltyImage ? `
+              <button class="bilty-thumbnail" type="button" data-view-bilty="${escapeHtml(item.id)}" aria-label="View Bilty image" title="View Bilty">
+                <img src="${escapeHtml(item.biltyImage)}" alt="Bilty thumbnail" />
+              </button>
+            ` : "-"}</td>
             <td>${text(item.remarks)}</td>
             <td>
               <div class="table-actions">
@@ -1320,6 +1440,8 @@
       });
       syncTotalAmount();
       renderContainerRows(getBookingContainerLines(item));
+      biltyInput.value = "";
+      setBiltyPreview(item.biltyImage);
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Booking";
     }
@@ -1342,6 +1464,33 @@
     rateField.addEventListener("input", syncTotalAmount);
     detentionField.addEventListener("input", syncTotalAmount);
     salesTaxAuthorityField.addEventListener("change", syncTotalAmount);
+
+    biltyInput.addEventListener("change", () => {
+      const file = biltyInput.files && biltyInput.files[0];
+      if (!file) return;
+
+      biltyInput.disabled = true;
+      biltyImagePromise = compressBiltyImage(file)
+        .then((imageData) => {
+          setBiltyPreview(imageData);
+          return imageData;
+        })
+        .catch((error) => {
+          biltyInput.value = "";
+          setBiltyPreview("");
+          notice.textContent = error.message;
+          return "";
+        })
+        .finally(() => {
+          biltyInput.disabled = false;
+        });
+    });
+
+    removeBiltyButton.addEventListener("click", () => {
+      biltyInput.value = "";
+      biltyImagePromise = Promise.resolve("");
+      setBiltyPreview("");
+    });
 
     customerFilter.addEventListener("change", render);
     if (dateSort) dateSort.addEventListener("change", render);
@@ -1367,8 +1516,9 @@
       updateContainerSummary(collectContainerLines());
     });
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      await biltyImagePromise;
       const data = Object.fromEntries(new FormData(form).entries());
       const bookingDate = formatShortDate(datePickerField.value || data.date);
       const containerLines = collectContainerLines();
@@ -1390,12 +1540,14 @@
         salesTaxByUsAmount: Number(data.salesTaxByUsAmount || 0),
         receivableAmount: Number(data.receivableAmount || 0),
         paymentReceivedDate: String(data.paymentReceivedDate || "").trim(),
-        chequeNumber: String(data.chequeNumber || "").trim()
+        chequeNumber: String(data.chequeNumber || "").trim(),
+        biltyImage: biltyImageData
       };
       delete normalized.datePicker;
+      delete normalized.biltyUpload;
 
       if (!editingId) {
-        normalized.id = `BK-${Date.now().toString().slice(-6)}`;
+        normalized.id = getNextBookingJobNo(store.bookings);
         store.bookings.unshift(normalizeBookingContainers(normalized));
         notice.textContent = "New booking saved successfully in the current browser session.";
       } else {
@@ -1410,9 +1562,15 @@
     });
 
     body.addEventListener("click", (event) => {
+      const biltyTrigger = event.target.closest("[data-view-bilty]");
       const invoiceId = event.target.getAttribute("data-download-invoice");
       const editId = event.target.getAttribute("data-edit-booking");
       const deleteId = event.target.getAttribute("data-delete-booking");
+      if (biltyTrigger) {
+        const item = store.bookings.find((entry) => entry.id === biltyTrigger.getAttribute("data-view-bilty"));
+        if (item && item.biltyImage) openBiltyModal(item.biltyImage);
+        return;
+      }
       if (invoiceId) {
         const item = store.bookings.find((entry) => entry.id === invoiceId);
         if (!item) return;
@@ -1432,6 +1590,14 @@
         notice.textContent = `Booking ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
+    });
+
+    closeBiltyModalButton.addEventListener("click", closeBiltyModal);
+    biltyModal.addEventListener("click", (event) => {
+      if (event.target === biltyModal) closeBiltyModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !biltyModal.hidden) closeBiltyModal();
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
@@ -1498,7 +1664,7 @@
 
       const summaryRows = [...grouped.values()];
       if (totalElement) {
-        totalElement.textContent = money(summaryRows.reduce((sum, item) => sum + item.totalRate, 0));
+        totalElement.textContent = `PKR ${money(summaryRows.reduce((sum, item) => sum + item.totalRate, 0))}`;
       }
       countElement.textContent = `${summaryRows.length} customer(s)`;
 
@@ -1541,32 +1707,160 @@
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
     const isImport = tripType === "import";
     const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("l", "pt", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const letterhead = await loadInvoiceTemplateDataUrl();
+    const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    if (letterheadHeader) {
+      const headerWidth = 520;
+      const headerHeight = 124;
+      pdf.addImage(letterheadHeader, "JPEG", (pageWidth - headerWidth) / 2, 10, headerWidth, headerHeight);
+    }
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.text(isImport ? "IMPORT INVOICE" : "EXPORT INVOICE", 28, 150);
+    pdf.text(`Job No: ${text(trip.jobNo)}`, 28, 168);
+
+    const details = isImport ? {
+      date: trip.date, truckNo: trip.truckNo, origin: trip.origin, destination: trip.destination,
+      size: trip.size, weight: trip.weight, freight: trip.importFreight, broker: trip.importBroker,
+      remarks: trip.importRemarks || trip.remarks
+    } : {
+      date: trip.exportLoadDate, truckNo: trip.exportTruckNo || trip.truckNo, origin: trip.exportOrigin, destination: trip.exportDestination,
+      size: trip.exportSize, weight: trip.exportWeight, freight: trip.exportFreight, broker: trip.exportBroker,
+      remarks: trip.exportRemarks || trip.remarks
+    };
+
+    const movementDate = parseDateValue(details.date);
+    const formattedMovementDate = movementDate
+      ? `${String(movementDate.getDate()).padStart(2, "0")}-${movementDate.toLocaleString("en-US", { month: "short" })}-${String(movementDate.getFullYear()).slice(-2)}`
+      : "-";
+
+    pdf.autoTable({
+      startY: 182,
+      theme: "grid",
+      margin: { left: 20, right: 20 },
+      head: [[
+        "S.No", "Date", "Registration No", "Origin", "Destination", "Size", "Weight",
+        "Cargo Description", `${isImport ? "Import" : "Export"} Freight`,
+        `${isImport ? "Import" : "Export"} - Broker`, "Remarks"
+      ]],
+      body: [[
+        "1",
+        formattedMovementDate,
+        text(details.truckNo || "-"),
+        text(details.origin || "-"),
+        text(details.destination || "-"),
+        text(details.size || "-"),
+        text(details.weight || "-"),
+        text(trip.cargoDescription || "-"),
+        money(details.freight),
+        text(details.broker || "-"),
+        text(details.remarks || "-")
+      ]],
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 5,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.8,
+        textColor: [0, 0, 0],
+        valign: "middle",
+        overflow: "linebreak"
+      },
+      headStyles: {
+        fillColor: [184, 220, 231],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        halign: "center",
+        minCellHeight: 38
+      },
+      bodyStyles: { minCellHeight: 42, halign: "center" },
+      columnStyles: {
+        0: { cellWidth: 30, halign: "center" },
+        1: { cellWidth: 58, halign: "center" },
+        2: { cellWidth: 82, halign: "center" },
+        3: { cellWidth: 58, halign: "center" },
+        4: { cellWidth: 66, halign: "center" },
+        5: { cellWidth: 40, halign: "center" },
+        6: { cellWidth: 52, halign: "center" },
+        7: { cellWidth: 82 },
+        8: { cellWidth: 68, halign: "center" },
+        9: { cellWidth: 140, halign: "center" },
+        10: { cellWidth: 124, halign: "center" }
+      }
+    });
+
+    const accountStartY = (pdf.lastAutoTable?.finalY || 262) + 48;
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text("Account Title", 20, accountStartY);
+    pdf.text("GLOBAL TRANSPORT AND LOGISTICS SERVICES", 20, accountStartY + 18);
+    pdf.text("Account No", 20, accountStartY + 36);
+    pdf.text("PK68UNIL0109000333247042", 20, accountStartY + 54);
+    pdf.text("United Bank Limited", 20, accountStartY + 72);
+
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
+    pdf.setDrawColor(0, 0, 0);
+    pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
+    pdf.save(`${String(trip.customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
+  }
+
+  async function buildTruckDetailsInvoicePdf(trip, tripType) {
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const isImport = tripType === "import";
+    const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("p", "pt", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     if (letterhead) pdf.addImage(letterhead, "JPEG", 0, 0, pageWidth, pageHeight);
+
     pdf.setFillColor(255, 255, 255);
     pdf.rect(22, 118, pageWidth - 44, pageHeight - 172, "F");
-    pdf.setTextColor(24, 48, 77);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text(`${isImport ? "IMPORT" : "EXPORT / BACK LOAD"} INVOICE`, 36, 158);
-    pdf.setFontSize(12);
-    pdf.text(`Job No: ${text(trip.jobNo)}`, 36, 182);
-    pdf.text(`Customer/Payer: ${text(trip.customer || "-")}`, 36, 202);
 
     const details = isImport ? {
-      date: trip.date, truckNo: trip.truckNo, origin: trip.origin, destination: trip.destination,
-      size: trip.size, weight: trip.weight, freight: trip.importFreight, broker: trip.importBroker,
-      commission: trip.importBrokerCommission, received: trip.importReceivedAmount,
-      instrument: trip.importChequeDetails, paymentDate: trip.importPaymentDate, status: trip.importPaymentStatus
+      date: trip.date,
+      truckNo: trip.truckNo,
+      origin: trip.origin,
+      destination: trip.destination,
+      size: trip.size,
+      weight: trip.weight,
+      freight: trip.importFreight,
+      broker: trip.importBroker,
+      commission: trip.importBrokerCommission,
+      paymentStatus: trip.importPaymentStatus,
+      remarks: trip.importRemarks || trip.remarks
     } : {
-      date: trip.exportLoadDate, truckNo: trip.exportTruckNo || trip.truckNo, origin: trip.exportOrigin, destination: trip.exportDestination,
-      size: trip.exportSize, weight: trip.exportWeight, freight: trip.exportFreight, broker: trip.exportBroker,
-      commission: trip.exportBrokerCommission, received: trip.exportReceivedAmount,
-      instrument: trip.exportChequeDetails, paymentDate: trip.exportPaymentDate, status: trip.exportPaymentStatus
+      date: trip.exportLoadDate,
+      truckNo: trip.exportTruckNo || trip.truckNo,
+      origin: trip.exportOrigin,
+      destination: trip.exportDestination,
+      size: trip.exportSize,
+      weight: trip.exportWeight,
+      freight: trip.exportFreight,
+      broker: trip.exportBroker,
+      commission: trip.exportBrokerCommission,
+      paymentStatus: trip.exportPaymentStatus,
+      remarks: trip.exportRemarks || trip.remarks
     };
+
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.text(isImport ? "IMPORT INVOICE" : "EXPORT INVOICE", 36, 158);
+    pdf.text(`Job No: ${text(trip.jobNo || "-")}`, 36, 178);
+    pdf.text(
+      `${isImport ? "Import - Broker" : "Export - Broker"}: ${text(details.broker || "-")}`,
+      36,
+      198
+    );
 
     pdf.autoTable({
       startY: 226,
@@ -1580,23 +1874,34 @@
         ["Broker", text(details.broker || "-")],
         ["Freight", money(details.freight)],
         ["Broker Commission", money(details.commission)],
-        ["Received Amount", money(details.received)],
-        ["Cheque / Instrument", text(details.instrument || "-")],
-        ["Payment Received Date", details.paymentDate ? formatShortDate(details.paymentDate) : "-"],
-        ["Payment Status", text(details.status || "Awaited")],
-        ["Remarks", text((isImport ? trip.importRemarks : trip.exportRemarks) || trip.remarks || "-")]
+        ["Payment Status", text(details.paymentStatus || "Awaited")],
+        ["Remarks", text(details.remarks || "-")]
       ],
-      styles: { fontSize: 10, cellPadding: 6, lineColor: [226, 210, 193], textColor: [25, 40, 58] },
-      columnStyles: { 0: { cellWidth: 150, fontStyle: "bold" }, 1: { cellWidth: 355 } }
+      styles: {
+        fontSize: 10,
+        cellPadding: 6,
+        lineColor: [226, 210, 193],
+        textColor: [25, 40, 58],
+        overflow: "linebreak"
+      },
+      columnStyles: {
+        0: { cellWidth: 150, fontStyle: "bold" },
+        1: { cellWidth: 355 }
+      }
     });
+
     pdf.setFillColor(255, 255, 255);
-    pdf.rect(18, pageHeight - 112, pageWidth - 36, 86, "F");
+    pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
     pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
     pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
-    pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
-    pdf.save(`${String(trip.customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
+    pdf.setTextColor(32, 32, 32);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
+
+    const safeJobNo = String(trip.jobNo || "truck").replace(/[^\w-]+/g, "_");
+    pdf.save(`${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
   }
 
   function truckPage(store) {
@@ -1605,30 +1910,34 @@
     const notice = document.querySelector("[data-notice]");
     const count = document.querySelector("[data-truck-trip-count]");
     const customerFilter = document.querySelector("[data-truck-customer-filter]");
-    const dateSort = document.querySelector("[data-truck-date-sort]");
+    const jobSort = document.querySelector("[data-truck-job-sort]");
     if (!body || !form) return;
     let editingId = "";
 
-    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount", "balanceReceivable", "grandTotal", "roundTripExpense", "profitLoss"];
+    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount"];
 
     function calculateTrip() {
       const importReceived = Number(form.elements.importFreight.value || 0) - Number(form.elements.importBrokerCommission.value || 0);
       const exportReceived = Number(form.elements.exportFreight.value || 0) - Number(form.elements.exportBrokerCommission.value || 0);
-      const grandTotal = Number(form.elements.mtyBoxFreight.value || 0) + importReceived + exportReceived;
-      const profitLoss = grandTotal - Number(form.elements.roundTripExpense.value || 0);
       form.elements.importReceivedAmount.value = String(importReceived);
       form.elements.exportReceivedAmount.value = String(exportReceived);
-      form.elements.grandTotal.value = String(grandTotal);
-      form.elements.profitLoss.value = String(profitLoss);
+    }
+
+    function getNextTruckJobNo() {
+      const highestJobNumber = store.truckExpenses.reduce((highest, item) => {
+        const match = String(item.jobNo || "").trim().match(/^Job-(\d+)$/i);
+        return match ? Math.max(highest, Number(match[1])) : highest;
+      }, 0);
+      return `Job-${String(highestJobNumber + 1).padStart(2, "0")}`;
     }
 
     function resetForm() {
       form.reset();
-      form.elements.jobNo.value = "GT-001";
       form.elements.date.value = "2026-07-04";
       form.elements.truckNo.value = "JW-5477";
       form.elements.exportTruckNo.value = "JW-5477";
       form.elements.importPaymentStatus.value = "Awaited";
+      form.elements.mtyPaymentStatus.value = "Awaited";
       form.elements.exportPaymentStatus.value = "Awaited";
       calculateTrip();
       editingId = "";
@@ -1637,17 +1946,18 @@
 
     function render() {
       const allRows = store.truckExpenses.filter((item) => item.jobNo);
-      const customers = [...new Set(allRows.map((item) => String(item.customer || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-      const selectedCustomer = String(customerFilter?.value || "").trim();
+      const truckNumbers = [...new Set(allRows.map((item) => String(item.truckNo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const selectedTruckNo = String(customerFilter?.value || "").trim();
       if (customerFilter) {
-        customerFilter.innerHTML = `<option value="">All Customers</option>${customers.map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}`;
-        customerFilter.value = customers.includes(selectedCustomer) ? selectedCustomer : "";
+        customerFilter.innerHTML = `<option value="">All Trucks</option>${truckNumbers.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${text(truckNo)}</option>`).join("")}`;
+        customerFilter.value = truckNumbers.includes(selectedTruckNo) ? selectedTruckNo : "";
       }
-      const rows = (selectedCustomer ? allRows.filter((item) => String(item.customer || "").trim() === selectedCustomer) : [...allRows])
-        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
+      const rows = (selectedTruckNo ? allRows.filter((item) => String(item.truckNo || "").trim() === selectedTruckNo) : [...allRows])
+        .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
+
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="40">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="37">No truck trip records available yet.</td></tr>`;
         return;
       }
       body.innerHTML = rows.map((item, index) => `
@@ -1655,9 +1965,8 @@
           <td>${index + 1}</td><td>${text(item.jobNo)}</td><td>${formatShortDate(item.date)}</td><td>${text(item.truckNo)}</td>
           <td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.customer)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
           <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
-          <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${text(item.importRemarks || item.remarks || "-")}</td>
+          <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td>${text(item.importRemarks || item.remarks || "-")}</td>
           <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${text(item.exportRemarks || item.remarks || "-")}</td>
-          <td>${money(item.balanceReceivable)}</td><td>${money(item.grandTotal)}</td><td>${money(item.roundTripExpense)}</td><td>${money(item.profitLoss)}</td><td>${text(item.remarks)}</td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-import-invoice="${item.id}">Import Invoice</button>
@@ -1679,7 +1988,7 @@
       form.querySelector("[data-submit-label]").textContent = "Update Trip";
     }
 
-    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission", "roundTripExpense"].forEach((name) => {
+    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission"].forEach((name) => {
       form.elements[name].addEventListener("input", calculateTrip);
     });
 
@@ -1691,11 +2000,13 @@
       const normalized = { ...calculatedData };
       numberFields.forEach((name) => { normalized[name] = Number(calculatedData[name] || 0); });
       if (!editingId) {
+        normalized.jobNo = getNextTruckJobNo();
         normalized.id = `TRIP-${Date.now().toString().slice(-6)}`;
         store.truckExpenses.unshift(normalized);
         notice.textContent = `Truck trip ${normalized.jobNo} saved successfully.`;
       } else {
         const index = store.truckExpenses.findIndex((item) => item.id === editingId);
+        normalized.jobNo = store.truckExpenses[index]?.jobNo || getNextTruckJobNo();
         normalized.id = editingId;
         store.truckExpenses[index] = normalized;
         notice.textContent = `Truck trip ${normalized.jobNo} updated successfully.`;
@@ -1712,7 +2023,7 @@
       const deleteId = event.target.getAttribute("data-delete-trip");
       if (importInvoiceId || exportInvoiceId) {
         const item = store.truckExpenses.find((entry) => entry.id === (importInvoiceId || exportInvoiceId));
-        if (item) buildTruckTripInvoicePdf(item, importInvoiceId ? "import" : "export").catch(() => {
+        if (item) buildTruckDetailsInvoicePdf(item, importInvoiceId ? "import" : "export").catch(() => {
           notice.textContent = "Invoice download failed. Please try again.";
         });
         return;
@@ -1729,28 +2040,69 @@
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     if (customerFilter) customerFilter.addEventListener("change", render);
-    if (dateSort) dateSort.addEventListener("change", render);
+    if (jobSort) jobSort.addEventListener("change", render);
     resetForm();
     render();
   }
 
   function truckSummaryPage(store) {
+    const isCompletedSummary = document.body.dataset.page === "completed-truck-summary";
     const groupsContainer = document.querySelector("[data-truck-summary-groups]");
     const count = document.querySelector("[data-truck-summary-count]");
     const customerFilter = document.querySelector("[data-truck-summary-customer-filter]");
-    const dateSort = document.querySelector("[data-truck-summary-date-sort]");
+    const jobSort = document.querySelector("[data-truck-summary-job-sort]");
+    const importReceivableTotal = document.querySelector("[data-truck-summary-import-receivable]");
+    const exportReceivableTotal = document.querySelector("[data-truck-summary-export-receivable]");
+    const grandTotalElement = document.querySelector("[data-truck-summary-grand-total]");
+    const totalTrucksElement = document.querySelector("[data-truck-summary-total-trucks]");
+    const totalWorkElement = document.querySelector("[data-completed-total-work]");
     if (!groupsContainer || !count) return;
 
     function render() {
-      const trips = store.truckExpenses.filter((item) => item.jobNo);
-      const customers = [...new Set(trips.map((item) => String(item.customer || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-      const selectedCustomer = String(customerFilter?.value || "").trim();
+      const trips = store.truckExpenses.filter((item) => {
+        if (!item.jobNo) return false;
+        const importStatus = String(item.importPaymentStatus || "Awaited").trim().toLowerCase();
+        const exportStatus = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase();
+        return isCompletedSummary
+          ? importStatus === "credit" && exportStatus === "credit"
+          : importStatus === "awaited" || exportStatus === "awaited";
+      });
+      const truckNumbers = [...new Set(trips.map((item) => String(item.truckNo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const selectedTruckNo = String(customerFilter?.value || "").trim();
       if (customerFilter) {
-        customerFilter.innerHTML = `<option value="">All Customers</option>${customers.map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}`;
-        customerFilter.value = customers.includes(selectedCustomer) ? selectedCustomer : "";
+        customerFilter.innerHTML = `<option value="">All Trucks</option>${truckNumbers.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${text(truckNo)}</option>`).join("")}`;
+        customerFilter.value = truckNumbers.includes(selectedTruckNo) ? selectedTruckNo : "";
       }
-      const filteredTrips = (selectedCustomer ? trips.filter((item) => String(item.customer || "").trim() === selectedCustomer) : [...trips])
-        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
+      const filteredTrips = (selectedTruckNo ? trips.filter((item) => String(item.truckNo || "").trim() === selectedTruckNo) : [...trips])
+        .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
+
+      const totals = filteredTrips.reduce((summary, item) => {
+        const storedImportReceivable = Number(item.importReceivedAmount);
+        const storedExportReceivable = Number(item.exportReceivedAmount);
+        const importReceivable = Number.isFinite(storedImportReceivable)
+          ? storedImportReceivable
+          : Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0);
+        const exportReceivable = Number.isFinite(storedExportReceivable)
+          ? storedExportReceivable
+          : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
+        const storedGrandTotal = Number(item.grandTotal);
+        const grandTotal = Number.isFinite(storedGrandTotal)
+          ? storedGrandTotal
+          : Number(item.mtyBoxFreight || 0) + importReceivable + exportReceivable;
+        summary.importReceivable += importReceivable;
+        summary.exportReceivable += exportReceivable;
+        summary.grandTotal += grandTotal;
+        return summary;
+      }, { importReceivable: 0, exportReceivable: 0, grandTotal: 0 });
+
+      if (importReceivableTotal) importReceivableTotal.textContent = `PKR ${money(totals.importReceivable)}`;
+      if (exportReceivableTotal) exportReceivableTotal.textContent = `PKR ${money(totals.exportReceivable)}`;
+      if (grandTotalElement) grandTotalElement.textContent = `PKR ${money(totals.grandTotal)}`;
+      if (totalTrucksElement) {
+        const totalTrucks = new Set(filteredTrips.map((item) => String(item.truckNo || "").trim()).filter(Boolean)).size;
+        totalTrucksElement.textContent = String(totalTrucks);
+      }
+      if (totalWorkElement) totalWorkElement.textContent = `PKR ${money(totals.grandTotal)}`;
       const groupedTrips = new Map();
 
       filteredTrips.forEach((trip) => {
@@ -1768,16 +2120,18 @@
       const jobGroups = [...groupedTrips.values()];
       count.textContent = `${jobGroups.length} job(s)`;
       if (!jobGroups.length) {
-        groupsContainer.innerHTML = `<div class="truck-summary-empty">No truck summary records available yet.</div>`;
+        groupsContainer.innerHTML = `<div class="truck-summary-empty">No ${isCompletedSummary ? "completed" : "pending"} truck records available yet.</div>`;
         return;
       }
 
       let serialNumber = 0;
       groupsContainer.innerHTML = jobGroups.map((group) => {
         const legs = group.trips.flatMap((item) => ([
-          { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, broker: item.importBroker, remarks: item.importRemarks || item.remarks },
-          { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, broker: item.exportBroker, remarks: item.exportRemarks || item.remarks }
+          { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, receivable: item.importReceivedAmount === undefined || item.importReceivedAmount === "" ? Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0) : Number(item.importReceivedAmount || 0), broker: item.importBroker, remarks: item.importRemarks || item.remarks },
+          { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, receivable: item.exportReceivedAmount === undefined || item.exportReceivedAmount === "" ? Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0) : Number(item.exportReceivedAmount || 0), broker: item.exportBroker, remarks: item.exportRemarks || item.remarks }
         ]));
+        const brokerSummary = [...new Set(legs.map((leg) => String(leg.broker || "").trim()).filter(Boolean))].join(" | ") || "-";
+        const downloadHeader = isCompletedSummary ? "" : "<th>Download PDF</th>";
 
         return `
           <section class="truck-job-group">
@@ -1787,8 +2141,8 @@
                 <strong>${escapeHtml(group.jobNo)}</strong>
               </div>
               <div class="truck-job-customer">
-                <span>Customer</span>
-                <strong>${escapeHtml(group.customer)}</strong>
+                <span>Broker</span>
+                <strong>${escapeHtml(brokerSummary)}</strong>
               </div>
               <span class="truck-job-count">${legs.length} movement(s)</span>
             </div>
@@ -1796,12 +2150,15 @@
               <table class="statement-table truck-summary-table">
                 <thead>
                   <tr>
-                    <th>S.No</th><th>Type</th><th>Date</th><th>Registration No</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>Freight</th><th>Broker</th><th>Remarks</th><th>Download PDF</th>
+                    <th>S.No</th><th>Type</th><th>Date</th><th>Registration No</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>${isCompletedSummary ? "Received Amount" : "Receivable Amount"}</th><th>Broker</th><th>Remarks</th>${downloadHeader}
                   </tr>
                 </thead>
                 <tbody>
                   ${legs.map((leg) => {
                     serialNumber += 1;
+                    const downloadCell = isCompletedSummary
+                      ? ""
+                      : `<td><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">Download PDF</button></td>`;
                     return `<tr>
                       <td>${serialNumber}</td>
                       <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${leg.type}</span></td>
@@ -1812,10 +2169,10 @@
                       <td>${text(leg.size)}</td>
                       <td>${text(leg.weight)}</td>
                       <td>${text(leg.cargo)}</td>
-                      <td>${money(leg.freight)}</td>
+                      <td>${money(leg.receivable)}</td>
                       <td>${text(leg.broker)}</td>
                       <td>${text(leg.remarks)}</td>
-                      <td><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">Download PDF</button></td>
+                      ${downloadCell}
                     </tr>`;
                   }).join("")}
                 </tbody>
@@ -1827,7 +2184,7 @@
     }
 
     if (customerFilter) customerFilter.addEventListener("change", render);
-    if (dateSort) dateSort.addEventListener("change", render);
+    if (jobSort) jobSort.addEventListener("change", render);
     groupsContainer.addEventListener("click", (event) => {
       const tripId = event.target.getAttribute("data-summary-invoice");
       if (!tripId) return;
@@ -2319,14 +2676,14 @@
       pdf.text(`Report Generated on ${statement.today}`, left, Math.min(finalY + 28, pageHeight - 70));
 
       pdf.setFillColor(255, 255, 255);
-      pdf.rect(18, pageHeight - 112, pageWidth - 36, 86, "F");
+      pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
       pdf.setDrawColor(0, 0, 0);
       pdf.setLineWidth(0.8);
       pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
       pdf.setTextColor(32, 32, 32);
-      pdf.text("Office # 15, Ayub Shopping Center, Keemari, Karachi", pageWidth / 2, pageHeight - 48, { align: "center" });
+      pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
 
       const blob = pdf.output("blob");
       return new File([blob], `${account.customer.replace(/[^\w-]+/g, "_")}_khata.pdf`, { type: "application/pdf" });
@@ -2653,7 +3010,7 @@
     if (page === "booking") bookingPage(store);
     if (page === "ledger") ledgerPage(store);
     if (page === "truck") truckPage(store);
-    if (page === "truck-summary") truckSummaryPage(store);
+    if (page === "truck-summary" || page === "completed-truck-summary") truckSummaryPage(store);
     if (page === "employee") employeePage(store);
     if (page === "admin-login") adminLoginPage(store);
     if (page === "admin") adminPage(store);

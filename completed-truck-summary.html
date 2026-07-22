@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GTLS Transport - Pending Truck Summary</title>
+  <title>GTLS Transport - Completed Truck Summary</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body data-page="truck-summary">
+<body data-page="completed-truck-summary">
   <div class="app">
     <div class="mobile-topbar"><button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button><strong>GTLS Transport</strong></div>
     <div class="nav-overlay" data-nav-overlay></div>
@@ -20,11 +20,17 @@
       </nav><div class="tip"></div>
     </aside>
     <main class="main">
-      <section class="hero"><h2>Pending Truck Summary</h2></section>
+      <section class="hero"><h2>Completed Truck Summary</h2></section>
       <section class="screen">
         <div class="screen-head">
           <div></div>
-          <div class="ledger-filter"><div class="ledger-total" aria-live="polite"><span>Total Trucks</span><strong data-truck-summary-total-trucks>0</strong></div><div class="ledger-total" aria-live="polite"><span>Total Import Receivable</span><strong data-truck-summary-import-receivable>PKR 0</strong></div><div class="ledger-total" aria-live="polite"><span>Total Export Receivable</span><strong data-truck-summary-export-receivable>PKR 0</strong></div><div class="ledger-total" aria-live="polite"><span>Grand Total</span><strong data-truck-summary-grand-total>PKR 0</strong></div><div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div><div class="ledger-filter-control"><label for="truck-summary-job-sort">Job Order</label><select id="truck-summary-job-sort" data-truck-summary-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div><span class="ledger-count" data-truck-summary-count>0 job(s)</span></div>
+          <div class="ledger-filter">
+            <div class="ledger-total" aria-live="polite"><span>Total Trucks</span><strong data-truck-summary-total-trucks>0</strong></div>
+            <div class="ledger-total" aria-live="polite"><span>Total Work Amount</span><strong data-completed-total-work>PKR 0</strong></div>
+            <div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div>
+            <div class="ledger-filter-control"><label for="truck-summary-job-sort">Job Order</label><select id="truck-summary-job-sort" data-truck-summary-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div>
+            <span class="ledger-count" data-truck-summary-count>0 job(s)</span>
+          </div>
         </div>
         <div class="truck-summary-groups" data-truck-summary-groups></div>
       </section>

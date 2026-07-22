@@ -28,7 +28,8 @@
         <a href="booking.html" data-page="booking">Booking Form</a>
         <a href="ledger.html" data-page="ledger">Booking Summary</a>
         <a href="truck.html" data-page="truck">Truck Details</a>
-        <a href="truck-summary.html" data-page="truck-summary">Truck Summary</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
         <a href="employees.html" data-page="employee">Employees</a>
         <a href="khata.html" data-page="khata">Khata Page</a>
         <a href="admin-login.html" data-page="admin-login">Admin</a>
@@ -89,6 +90,7 @@
               <option value="Punjab Revenue Authority">Punjab Revenue Authority (15%)</option>
               <option value="Khyber Pakhtunkhwa Revenue Authority">Khyber Pakhtunkhwa Revenue Authority (15%)</option>
               <option value="Balochistan Revenue Authority">Balochistan Revenue Authority (15%)</option>
+              <option value="Without Income Tax">Without Income Tax</option>
               <option>Other</option>
             </select>
           </div>
@@ -109,6 +111,13 @@
               <option selected>Awaited</option>
               <option>Credit</option>
             </select>
+          </div>
+          <div class="field quarter bilty-upload-field">
+            <label for="bilty-upload">Bilty</label>
+            <div class="bilty-input-group">
+              <input id="bilty-upload" name="biltyUpload" type="file" accept="image/*" data-bilty-input />
+              <button class="bilty-clear" type="button" data-remove-bilty aria-label="Remove selected Bilty" title="Remove selected Bilty" hidden>&times;</button>
+            </div>
           </div>
           <div class="field full">
             <div class="container-block">
@@ -150,6 +159,10 @@
                 <option value="asc">Ascending (Oldest First)</option>
               </select>
             </div>
+            <div class="ledger-total" aria-live="polite">
+              <span>Total Amount</span>
+              <strong data-booking-total>PKR 0</strong>
+            </div>
             <span class="ledger-count" data-booking-count>0 record(s)</span>
           </div>
         </div>
@@ -188,6 +201,7 @@
                 <th>Cheque Number</th>
                 <th>Status</th>
                 <th>Payment Status</th>
+                <th>Bilty</th>
                 <th>Remarks</th>
                 <th>Actions</th>
               </tr>
@@ -197,6 +211,10 @@
         </div>
       </section>
     </main>
+  </div>
+  <div class="bilty-modal" data-bilty-modal hidden role="dialog" aria-modal="true" aria-label="Bilty image preview">
+    <button class="bilty-modal-close" type="button" data-close-bilty-modal aria-label="Close Bilty preview" title="Close">&times;</button>
+    <img data-bilty-modal-image alt="Bilty" />
   </div>
   <script src="app.js"></script>
 </body>

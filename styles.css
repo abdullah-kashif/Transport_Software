@@ -747,6 +747,32 @@ th {
   letter-spacing: 0.04em;
 }
 
+.ledger-total {
+  display: flex;
+  min-width: 180px;
+  min-height: 48px;
+  padding: 7px 13px;
+  border: 1px solid #dfbea2;
+  border-radius: 8px;
+  background: #f8eadc;
+  color: var(--nav);
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ledger-total span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ledger-total strong {
+  font-size: 15px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 .ledger-count {
   display: inline-flex;
   align-items: center;
@@ -759,6 +785,139 @@ th {
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.bilty-input-group {
+  position: relative;
+}
+
+.bilty-upload-field input[type="file"] {
+  min-height: 48px;
+  padding: 6px 48px 6px 6px;
+  cursor: pointer;
+}
+
+.bilty-upload-field input[type="file"]::file-selector-button {
+  min-height: 34px;
+  margin-right: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff7ef;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bilty-clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #eccfc7;
+  border-radius: 50%;
+  background: #fff7f4;
+  color: var(--red);
+  font-size: 22px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.bilty-clear:hover,
+.bilty-clear:focus-visible {
+  background: #fde9e4;
+  border-color: var(--red);
+  transform: translateY(-50%) scale(1.04);
+  outline: none;
+}
+
+.bilty-clear[hidden],
+.bilty-modal[hidden] {
+  display: none;
+}
+
+.bilty-thumbnail {
+  width: 58px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  cursor: zoom-in;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.bilty-thumbnail:hover,
+.bilty-thumbnail:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 6px 14px rgba(84, 55, 34, 0.16);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.bilty-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bilty-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(15, 24, 35, 0.82);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.bilty-modal img {
+  display: block;
+  max-width: min(1080px, 92vw);
+  max-height: 88vh;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+}
+
+.bilty-modal-close {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 50%;
+  background: rgba(17, 34, 53, 0.88);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bilty-modal-close:hover,
+.bilty-modal-close:focus-visible {
+  background: var(--accent);
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+body.bilty-modal-open {
+  overflow: hidden;
 }
 
 .table-wrap {
@@ -869,6 +1028,15 @@ body[data-page="truck-summary"] .truck-summary-table td {
 .truck-job-customer {
   display: grid;
   gap: 3px;
+}
+
+.truck-job-customer {
+  flex: 1;
+  min-width: 0;
+}
+
+.truck-job-customer strong {
+  overflow-wrap: anywhere;
 }
 
 .truck-job-header span {
