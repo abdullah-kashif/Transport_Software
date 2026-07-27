@@ -1095,6 +1095,11 @@ body[data-page="truck-summary"] .truck-summary-table td {
   background: #fff0d5;
 }
 
+.truck-leg-type.mty {
+  color: #4f5261;
+  background: #ececf2;
+}
+
 .truck-summary-empty {
   padding: 28px;
   border: 1px dashed #aab8c4;
@@ -1127,6 +1132,11 @@ body[data-page="truck"] .truck-trip-table th,
 body[data-page="truck"] .truck-trip-table td {
   white-space: nowrap;
   vertical-align: top;
+}
+
+body[data-page="truck"] .truck-trip-table th:nth-child(22),
+body[data-page="truck"] .truck-trip-table td:nth-child(22) {
+  border-right: 2px solid #b18462;
 }
 
 body[data-page="truck"] .truck-trip-table td:nth-last-child(2) {

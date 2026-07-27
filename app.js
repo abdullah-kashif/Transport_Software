@@ -1030,7 +1030,9 @@
       return summary;
     }, { roadHaulage: 0, salesTax: 0, totalAmount: 0 });
     if (letterheadHeader) {
-      pdf.addImage(letterheadHeader, "JPEG", 20, 10, pageWidth - 40, 126);
+      const headerWidth = 520;
+      const headerHeight = 124;
+      pdf.addImage(letterheadHeader, "JPEG", 20, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
@@ -1041,16 +1043,16 @@
     pdf.autoTable({
       startY: 184,
       theme: "grid",
-      head: [["S.No", "Date", "Booking No", "Customer", "Container", "NTN", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
+      head: [["S.No", "Date", "Booking No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
         return [
         String(index + 1),
         formatShortDate(item.date),
         text(item.bookingNo || item.id),
+        text(item.invoiceNo || "-"),
         text(item.customer || customer || "-"),
         formatContainerSizeSummary(item),
-        text(item.gatePass || "-"),
         money(item.rate),
         money(item.salesTaxAmount || tax.salesTaxAmount),
         money(item.totalAmount || tax.totalAmount),
@@ -1065,13 +1067,13 @@
         0: { cellWidth: 30 },
         1: { cellWidth: 58 },
         2: { cellWidth: 72 },
-        3: { cellWidth: 92 },
-        4: { cellWidth: 58 },
-        5: { cellWidth: 62 },
+        3: { cellWidth: 72 },
+        4: { cellWidth: 92 },
+        5: { cellWidth: 58 },
         6: { cellWidth: 88 },
         7: { cellWidth: 72 },
         8: { cellWidth: 78 },
-        9: { cellWidth: 116 }
+        9: { cellWidth: 106 }
       }
     });
     pdf.setFillColor(255, 255, 255);
@@ -1715,7 +1717,7 @@
     if (letterheadHeader) {
       const headerWidth = 520;
       const headerHeight = 124;
-      pdf.addImage(letterheadHeader, "JPEG", (pageWidth - headerWidth) / 2, 10, headerWidth, headerHeight);
+      pdf.addImage(letterheadHeader, "JPEG", 20, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
@@ -1791,16 +1793,6 @@
         10: { cellWidth: 124, halign: "center" }
       }
     });
-
-    const accountStartY = (pdf.lastAutoTable?.finalY || 262) + 48;
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(11);
-    pdf.text("Account Title", 20, accountStartY);
-    pdf.text("GLOBAL TRANSPORT AND LOGISTICS SERVICES", 20, accountStartY + 18);
-    pdf.text("Account No", 20, accountStartY + 36);
-    pdf.text("PK68UNIL0109000333247042", 20, accountStartY + 54);
-    pdf.text("United Bank Limited", 20, accountStartY + 72);
 
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
@@ -1904,6 +1896,18 @@
     pdf.save(`${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
   }
 
+  function calculateTruckTripFinancials(trip = {}) {
+    const importReceivable = Number(trip.importFreight || 0) - Number(trip.importBrokerCommission || 0);
+    const exportReceivable = Number(trip.exportFreight || 0) - Number(trip.exportBrokerCommission || 0);
+    const grandTotal = importReceivable + exportReceivable + Number(trip.mtyBoxFreight || 0);
+    const roundTripExpense = Number(trip.roundTripExpense || 0);
+    return {
+      grandTotal,
+      roundTripExpense,
+      profitLoss: grandTotal - roundTripExpense
+    };
+  }
+
   function truckPage(store) {
     const body = document.querySelector("[data-truck-trip-rows]");
     const form = document.querySelector("[data-truck-trip-form]");
@@ -1911,16 +1915,27 @@
     const count = document.querySelector("[data-truck-trip-count]");
     const customerFilter = document.querySelector("[data-truck-customer-filter]");
     const jobSort = document.querySelector("[data-truck-job-sort]");
+    const profitLossTotal = document.querySelector("[data-truck-ledger-profit-loss]");
     if (!body || !form) return;
     let editingId = "";
 
-    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount"];
+    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount", "grandTotal", "roundTripExpense", "profitLoss"];
 
     function calculateTrip() {
       const importReceived = Number(form.elements.importFreight.value || 0) - Number(form.elements.importBrokerCommission.value || 0);
       const exportReceived = Number(form.elements.exportFreight.value || 0) - Number(form.elements.exportBrokerCommission.value || 0);
+      const financials = calculateTruckTripFinancials({
+        importFreight: form.elements.importFreight.value,
+        importBrokerCommission: form.elements.importBrokerCommission.value,
+        exportFreight: form.elements.exportFreight.value,
+        exportBrokerCommission: form.elements.exportBrokerCommission.value,
+        mtyBoxFreight: form.elements.mtyBoxFreight.value,
+        roundTripExpense: form.elements.roundTripExpense.value
+      });
       form.elements.importReceivedAmount.value = String(importReceived);
       form.elements.exportReceivedAmount.value = String(exportReceived);
+      form.elements.grandTotal.value = String(financials.grandTotal);
+      form.elements.profitLoss.value = String(financials.profitLoss);
     }
 
     function getNextTruckJobNo() {
@@ -1955,18 +1970,24 @@
       const rows = (selectedTruckNo ? allRows.filter((item) => String(item.truckNo || "").trim() === selectedTruckNo) : [...allRows])
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
 
+      if (profitLossTotal) {
+        const totalProfitLoss = rows.reduce((total, item) => total + calculateTruckTripFinancials(item).profitLoss, 0);
+        profitLossTotal.textContent = `PKR ${money(totalProfitLoss)}`;
+      }
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="37">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="40">No truck trip records available yet.</td></tr>`;
         return;
       }
-      body.innerHTML = rows.map((item, index) => `
+      body.innerHTML = rows.map((item, index) => {
+        const financials = calculateTruckTripFinancials(item);
+        return `
         <tr>
           <td>${index + 1}</td><td>${text(item.jobNo)}</td><td>${formatShortDate(item.date)}</td><td>${text(item.truckNo)}</td>
           <td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.customer)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
           <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
           <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td>${text(item.importRemarks || item.remarks || "-")}</td>
-          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${text(item.exportRemarks || item.remarks || "-")}</td>
+          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-import-invoice="${item.id}">Import Invoice</button>
@@ -1976,7 +1997,8 @@
             </div>
           </td>
         </tr>
-      `).join("");
+      `;
+      }).join("");
     }
 
     function fillForm(item) {
@@ -1988,7 +2010,7 @@
       form.querySelector("[data-submit-label]").textContent = "Update Trip";
     }
 
-    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission"].forEach((name) => {
+    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission", "roundTripExpense"].forEach((name) => {
       form.elements[name].addEventListener("input", calculateTrip);
     });
 
@@ -2051,6 +2073,8 @@
     const count = document.querySelector("[data-truck-summary-count]");
     const customerFilter = document.querySelector("[data-truck-summary-customer-filter]");
     const jobSort = document.querySelector("[data-truck-summary-job-sort]");
+    const startDateFilter = document.querySelector("[data-truck-summary-start-date]");
+    const endDateFilter = document.querySelector("[data-truck-summary-end-date]");
     const importReceivableTotal = document.querySelector("[data-truck-summary-import-receivable]");
     const exportReceivableTotal = document.querySelector("[data-truck-summary-export-receivable]");
     const grandTotalElement = document.querySelector("[data-truck-summary-grand-total]");
@@ -2063,9 +2087,11 @@
         if (!item.jobNo) return false;
         const importStatus = String(item.importPaymentStatus || "Awaited").trim().toLowerCase();
         const exportStatus = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase();
-        return isCompletedSummary
-          ? importStatus === "credit" && exportStatus === "credit"
-          : importStatus === "awaited" || exportStatus === "awaited";
+        const mtyStatus = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase();
+        const allPaymentsCredited = importStatus === "credit"
+          && exportStatus === "credit"
+          && mtyStatus === "credit";
+        return isCompletedSummary ? allPaymentsCredited : !allPaymentsCredited;
       });
       const truckNumbers = [...new Set(trips.map((item) => String(item.truckNo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const selectedTruckNo = String(customerFilter?.value || "").trim();
@@ -2073,7 +2099,18 @@
         customerFilter.innerHTML = `<option value="">All Trucks</option>${truckNumbers.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${text(truckNo)}</option>`).join("")}`;
         customerFilter.value = truckNumbers.includes(selectedTruckNo) ? selectedTruckNo : "";
       }
-      const filteredTrips = (selectedTruckNo ? trips.filter((item) => String(item.truckNo || "").trim() === selectedTruckNo) : [...trips])
+      const startDate = parseDateValue(startDateFilter?.value);
+      const endDate = parseDateValue(endDateFilter?.value);
+      const filteredTrips = trips
+        .filter((item) => !selectedTruckNo || String(item.truckNo || "").trim() === selectedTruckNo)
+        .filter((item) => {
+          if (!startDate && !endDate) return true;
+          const completedDate = parseDateValue(item.exportLoadDate || item.date);
+          if (!completedDate) return false;
+          if (startDate && completedDate < startDate) return false;
+          if (endDate && completedDate > endDate) return false;
+          return true;
+        })
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
 
       const totals = filteredTrips.reduce((summary, item) => {
@@ -2085,10 +2122,7 @@
         const exportReceivable = Number.isFinite(storedExportReceivable)
           ? storedExportReceivable
           : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
-        const storedGrandTotal = Number(item.grandTotal);
-        const grandTotal = Number.isFinite(storedGrandTotal)
-          ? storedGrandTotal
-          : Number(item.mtyBoxFreight || 0) + importReceivable + exportReceivable;
+        const grandTotal = calculateTruckTripFinancials(item).grandTotal;
         summary.importReceivable += importReceivable;
         summary.exportReceivable += exportReceivable;
         summary.grandTotal += grandTotal;
@@ -2128,7 +2162,8 @@
       groupsContainer.innerHTML = jobGroups.map((group) => {
         const legs = group.trips.flatMap((item) => ([
           { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, receivable: item.importReceivedAmount === undefined || item.importReceivedAmount === "" ? Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0) : Number(item.importReceivedAmount || 0), broker: item.importBroker, remarks: item.importRemarks || item.remarks },
-          { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, receivable: item.exportReceivedAmount === undefined || item.exportReceivedAmount === "" ? Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0) : Number(item.exportReceivedAmount || 0), broker: item.exportBroker, remarks: item.exportRemarks || item.remarks }
+          { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, receivable: item.exportReceivedAmount === undefined || item.exportReceivedAmount === "" ? Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0) : Number(item.exportReceivedAmount || 0), broker: item.exportBroker, remarks: item.exportRemarks || item.remarks },
+          { tripId: item.id, type: "MTY", date: "", truckNo: "", origin: "", destination: "", size: "", weight: "", cargo: "", freight: item.mtyBoxFreight, receivable: Number(item.mtyBoxFreight || 0), broker: item.mtyBroker, remarks: "" }
         ]));
         const brokerSummary = [...new Set(legs.map((leg) => String(leg.broker || "").trim()).filter(Boolean))].join(" | ") || "-";
         const downloadHeader = isCompletedSummary ? "" : "<th>Download PDF</th>";
@@ -2158,7 +2193,9 @@
                     serialNumber += 1;
                     const downloadCell = isCompletedSummary
                       ? ""
-                      : `<td><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">Download PDF</button></td>`;
+                      : leg.type === "MTY"
+                        ? "<td>-</td>"
+                        : `<td><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">Download PDF</button></td>`;
                     return `<tr>
                       <td>${serialNumber}</td>
                       <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${leg.type}</span></td>
@@ -2185,6 +2222,8 @@
 
     if (customerFilter) customerFilter.addEventListener("change", render);
     if (jobSort) jobSort.addEventListener("change", render);
+    if (startDateFilter) startDateFilter.addEventListener("change", render);
+    if (endDateFilter) endDateFilter.addEventListener("change", render);
     groupsContainer.addEventListener("click", (event) => {
       const tripId = event.target.getAttribute("data-summary-invoice");
       if (!tripId) return;
