@@ -16,7 +16,7 @@
       <div class="sidebar-mobile-head"><strong>Menu</strong><button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button></div>
       <div class="brand"><h1>GTLS Transport</h1></div>
       <nav class="nav">
-        <a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="booking.html" data-page="booking">Booking Form</a><a href="ledger.html" data-page="ledger">Booking Summary</a><a href="truck.html" data-page="truck">Truck Details</a><a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a><a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a><a href="employees.html" data-page="employee">Employees</a><a href="khata.html" data-page="khata">Khata Page</a><a href="admin-login.html" data-page="admin-login">Admin</a>
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="booking.html" data-page="booking">Booking Form</a><a href="ledger.html" data-page="ledger">Booking Summary</a><a href="truck.html" data-page="truck">Truck Details</a><a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a><a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a><a href="employees.html" data-page="employee">Employees</a><a href="khata.html" data-page="khata">Accounts Receivable</a><a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a><a href="admin-login.html" data-page="admin-login">Admin</a>
       </nav><div class="tip"></div>
     </aside>
     <main class="main">
@@ -25,6 +25,9 @@
         <div class="screen-head">
           <div></div>
           <div class="ledger-filter"><div class="ledger-total" aria-live="polite"><span>Total Trucks</span><strong data-truck-summary-total-trucks>0</strong></div><div class="ledger-total" aria-live="polite"><span>Total Import Receivable</span><strong data-truck-summary-import-receivable>PKR 0</strong></div><div class="ledger-total" aria-live="polite"><span>Total Export Receivable</span><strong data-truck-summary-export-receivable>PKR 0</strong></div><div class="ledger-total" aria-live="polite"><span>Grand Total</span><strong data-truck-summary-grand-total>PKR 0</strong></div><div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div><div class="ledger-filter-control"><label for="truck-summary-job-sort">Job Order</label><select id="truck-summary-job-sort" data-truck-summary-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div><span class="ledger-count" data-truck-summary-count>0 job(s)</span></div>
+        </div>
+        <div class="truck-summary-download">
+          <button class="btn primary" type="button" data-download-pending-truck-summary disabled>Download PDF</button>
         </div>
         <div class="truck-summary-groups" data-truck-summary-groups></div>
       </section>

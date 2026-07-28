@@ -1,6 +1,7 @@
 (function () {
   const KEY = "gtls-transport-demo-data-v1";
   const ADMIN_AUTH_KEY = "gtls-admin-auth-v1";
+  const SIDEBAR_COLLAPSED_KEY = "gtls-sidebar-collapsed-v1";
   const ACCESS_OPTIONS = [
     { value: "dashboard", label: "Dashboard" },
     { value: "booking", label: "Booking Form" },
@@ -8,8 +9,10 @@
     { value: "truck", label: "Truck Details" },
     { value: "truck-summary", label: "Pending Truck Summary" },
     { value: "completed-truck-summary", label: "Completed Truck Summary" },
+    { value: "equipment", label: "Equipment & Handling Fleet" },
     { value: "employee", label: "Employees" },
-    { value: "khata", label: "Khata Page" },
+    { value: "khata", label: "Accounts Receivable" },
+    { value: "accounts-payable", label: "Accounts Payable" },
     { value: "admin", label: "Admin" }
   ];
   const DEFAULT_USER_ACCESS = ACCESS_OPTIONS.map((item) => item.value).filter((item) => item !== "admin");
@@ -167,6 +170,76 @@
         documentAlert: "Route permit renewal needed"
       }
     ],
+    equipmentFleet: [
+      {
+        id: "EQP-001",
+        truckNo: "TMT-066",
+        chassisNo: "JALFVR34MS7000695",
+        engineNo: "6HK1AA6552",
+        make: "ISUZU",
+        model: "2025",
+        mra: "Lasbellah Balochistan",
+        banker: "United Bank Limited",
+        fitnessExpiry: "2026-06-17",
+        balochistanPermitExpiry: "2028-12-09",
+        sindhPermitExpiry: "2028-12-09",
+        kpkPermitExpiry: "",
+        punjabPermitExpiry: "2028-12-09",
+        taxPaidUpTo: "2026-12-31",
+        originalDocs: "Fitness, Route Permits"
+      },
+      {
+        id: "EQP-002",
+        truckNo: "TMT-166",
+        chassisNo: "JALFVR34MS7000801",
+        engineNo: "6HK1AA7939",
+        make: "ISUZU",
+        model: "2025",
+        mra: "Lasbellah Balochistan",
+        banker: "Bank of Punjab",
+        fitnessExpiry: "2026-12-28",
+        balochistanPermitExpiry: "2028-12-09",
+        sindhPermitExpiry: "2028-12-09",
+        kpkPermitExpiry: "2028-12-09",
+        punjabPermitExpiry: "2028-12-09",
+        taxPaidUpTo: "2026-12-31",
+        originalDocs: "Fitness, Route Permits, Original Card"
+      },
+      {
+        id: "EQP-003",
+        truckNo: "TMT-266",
+        chassisNo: "JALFVR34MS7001096",
+        engineNo: "6HK1AD1590",
+        make: "ISUZU",
+        model: "2026",
+        mra: "Lasbellah Balochistan",
+        banker: "Bank of Punjab",
+        fitnessExpiry: "2026-09-08",
+        balochistanPermitExpiry: "2029-02-23",
+        sindhPermitExpiry: "2029-02-23",
+        kpkPermitExpiry: "2029-02-23",
+        punjabPermitExpiry: "2029-02-23",
+        taxPaidUpTo: "2026-12-31",
+        originalDocs: "Fitness, Route Permits"
+      },
+      {
+        id: "EQP-004",
+        truckNo: "JW-5477",
+        chassisNo: "JALFVR34MS7000694",
+        engineNo: "6HK1AA6552",
+        make: "ISUZU",
+        model: "2025",
+        mra: "Karachi Sindh",
+        banker: "United Bank Limited",
+        fitnessExpiry: "2026-12-19",
+        balochistanPermitExpiry: "",
+        sindhPermitExpiry: "2029-01-16",
+        kpkPermitExpiry: "",
+        punjabPermitExpiry: "2029-01-16",
+        taxPaidUpTo: "2027-06-30",
+        originalDocs: "Fitness, Route Permits, Number Plate, Copy Key"
+      }
+    ],
     truckExpenses: [
       {
         id: "EXP-001",
@@ -305,6 +378,31 @@
           }
         ]
       }
+    ],
+    vendorKhatas: [
+      {
+        id: "PAY-1001",
+        customer: "Abdullah Transport",
+        phone: "0300-1234567",
+        city: "Karachi",
+        openingBalance: 0,
+        entries: [
+          {
+            id: "PAYE-001",
+            date: "2026-07-04",
+            type: "Debit",
+            description: "Transport service payable",
+            amount: 120000
+          },
+          {
+            id: "PAYE-002",
+            date: "2026-07-08",
+            type: "Credit",
+            description: "Part payment made",
+            amount: 40000
+          }
+        ]
+      }
     ]
   };
 
@@ -333,8 +431,24 @@
       }));
     }
 
+    if (!Array.isArray(store.vendorKhatas) || store.vendorKhatas.length === 0) {
+      store.vendorKhatas = structuredClone(seed.vendorKhatas);
+    } else {
+      store.vendorKhatas = store.vendorKhatas.map((account) => ({
+        ...account,
+        entries: Array.isArray(account.entries) ? account.entries.map((entry) => ({
+          ...entry,
+          type: entry.type === "Payable" ? "Debit" : entry.type === "Paid" ? "Credit" : entry.type
+        })) : []
+      }));
+    }
+
     if (!Array.isArray(store.employees)) {
       store.employees = structuredClone(seed.employees);
+    }
+
+    if (!Array.isArray(store.equipmentFleet)) {
+      store.equipmentFleet = structuredClone(seed.equipmentFleet);
     }
 
     if (!Array.isArray(store.adminUsers) || store.adminUsers.length === 0) {
@@ -376,7 +490,13 @@
         ? [access]
         : structuredClone(DEFAULT_USER_ACCESS);
 
-    const normalized = [...new Set(values
+    let migratedValues = values.includes("khata") && !values.includes("accounts-payable")
+      ? [...values, "accounts-payable"]
+      : [...values];
+    if (migratedValues.includes("truck") && !migratedValues.includes("equipment")) {
+      migratedValues.push("equipment");
+    }
+    const normalized = [...new Set(migratedValues
       .map((item) => String(item || "").trim())
       .filter((item) => allowedValues.has(item))
     )];
@@ -555,9 +675,55 @@
     sidebarTip.innerHTML = `<div class="actions"><button class="btn small" type="button" data-software-signout>Sign Out</button></div>`;
 
     sidebarTip.querySelector("[data-software-signout]").addEventListener("click", () => {
-      clearAdminSession();
-      navigateWithTransition("index.html");
+      openSignOutConfirmation();
     });
+  }
+
+  function openSignOutConfirmation() {
+    let modal = document.querySelector("[data-signout-modal]");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.className = "confirm-modal";
+      modal.dataset.signoutModal = "";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="signout-title" aria-describedby="signout-description">
+          <div class="confirm-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M10 17l5-5-5-5M15 12H3"></path>
+              <path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"></path>
+            </svg>
+          </div>
+          <h2 id="signout-title">Sign out?</h2>
+          <p id="signout-description">Are you sure you want to end your current session?</p>
+          <div class="confirm-actions">
+            <button class="btn" type="button" data-cancel-signout>Stay Signed In</button>
+            <button class="btn primary" type="button" data-confirm-signout>Sign Out</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      const closeModal = () => {
+        modal.hidden = true;
+        document.body.classList.remove("confirm-modal-open");
+      };
+      modal.querySelector("[data-cancel-signout]").addEventListener("click", closeModal);
+      modal.querySelector("[data-confirm-signout]").addEventListener("click", () => {
+        clearAdminSession();
+        navigateWithTransition("index.html");
+      });
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modal.hidden) closeModal();
+      });
+    }
+
+    modal.hidden = false;
+    document.body.classList.add("confirm-modal-open");
+    modal.querySelector("[data-cancel-signout]").focus();
   }
 
   function normalizeContainerLine(line = {}) {
@@ -1092,6 +1258,92 @@
     const page = document.body.dataset.page;
     document.querySelectorAll(".nav a").forEach((link) => {
       link.classList.toggle("active", link.dataset.page === page);
+    });
+  }
+
+  function ensureEquipmentNavigation() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      if (nav.querySelector('[data-page="equipment"]')) return;
+      const link = document.createElement("a");
+      link.href = "equipment.html";
+      link.dataset.page = "equipment";
+      link.textContent = "Equipment & Handling Fleet";
+      const employeeLink = nav.querySelector('[data-page="employee"]');
+      nav.insertBefore(link, employeeLink || nav.querySelector('[data-page="admin"], [data-page="admin-login"]'));
+    });
+  }
+
+  function getNavigationIcon(page) {
+    const icons = {
+      dashboard: '<path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path>',
+      booking: '<path d="M6 3v3M18 3v3"></path><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h3M8 17h6"></path>',
+      ledger: '<path d="M6 2h9l4 4v16H6z"></path><path d="M14 2v5h5M9 12h6M9 16h6"></path>',
+      truck: '<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7z"></path><circle cx="7" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle>',
+      "truck-summary": '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
+      "completed-truck-summary": '<circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path>',
+      equipment: '<path d="M4 14h11v5H4zM15 11h4l2 3v5h-6z"></path><path d="M7 14V8h6M13 8l3-3M3 19h19"></path><circle cx="8" cy="20" r="1.5"></circle><circle cx="18" cy="20" r="1.5"></circle>',
+      employee: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c.8-4.2 3.5-6 8-6s7.2 1.8 8 6"></path>',
+      khata: '<path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
+      "accounts-payable": '<path d="M3 7h18v12H3z"></path><path d="M3 10h18M7 15h4"></path><path d="m16 14 2 2 3-4"></path>',
+      "admin-login": '<circle cx="12" cy="8" r="4"></circle><path d="M5 21v-2a7 7 0 0 1 14 0v2"></path><path d="M18 5.5 20 4l1 2"></path>',
+      admin: '<circle cx="12" cy="8" r="4"></circle><path d="M5 21v-2a7 7 0 0 1 14 0v2"></path><path d="M18 5.5 20 4l1 2"></path>'
+    };
+    return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${icons[page] || icons.dashboard}</svg>`;
+  }
+
+  function bindDesktopSidebar() {
+    const sidebar = document.querySelector(".sidebar");
+    const brand = sidebar?.querySelector(".brand");
+    const nav = sidebar?.querySelector(".nav");
+    if (!sidebar || !brand || !nav) return;
+
+    nav.querySelectorAll("a[data-page]").forEach((link) => {
+      if (link.querySelector(".nav-icon")) return;
+      const label = link.textContent.trim();
+      link.innerHTML = `<span class="nav-icon">${getNavigationIcon(link.dataset.page)}</span><span class="nav-label">${escapeHtml(label)}</span>`;
+      link.title = label;
+    });
+
+    let collapseButton = brand.querySelector("[data-sidebar-collapse]");
+    if (!collapseButton) {
+      collapseButton = document.createElement("button");
+      collapseButton.type = "button";
+      collapseButton.className = "sidebar-collapse";
+      collapseButton.dataset.sidebarCollapse = "";
+      brand.appendChild(collapseButton);
+    }
+
+    const signOutButton = sidebar.querySelector("[data-software-signout]");
+    if (signOutButton && !signOutButton.querySelector(".nav-icon")) {
+      signOutButton.innerHTML = `
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M10 17l5-5-5-5M15 12H3"></path><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"></path>
+          </svg>
+        </span>
+        <span class="nav-label">Sign Out</span>
+      `;
+      signOutButton.title = "Sign Out";
+    }
+
+    function applyCollapsedState(isCollapsed) {
+      sidebar.classList.toggle("collapsed", isCollapsed);
+      document.body.classList.toggle("sidebar-collapsed", isCollapsed);
+      collapseButton.setAttribute("aria-expanded", String(!isCollapsed));
+      collapseButton.setAttribute("aria-label", isCollapsed ? "Expand sidebar" : "Collapse sidebar");
+      collapseButton.title = isCollapsed ? "Expand sidebar" : "Collapse sidebar";
+      collapseButton.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="${isCollapsed ? "m9 18 6-6-6-6" : "m15 18-6-6 6-6"}"></path>
+        </svg>
+      `;
+    }
+
+    applyCollapsedState(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
+    collapseButton.addEventListener("click", () => {
+      const nextState = !sidebar.classList.contains("collapsed");
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(nextState));
+      applyCollapsedState(nextState);
     });
   }
 
@@ -1705,9 +1957,12 @@
     render();
   }
 
-  async function buildTruckTripInvoicePdf(trip, tripType) {
+  async function buildPendingTruckSummaryPdf(trips, summaryTruckNo) {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
-    const isImport = tripType === "import";
+    const records = (Array.isArray(trips) ? trips : [trips])
+      .filter(Boolean)
+      .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, "asc"));
+    if (!records.length) throw new Error("No pending truck records were found.");
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("l", "pt", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -1722,51 +1977,112 @@
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12);
-    pdf.text(isImport ? "IMPORT INVOICE" : "EXPORT INVOICE", 28, 150);
-    pdf.text(`Job No: ${text(trip.jobNo)}`, 28, 168);
+    pdf.text("PENDING TRUCK SUMMARY", 28, 150);
+    pdf.text(`Truck No: ${text(summaryTruckNo)}`, 28, 168);
 
-    const details = isImport ? {
-      date: trip.date, truckNo: trip.truckNo, origin: trip.origin, destination: trip.destination,
-      size: trip.size, weight: trip.weight, freight: trip.importFreight, broker: trip.importBroker,
-      remarks: trip.importRemarks || trip.remarks
-    } : {
-      date: trip.exportLoadDate, truckNo: trip.exportTruckNo || trip.truckNo, origin: trip.exportOrigin, destination: trip.exportDestination,
-      size: trip.exportSize, weight: trip.exportWeight, freight: trip.exportFreight, broker: trip.exportBroker,
-      remarks: trip.exportRemarks || trip.remarks
-    };
+    function shortPdfDate(value) {
+      const movementDate = parseDateValue(value);
+      return movementDate
+        ? `${String(movementDate.getDate()).padStart(2, "0")}-${movementDate.toLocaleString("en-US", { month: "short" })}-${String(movementDate.getFullYear()).slice(-2)}`
+        : "-";
+    }
 
-    const movementDate = parseDateValue(details.date);
-    const formattedMovementDate = movementDate
-      ? `${String(movementDate.getDate()).padStart(2, "0")}-${movementDate.toLocaleString("en-US", { month: "short" })}-${String(movementDate.getFullYear()).slice(-2)}`
-      : "-";
+    const rows = records.flatMap((trip) => {
+      const importReceivable = trip.importReceivedAmount === undefined || trip.importReceivedAmount === ""
+        ? Number(trip.importFreight || 0) - Number(trip.importBrokerCommission || 0)
+        : Number(trip.importReceivedAmount || 0);
+      const exportReceivable = trip.exportReceivedAmount === undefined || trip.exportReceivedAmount === ""
+        ? Number(trip.exportFreight || 0) - Number(trip.exportBrokerCommission || 0)
+        : Number(trip.exportReceivedAmount || 0);
+      return [
+        {
+          amount: importReceivable,
+          values: {
+            jobNo: trip.jobNo,
+            type: "Import",
+            date: shortPdfDate(trip.date),
+            truckNo: trip.truckNo,
+            origin: trip.origin,
+            destination: trip.destination,
+            size: trip.size,
+            weight: trip.weight,
+            cargo: trip.cargoDescription,
+            receivable: importReceivable,
+            broker: trip.importBroker,
+            remarks: trip.importRemarks || trip.remarks
+          }
+        },
+        {
+          amount: exportReceivable,
+          values: {
+            jobNo: trip.jobNo,
+            type: "Export",
+            date: shortPdfDate(trip.exportLoadDate),
+            truckNo: trip.exportTruckNo || trip.truckNo,
+            origin: trip.exportOrigin,
+            destination: trip.exportDestination,
+            size: trip.exportSize,
+            weight: trip.exportWeight,
+            cargo: trip.cargoDescription,
+            receivable: exportReceivable,
+            broker: trip.exportBroker,
+            remarks: trip.exportRemarks || trip.remarks
+          }
+        },
+        {
+          amount: Number(trip.mtyBoxFreight || 0),
+          values: {
+            jobNo: trip.jobNo,
+            type: "MTY",
+            date: "-",
+            truckNo: "-",
+            origin: "-",
+            destination: "-",
+            size: "-",
+            weight: "-",
+            cargo: "-",
+            receivable: Number(trip.mtyBoxFreight || 0),
+            broker: trip.mtyBroker,
+            remarks: "-"
+          }
+        }
+      ];
+    }).map((row, index) => ({
+      amount: row.amount,
+      cells: [
+        String(index + 1),
+        text(row.values.jobNo || "-"),
+        row.values.type,
+        row.values.date,
+        text(row.values.truckNo || "-"),
+        text(row.values.origin || "-"),
+        text(row.values.destination || "-"),
+        text(row.values.size || "-"),
+        text(row.values.weight || "-"),
+        text(row.values.cargo || "-"),
+        money(row.values.receivable),
+        text(row.values.broker || "-"),
+        text(row.values.remarks || "-")
+      ]
+    }));
+    const totalReceivable = rows.reduce((total, row) => total + Number(row.amount || 0), 0);
 
     pdf.autoTable({
       startY: 182,
       theme: "grid",
-      margin: { left: 20, right: 20 },
+      margin: { left: 20, right: 20, bottom: 72 },
+      showFoot: "lastPage",
       head: [[
-        "S.No", "Date", "Registration No", "Origin", "Destination", "Size", "Weight",
-        "Cargo Description", `${isImport ? "Import" : "Export"} Freight`,
-        `${isImport ? "Import" : "Export"} - Broker`, "Remarks"
+        "S.No", "Job No", "Type", "Date", "Registration No", "Origin", "Destination", "Size",
+        "Weight", "Cargo Description", "Receivable Amount", "Broker", "Remarks"
       ]],
-      body: [[
-        "1",
-        formattedMovementDate,
-        text(details.truckNo || "-"),
-        text(details.origin || "-"),
-        text(details.destination || "-"),
-        text(details.size || "-"),
-        text(details.weight || "-"),
-        text(trip.cargoDescription || "-"),
-        money(details.freight),
-        text(details.broker || "-"),
-        text(details.remarks || "-")
-      ]],
+      body: rows.map((row) => row.cells),
+      foot: [["", "", "", "", "", "", "", "", "", "Total", money(totalReceivable), "", ""]],
       styles: {
-        fontSize: 8.5,
-        cellPadding: 5,
+        fontSize: 8,
+        cellPadding: 4,
         lineColor: [0, 0, 0],
-        lineWidth: 0.8,
+        lineWidth: 0.65,
         textColor: [0, 0, 0],
         valign: "middle",
         overflow: "linebreak"
@@ -1776,32 +2092,44 @@
         textColor: [0, 0, 0],
         fontStyle: "bold",
         halign: "center",
-        minCellHeight: 38
+        minCellHeight: 34
       },
-      bodyStyles: { minCellHeight: 42, halign: "center" },
+      bodyStyles: { minCellHeight: 34, halign: "center" },
+      footStyles: {
+        fillColor: [255, 247, 239],
+        textColor: [24, 48, 77],
+        fontStyle: "bold",
+        halign: "center",
+        minCellHeight: 28
+      },
       columnStyles: {
-        0: { cellWidth: 30, halign: "center" },
-        1: { cellWidth: 58, halign: "center" },
-        2: { cellWidth: 82, halign: "center" },
-        3: { cellWidth: 58, halign: "center" },
-        4: { cellWidth: 66, halign: "center" },
-        5: { cellWidth: 40, halign: "center" },
-        6: { cellWidth: 52, halign: "center" },
-        7: { cellWidth: 82 },
-        8: { cellWidth: 68, halign: "center" },
-        9: { cellWidth: 140, halign: "center" },
-        10: { cellWidth: 124, halign: "center" }
+        0: { cellWidth: 28, halign: "center" },
+        1: { cellWidth: 48, halign: "center" },
+        2: { cellWidth: 42, halign: "center" },
+        3: { cellWidth: 52, halign: "center" },
+        4: { cellWidth: 72, halign: "center" },
+        5: { cellWidth: 47, halign: "center" },
+        6: { cellWidth: 58, halign: "center" },
+        7: { cellWidth: 36, halign: "center" },
+        8: { cellWidth: 43, halign: "center" },
+        9: { cellWidth: 68, halign: "center" },
+        10: { cellWidth: 74, halign: "center" },
+        11: { cellWidth: 106, halign: "center" },
+        12: { cellWidth: 84, halign: "center" }
+      },
+      didDrawPage: () => {
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.7);
+        pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+        pdf.setTextColor(24, 48, 77);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
       }
     });
 
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
-    pdf.setDrawColor(0, 0, 0);
-    pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
-    pdf.save(`${String(trip.customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
+    const safeTruckNo = String(summaryTruckNo || "truck").replace(/[^\w-]+/g, "_");
+    pdf.save(`${safeTruckNo}_pending_summary.pdf`);
   }
 
   async function buildTruckDetailsInvoicePdf(trip, tripType) {
@@ -2080,18 +2408,25 @@
     const grandTotalElement = document.querySelector("[data-truck-summary-grand-total]");
     const totalTrucksElement = document.querySelector("[data-truck-summary-total-trucks]");
     const totalWorkElement = document.querySelector("[data-completed-total-work]");
+    const completedProfitLossElement = document.querySelector("[data-completed-profit-loss]");
+    const pendingSummaryDownloadButton = document.querySelector("[data-download-pending-truck-summary]");
+    let currentPendingSummaryTrips = [];
+    let currentPendingSummaryTruckNo = "";
     if (!groupsContainer || !count) return;
+
+    function hasAllPaymentsCredited(item) {
+      const importStatus = String(item.importPaymentStatus || "Awaited").trim().toLowerCase();
+      const exportStatus = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase();
+      const mtyStatus = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase();
+      return importStatus === "credit"
+        && exportStatus === "credit"
+        && mtyStatus === "credit";
+    }
 
     function render() {
       const trips = store.truckExpenses.filter((item) => {
         if (!item.jobNo) return false;
-        const importStatus = String(item.importPaymentStatus || "Awaited").trim().toLowerCase();
-        const exportStatus = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase();
-        const mtyStatus = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase();
-        const allPaymentsCredited = importStatus === "credit"
-          && exportStatus === "credit"
-          && mtyStatus === "credit";
-        return isCompletedSummary ? allPaymentsCredited : !allPaymentsCredited;
+        return isCompletedSummary ? hasAllPaymentsCredited(item) : !hasAllPaymentsCredited(item);
       });
       const truckNumbers = [...new Set(trips.map((item) => String(item.truckNo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const selectedTruckNo = String(customerFilter?.value || "").trim();
@@ -2113,6 +2448,14 @@
         })
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
 
+      if (!isCompletedSummary) {
+        currentPendingSummaryTrips = filteredTrips;
+        currentPendingSummaryTruckNo = selectedTruckNo;
+        if (pendingSummaryDownloadButton) {
+          pendingSummaryDownloadButton.disabled = !selectedTruckNo || !filteredTrips.length;
+        }
+      }
+
       const totals = filteredTrips.reduce((summary, item) => {
         const storedImportReceivable = Number(item.importReceivedAmount);
         const storedExportReceivable = Number(item.exportReceivedAmount);
@@ -2122,12 +2465,14 @@
         const exportReceivable = Number.isFinite(storedExportReceivable)
           ? storedExportReceivable
           : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
-        const grandTotal = calculateTruckTripFinancials(item).grandTotal;
+        const financials = calculateTruckTripFinancials(item);
+        const grandTotal = financials.grandTotal;
         summary.importReceivable += importReceivable;
         summary.exportReceivable += exportReceivable;
         summary.grandTotal += grandTotal;
+        summary.profitLoss += financials.profitLoss;
         return summary;
-      }, { importReceivable: 0, exportReceivable: 0, grandTotal: 0 });
+      }, { importReceivable: 0, exportReceivable: 0, grandTotal: 0, profitLoss: 0 });
 
       if (importReceivableTotal) importReceivableTotal.textContent = `PKR ${money(totals.importReceivable)}`;
       if (exportReceivableTotal) exportReceivableTotal.textContent = `PKR ${money(totals.exportReceivable)}`;
@@ -2137,6 +2482,7 @@
         totalTrucksElement.textContent = String(totalTrucks);
       }
       if (totalWorkElement) totalWorkElement.textContent = `PKR ${money(totals.grandTotal)}`;
+      if (completedProfitLossElement) completedProfitLossElement.textContent = `PKR ${money(totals.profitLoss)}`;
       const groupedTrips = new Map();
 
       filteredTrips.forEach((trip) => {
@@ -2166,7 +2512,6 @@
           { tripId: item.id, type: "MTY", date: "", truckNo: "", origin: "", destination: "", size: "", weight: "", cargo: "", freight: item.mtyBoxFreight, receivable: Number(item.mtyBoxFreight || 0), broker: item.mtyBroker, remarks: "" }
         ]));
         const brokerSummary = [...new Set(legs.map((leg) => String(leg.broker || "").trim()).filter(Boolean))].join(" | ") || "-";
-        const downloadHeader = isCompletedSummary ? "" : "<th>Download PDF</th>";
 
         return `
           <section class="truck-job-group">
@@ -2185,17 +2530,12 @@
               <table class="statement-table truck-summary-table">
                 <thead>
                   <tr>
-                    <th>S.No</th><th>Type</th><th>Date</th><th>Registration No</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>${isCompletedSummary ? "Received Amount" : "Receivable Amount"}</th><th>Broker</th><th>Remarks</th>${downloadHeader}
+                    <th>S.No</th><th>Type</th><th>Date</th><th>Registration No</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>${isCompletedSummary ? "Received Amount" : "Receivable Amount"}</th><th>Broker</th><th>Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${legs.map((leg) => {
                     serialNumber += 1;
-                    const downloadCell = isCompletedSummary
-                      ? ""
-                      : leg.type === "MTY"
-                        ? "<td>-</td>"
-                        : `<td><button class="btn small" type="button" data-summary-invoice="${leg.tripId}" data-summary-type="${leg.type.toLowerCase()}">Download PDF</button></td>`;
                     return `<tr>
                       <td>${serialNumber}</td>
                       <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${leg.type}</span></td>
@@ -2209,7 +2549,6 @@
                       <td>${money(leg.receivable)}</td>
                       <td>${text(leg.broker)}</td>
                       <td>${text(leg.remarks)}</td>
-                      ${downloadCell}
                     </tr>`;
                   }).join("")}
                 </tbody>
@@ -2224,12 +2563,180 @@
     if (jobSort) jobSort.addEventListener("change", render);
     if (startDateFilter) startDateFilter.addEventListener("change", render);
     if (endDateFilter) endDateFilter.addEventListener("change", render);
-    groupsContainer.addEventListener("click", (event) => {
-      const tripId = event.target.getAttribute("data-summary-invoice");
-      if (!tripId) return;
-      const trip = store.truckExpenses.find((item) => item.id === tripId);
-      if (trip) buildTruckTripInvoicePdf(trip, event.target.getAttribute("data-summary-type") || "import").catch(() => {});
+    if (pendingSummaryDownloadButton) {
+      pendingSummaryDownloadButton.addEventListener("click", () => {
+        if (!currentPendingSummaryTruckNo || !currentPendingSummaryTrips.length) return;
+        buildPendingTruckSummaryPdf(currentPendingSummaryTrips, currentPendingSummaryTruckNo).catch(() => {});
+      });
+    }
+    render();
+  }
+
+  function equipmentPage(store) {
+    const form = document.querySelector("[data-equipment-form]");
+    const body = document.querySelector("[data-equipment-rows]");
+    const summary = document.querySelector("[data-equipment-summary]");
+    const search = document.querySelector("[data-equipment-search]");
+    const count = document.querySelector("[data-equipment-count]");
+    const notice = document.querySelector("[data-notice]");
+    let editingId = "";
+    if (!form || !body || !summary) return;
+
+    const permitFields = [
+      "balochistanPermitExpiry",
+      "sindhPermitExpiry",
+      "kpkPermitExpiry",
+      "punjabPermitExpiry"
+    ];
+
+    function setNotice(message = "") {
+      if (!notice) return;
+      notice.textContent = message;
+      notice.hidden = !message;
+    }
+
+    function getExpiryState(value) {
+      if (!value) return { className: "na", label: "N/A" };
+      const expiry = parseDateValue(value);
+      if (!expiry) return { className: "na", label: text(value) };
+      const today = parseDateValue(getTodayIsoDate());
+      const days = Math.ceil((expiry - today) / 86400000);
+      if (days < 0) return { className: "expired", label: formatShortDate(value) };
+      if (days <= 90) return { className: "due", label: formatShortDate(value) };
+      return { className: "valid", label: formatShortDate(value) };
+    }
+
+    function expiryCell(value) {
+      const state = getExpiryState(value);
+      return `<span class="expiry-status ${state.className}">${state.label}</span>`;
+    }
+
+    function updateSummary(rows) {
+      const fitnessAlerts = rows.filter((item) => {
+        const state = getExpiryState(item.fitnessExpiry).className;
+        return state === "expired" || state === "due";
+      }).length;
+      const permitAlerts = rows.filter((item) => permitFields.some((field) => {
+        const state = getExpiryState(item[field]).className;
+        return state === "expired" || state === "due";
+      })).length;
+      const completeFiles = rows.filter((item) => String(item.originalDocs || "").trim()).length;
+
+      summary.innerHTML = `
+        <div class="card span-3"><span class="badge">Fleet</span><strong>${rows.length}</strong><div class="muted">Registered equipment</div></div>
+        <div class="card span-3"><span class="badge ${fitnessAlerts ? "bad" : "good"}">Fitness</span><strong>${fitnessAlerts}</strong><div class="muted">Expiry alerts</div></div>
+        <div class="card span-3"><span class="badge ${permitAlerts ? "warn" : "good"}">Permits</span><strong>${permitAlerts}</strong><div class="muted">Permit alerts</div></div>
+        <div class="card span-3"><span class="badge good">Documents</span><strong>${completeFiles}</strong><div class="muted">Files recorded</div></div>
+      `;
+    }
+
+    function getFilteredRows() {
+      const query = String(search?.value || "").trim().toLowerCase();
+      return [...store.equipmentFleet]
+        .filter((item) => !query || [
+          item.truckNo,
+          item.chassisNo,
+          item.engineNo,
+          item.make,
+          item.model,
+          item.mra,
+          item.banker,
+          item.originalDocs
+        ].some((value) => String(value || "").toLowerCase().includes(query)))
+        .sort((left, right) => String(left.truckNo || "").localeCompare(String(right.truckNo || "")));
+    }
+
+    function render() {
+      const rows = getFilteredRows();
+      body.innerHTML = rows.map((item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td><strong>${text(item.truckNo)}</strong></td>
+          <td>${text(item.chassisNo)}</td>
+          <td>${text(item.engineNo)}</td>
+          <td>${text(item.make)}</td>
+          <td>${text(item.model)}</td>
+          <td>${text(item.mra)}</td>
+          <td>${text(item.banker)}</td>
+          <td>${expiryCell(item.fitnessExpiry)}</td>
+          <td>${expiryCell(item.balochistanPermitExpiry)}</td>
+          <td>${expiryCell(item.sindhPermitExpiry)}</td>
+          <td>${expiryCell(item.kpkPermitExpiry)}</td>
+          <td>${expiryCell(item.punjabPermitExpiry)}</td>
+          <td>${expiryCell(item.taxPaidUpTo)}</td>
+          <td class="equipment-docs">${text(item.originalDocs || "-")}</td>
+          <td>
+            <div class="table-actions">
+              <button class="btn small" type="button" data-edit-equipment="${item.id}">Edit</button>
+              <button class="btn small danger" type="button" data-delete-equipment="${item.id}">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+      updateSummary(rows);
+      if (count) count.textContent = `${rows.length} record(s)`;
+    }
+
+    function resetForm() {
+      form.reset();
+      editingId = "";
+      form.querySelector("[data-submit-label]").textContent = "Save Equipment";
+    }
+
+    function fillForm(item) {
+      if (!item) return;
+      Object.keys(item).forEach((key) => {
+        if (form.elements[key]) form.elements[key].value = item[key] || "";
+      });
+      editingId = item.id;
+      form.querySelector("[data-submit-label]").textContent = "Update Equipment";
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      const normalized = Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [key, String(value || "").trim()])
+      );
+
+      if (!editingId) {
+        const nextNumber = store.equipmentFleet.reduce((max, item) => {
+          const current = Number(String(item.id || "").replace(/\D/g, "")) || 0;
+          return Math.max(max, current);
+        }, 0) + 1;
+        normalized.id = `EQP-${String(nextNumber).padStart(3, "0")}`;
+        store.equipmentFleet.unshift(normalized);
+        setNotice(`${normalized.truckNo} added to the equipment register.`);
+      } else {
+        const index = store.equipmentFleet.findIndex((item) => item.id === editingId);
+        if (index === -1) return;
+        normalized.id = editingId;
+        store.equipmentFleet[index] = normalized;
+        setNotice(`${normalized.truckNo} equipment record updated.`);
+      }
+
+      saveStore(store);
+      resetForm();
+      render();
     });
+
+    body.addEventListener("click", (event) => {
+      const editId = event.target.getAttribute("data-edit-equipment");
+      const deleteId = event.target.getAttribute("data-delete-equipment");
+      if (editId) fillForm(store.equipmentFleet.find((item) => item.id === editId));
+      if (deleteId) {
+        store.equipmentFleet = store.equipmentFleet.filter((item) => item.id !== deleteId);
+        saveStore(store);
+        if (editingId === deleteId) resetForm();
+        render();
+        setNotice("Equipment record deleted.");
+      }
+    });
+
+    document.querySelector("[data-reset-equipment-form]").addEventListener("click", resetForm);
+    if (search) search.addEventListener("input", render);
+    resetForm();
     render();
   }
 
@@ -2495,8 +3002,7 @@
 
     if (logoutButton) {
       logoutButton.addEventListener("click", () => {
-        clearAdminSession();
-        navigateWithTransition("index.html");
+        openSignOutConfirmation();
       });
     }
 
@@ -2565,6 +3071,14 @@
   }
 
   function khataPage(store) {
+    const isPayable = document.body.dataset.page === "accounts-payable";
+    const accounts = isPayable ? store.vendorKhatas : store.customerKhatas;
+    const partyLabel = isPayable ? "Payee" : "Customer";
+    const statementLabel = isPayable ? "PAYABLE STATEMENT" : "CUSTOMER STATEMENT";
+    const debitLabel = isPayable ? "Total Payable" : "Total Debit";
+    const creditLabel = isPayable ? "Total Paid" : "Total Credit";
+    const balanceLabel = isPayable ? "Outstanding Payable" : "Net Balance";
+    const entryPrefix = isPayable ? "PAYE" : "KHT";
     const select = document.querySelector("[data-khata-select]");
     const body = document.querySelector("[data-khata-rows]");
     const summary = document.querySelector("[data-khata-summary]");
@@ -2583,7 +3097,7 @@
     let editingCustomerId = "";
 
     function getSelectedAccount() {
-      return store.customerKhatas.find((item) => item.id === select.value) || store.customerKhatas[0];
+      return accounts.find((item) => item.id === select.value) || accounts[0];
     }
 
     function getStatementData(account) {
@@ -2600,7 +3114,11 @@
           description: text(entry.description),
           debit: entry.type === "Debit" ? money(entry.amount) : "-",
           credit: entry.type === "Credit" ? money(entry.amount) : "-",
-          balance: runningBalance === 0 ? "0" : `${money(Math.abs(runningBalance))} ${runningBalance > 0 ? "(-)" : "(+)"}`
+          balance: runningBalance === 0
+            ? "0"
+            : `${money(Math.abs(runningBalance))} ${runningBalance > 0
+              ? (isPayable ? "Outstanding" : "(-)")
+              : (isPayable ? "Advance" : "(+)")}`
         };
       });
 
@@ -2634,10 +3152,10 @@
       pdf.setTextColor(24, 48, 77);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(17);
-      pdf.text("CUSTOMER STATEMENT", pageWidth - left, 154, { align: "right" });
+      pdf.text(statementLabel, pageWidth - left, 154, { align: "right" });
 
       pdf.setFontSize(18);
-      pdf.text(`${account.customer} Statement`, left, 170);
+      pdf.text(`${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`, left, 170);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
       pdf.setTextColor(75, 75, 75);
@@ -2654,9 +3172,9 @@
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
       pdf.setTextColor(85, 85, 85);
-      pdf.text("Total Debit", left, statsTop);
-      pdf.text("Total Credit", left + statWidth + 18, statsTop);
-      pdf.text("Net Balance", left + (statWidth * 2) + 18, statsTop);
+      pdf.text(debitLabel, left, statsTop);
+      pdf.text(creditLabel, left + statWidth + 18, statsTop);
+      pdf.text(balanceLabel, left + (statWidth * 2) + 18, statsTop);
 
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(16);
@@ -2669,11 +3187,25 @@
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
       pdf.setTextColor(255, 82, 82);
-      pdf.text(statement.totals.closingBalance > 0 ? "Debit (-)" : statement.totals.closingBalance < 0 ? "Credit (+)" : "-", left + (statWidth * 2) + 18, statsTop + 34);
+      pdf.text(
+        statement.totals.closingBalance > 0
+          ? (isPayable ? "Outstanding" : "Debit (-)")
+          : statement.totals.closingBalance < 0
+            ? (isPayable ? "Advance Paid" : "Credit (+)")
+            : "-",
+        left + (statWidth * 2) + 18,
+        statsTop + 34
+      );
 
       pdf.autoTable({
         startY: 288,
-        head: [["Date", "Tafseel", "Debit (-)", "Credit (+)", "Balance"]],
+        head: [[
+          "Date",
+          "Description",
+          isPayable ? "Payable" : "Debit (-)",
+          isPayable ? "Paid" : "Credit (+)",
+          isPayable ? "Outstanding" : "Balance"
+        ]],
         body: statement.rows.map((row) => [row.date, row.description, row.debit, row.credit, row.balance]),
         styles: {
           fontSize: 9,
@@ -2702,7 +3234,7 @@
         didParseCell(data) {
           if (data.section === "body" && data.column.index === 4) {
             const raw = String(data.cell.raw || "");
-            if (raw.includes("(-)")) data.cell.styles.textColor = [255, 82, 82];
+            if (raw.includes("(-)") || raw.includes("Outstanding")) data.cell.styles.textColor = [255, 82, 82];
           }
         },
         margin: { left, right: left }
@@ -2725,14 +3257,18 @@
       pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
 
       const blob = pdf.output("blob");
-      return new File([blob], `${account.customer.replace(/[^\w-]+/g, "_")}_khata.pdf`, { type: "application/pdf" });
+      return new File(
+        [blob],
+        `${account.customer.replace(/[^\w-]+/g, "_")}_${isPayable ? "payable" : "receivable"}.pdf`,
+        { type: "application/pdf" }
+      );
     }
 
     async function printStatement(account) {
       try {
         const file = await buildStatementPdfFile(account);
         triggerFileDownload(file);
-        exportNotice.textContent = `${account.customer} khata PDF downloaded successfully.`;
+        exportNotice.textContent = `${account.customer} ${isPayable ? "payable" : "receivable"} PDF downloaded successfully.`;
       } catch (error) {
         exportNotice.textContent = "The PDF could not be generated. Please try again.";
       }
@@ -2758,8 +3294,8 @@
         if (isMobileDevice() && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
           await navigator.share({
             files: [file],
-            title: `${account.customer} Statement`,
-            text: `${account.customer} statement`
+            title: `${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`,
+            text: `${account.customer} ${isPayable ? "payable" : "receivable"} statement`
           });
           exportNotice.textContent = "The share sheet is open. Select WhatsApp to send the statement directly.";
           return;
@@ -2780,12 +3316,12 @@
           ? "WhatsApp chat is open. The PDF has been downloaded; attach it and send it."
           : "WhatsApp Web is open and the PDF has been downloaded. Attach the downloaded PDF in the chat and send it.";
       } else {
-        exportNotice.textContent = "A valid WhatsApp number was not found for this customer.";
+        exportNotice.textContent = `A valid WhatsApp number was not found for this ${partyLabel.toLowerCase()}.`;
       }
     }
 
     function populateCustomers() {
-      select.innerHTML = store.customerKhatas.map((account) => `
+      select.innerHTML = accounts.map((account) => `
         <option value="${account.id}">${account.customer}</option>
       `).join("");
     }
@@ -2796,7 +3332,7 @@
       customerForm.elements.phone.value = "";
       customerForm.elements.city.value = "";
       editingCustomerId = "";
-      customerForm.querySelector("[data-customer-submit-label]").textContent = "Save Customer";
+      customerForm.querySelector("[data-customer-submit-label]").textContent = `Save ${partyLabel}`;
     }
 
     function fillCustomerForm(account) {
@@ -2805,11 +3341,12 @@
       customerForm.elements.phone.value = account.phone || "";
       customerForm.elements.city.value = account.city || "";
       editingCustomerId = account.id;
-      customerForm.querySelector("[data-customer-submit-label]").textContent = "Update Customer";
+      customerForm.querySelector("[data-customer-submit-label]").textContent = `Update ${partyLabel}`;
     }
 
     function renderCustomerList() {
-      customerListBody.innerHTML = store.customerKhatas.map((account) => {
+      if (!customerListBody) return;
+      customerListBody.innerHTML = accounts.map((account) => {
         const totals = calculateKhataSummary(account);
         return `
           <tr>
@@ -2818,7 +3355,11 @@
             <td>${text(account.city)}</td>
             <td>${money(totals.debit)}</td>
             <td>${money(totals.credit)}</td>
-            <td class="${totals.closingBalance > 0 ? "debit-text" : totals.closingBalance < 0 ? "credit-text" : ""}">${money(Math.abs(totals.closingBalance))}${totals.closingBalance > 0 ? " (-)" : totals.closingBalance < 0 ? " (+)" : ""}</td>
+            <td class="${totals.closingBalance > 0 ? "debit-text" : totals.closingBalance < 0 ? "credit-text" : ""}">${money(Math.abs(totals.closingBalance))}${totals.closingBalance > 0
+              ? (isPayable ? " Outstanding" : " (-)")
+              : totals.closingBalance < 0
+                ? (isPayable ? " Advance Paid" : " (+)")
+                : ""}</td>
             <td>${account.entries.length}</td>
             <td>
               <div class="table-actions">
@@ -2832,13 +3373,13 @@
     }
 
     function renderAccount(accountId) {
-      const account = store.customerKhatas.find((item) => item.id === accountId) || store.customerKhatas[0];
+      const account = accounts.find((item) => item.id === accountId) || accounts[0];
       if (!account) return;
 
       const totals = calculateKhataSummary(account);
       const statement = getStatementData(account);
       const sortedEntries = [...account.entries].sort((a, b) => a.date.localeCompare(b.date));
-      statementTitle.textContent = `${account.customer} Statement`;
+      statementTitle.textContent = `${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`;
       statementRange.textContent = `${statement.startDate} - ${statement.endDate}`;
       customerCard.innerHTML = `
         <div class="khata-mini">
@@ -2853,17 +3394,23 @@
 
       summary.innerHTML = `
         <div class="statement-stat">
-          <span>Total Debit</span>
+          <span>${debitLabel}</span>
           <strong>Rs ${money(totals.debit)}</strong>
         </div>
         <div class="statement-stat">
-          <span>Total Credit</span>
+          <span>${creditLabel}</span>
           <strong>Rs ${money(totals.credit)}</strong>
         </div>
         <div class="statement-stat ${totals.closingBalance > 0 ? "negative" : totals.closingBalance < 0 ? "positive" : ""}">
-          <span>Net Balance</span>
+          <span>${balanceLabel}</span>
           <strong>Rs ${money(Math.abs(totals.closingBalance))}</strong>
-          <small>${totals.hasEntries ? (totals.closingBalance > 0 ? "Debit (-)" : totals.closingBalance < 0 ? "Credit (+)" : "Settled") : "-"}</small>
+          <small>${totals.hasEntries
+            ? (totals.closingBalance > 0
+              ? (isPayable ? "Outstanding" : "Debit (-)")
+              : totals.closingBalance < 0
+                ? (isPayable ? "Advance Paid" : "Credit (+)")
+                : "Settled")
+            : "-"}</small>
         </div>
       `;
 
@@ -2877,7 +3424,11 @@
             <td>${text(entry.description)}</td>
             <td class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
-            <td class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0 ? "0" : `${money(Math.abs(runningBalance))} ${runningBalance > 0 ? "(-)" : "(+)"}`}</td>
+            <td class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0
+              ? "0"
+              : `${money(Math.abs(runningBalance))} ${runningBalance > 0
+                ? (isPayable ? "Outstanding" : "(-)")
+                : (isPayable ? "Advance" : "(+)")}`}</td>
             <td>
               <div class="table-actions">
                 <button class="btn small" data-edit-khata="${entry.id}">Edit</button>
@@ -2932,24 +3483,24 @@
       };
 
       if (!normalized.customer) {
-        customerNotice.textContent = "Customer name is required.";
+        customerNotice.textContent = `${partyLabel} name is required.`;
         return;
       }
 
       if (!editingCustomerId) {
-        normalized.id = `CUS-${Date.now().toString().slice(-6)}`;
-        store.customerKhatas.unshift(normalized);
-        customerNotice.textContent = `Customer ${normalized.customer} was added successfully.`;
+        normalized.id = `${isPayable ? "PAY" : "CUS"}-${Date.now().toString().slice(-6)}`;
+        accounts.unshift(normalized);
+        customerNotice.textContent = `${partyLabel} ${normalized.customer} was added successfully.`;
       } else {
-        const index = store.customerKhatas.findIndex((item) => item.id === editingCustomerId);
+        const index = accounts.findIndex((item) => item.id === editingCustomerId);
         if (index === -1) {
-          customerNotice.textContent = "Customer record not found.";
+          customerNotice.textContent = `${partyLabel} record not found.`;
           return;
         }
         normalized.id = editingCustomerId;
-        normalized.entries = store.customerKhatas[index].entries || [];
-        store.customerKhatas[index] = normalized;
-        customerNotice.textContent = `Customer ${normalized.customer} updated successfully.`;
+        normalized.entries = accounts[index].entries || [];
+        accounts[index] = normalized;
+        customerNotice.textContent = `${partyLabel} ${normalized.customer} updated successfully.`;
       }
 
       saveStore(store);
@@ -2961,7 +3512,7 @@
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(form).entries());
-      const account = store.customerKhatas.find((item) => item.id === data.accountId);
+      const account = accounts.find((item) => item.id === data.accountId);
       if (!account) return;
 
       const normalized = {
@@ -2973,9 +3524,9 @@
       };
 
       if (!editingId) {
-        normalized.id = `KHT-${Date.now().toString().slice(-6)}`;
+        normalized.id = `${entryPrefix}-${Date.now().toString().slice(-6)}`;
         account.entries.unshift(normalized);
-        notice.textContent = `Khata entry ${normalized.id} saved successfully.`;
+        notice.textContent = `Statement entry ${normalized.id} saved successfully.`;
       } else {
         const index = account.entries.findIndex((entry) => entry.id === editingId);
         if (index === -1) {
@@ -2983,7 +3534,7 @@
           return;
         }
         account.entries[index] = normalized;
-        notice.textContent = `Khata entry ${editingId} updated successfully.`;
+        notice.textContent = `Statement entry ${editingId} updated successfully.`;
       }
 
       saveStore(store);
@@ -2994,7 +3545,7 @@
     body.addEventListener("click", (event) => {
       const editId = event.target.getAttribute("data-edit-khata");
       const deleteId = event.target.getAttribute("data-delete-khata");
-      const account = store.customerKhatas.find((item) => item.id === select.value);
+      const account = accounts.find((item) => item.id === select.value);
       if (!account) return;
 
       if (editId) fillForm(account, account.entries.find((entry) => entry.id === editId));
@@ -3002,22 +3553,24 @@
         account.entries = account.entries.filter((entry) => entry.id !== deleteId);
         saveStore(store);
         renderAccount(account.id);
-        notice.textContent = `Khata entry ${deleteId} deleted successfully.`;
+        notice.textContent = `Statement entry ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
     });
 
-    customerListBody.addEventListener("click", (event) => {
-      const openId = event.target.getAttribute("data-open-customer");
-      const editCustomerId = event.target.getAttribute("data-edit-customer");
-      if (openId) {
-        renderAccount(openId);
-        resetForm();
-      }
-      if (editCustomerId) {
-        fillCustomerForm(store.customerKhatas.find((item) => item.id === editCustomerId));
-      }
-    });
+    if (customerListBody) {
+      customerListBody.addEventListener("click", (event) => {
+        const openId = event.target.getAttribute("data-open-customer");
+        const editCustomerId = event.target.getAttribute("data-edit-customer");
+        if (openId) {
+          renderAccount(openId);
+          resetForm();
+        }
+        if (editCustomerId) {
+          fillCustomerForm(accounts.find((item) => item.id === editCustomerId));
+        }
+      });
+    }
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     document.querySelector("[data-reset-customer-form]").addEventListener("click", resetCustomerForm);
@@ -3030,7 +3583,7 @@
       if (account) shareStatementOnWhatsapp(account);
     });
     populateCustomers();
-    renderAccount(store.customerKhatas[0]?.id);
+    renderAccount(accounts[0]?.id);
     resetForm();
     resetCustomerForm();
   }
@@ -3040,20 +3593,23 @@
     const page = document.body.dataset.page;
     if (!enforceSoftwareAccess(page)) return;
     bindPageTransitions();
+    ensureEquipmentNavigation();
     applySessionAccess();
     setActiveNav();
     bindMobileNav();
     if (page !== "signin") bindSoftwareSignOut();
+    bindDesktopSidebar();
     if (page === "signin") softwareLoginPage(store);
     if (page === "dashboard") dashboardPage(store);
     if (page === "booking") bookingPage(store);
     if (page === "ledger") ledgerPage(store);
     if (page === "truck") truckPage(store);
     if (page === "truck-summary" || page === "completed-truck-summary") truckSummaryPage(store);
+    if (page === "equipment") equipmentPage(store);
     if (page === "employee") employeePage(store);
     if (page === "admin-login") adminLoginPage(store);
     if (page === "admin") adminPage(store);
-    if (page === "khata") khataPage(store);
+    if (page === "khata" || page === "accounts-payable") khataPage(store);
     markPageReady();
   });
 })();

@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GTLS Transport - Accounts Receivable</title>
+  <title>GTLS Transport - Accounts Payable</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body data-page="khata">
+<body data-page="accounts-payable">
   <div class="app">
     <div class="mobile-topbar">
       <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
@@ -40,20 +40,20 @@
 
     <main class="main">
       <section class="hero">
-        <h2>Accounts Receivable</h2>
+        <h2>Accounts Payable</h2>
       </section>
       <section class="screen">
         <div class="screen-head">
           <div>
-            <h3>Add Customer</h3>
+            <h3>Add Payee</h3>
           </div>
         </div>
         <form data-customer-form class="form-grid">
-          <div class="field"><label>Customer Name</label><input name="customer" required /></div>
+          <div class="field"><label>Payee Name</label><input name="customer" required /></div>
           <div class="field"><label>Phone</label><input name="phone" /></div>
           <div class="field"><label>City</label><input name="city" /></div>
           <div class="field full actions">
-            <button class="btn primary" type="submit" data-customer-submit-label>Save Customer</button>
+            <button class="btn primary" type="submit" data-customer-submit-label>Save Payee</button>
             <button class="btn" type="button" data-reset-customer-form>Clear Form</button>
           </div>
         </form>
@@ -64,7 +64,7 @@
         <div class="statement-topbar">
           <div>
             <div class="statement-brand">Global Transport And Logistics Services</div>
-            <h2 class="statement-title" data-khata-title>Customer Statement</h2>
+            <h2 class="statement-title" data-khata-title>Payee Statement</h2>
             <div class="statement-sub" data-khata-customer></div>
             <div class="statement-range" data-khata-range>-</div>
           </div>
@@ -83,14 +83,14 @@
       <section class="screen">
         <div class="screen-head">
           <div>
-            <h3>Add Receivable Entry</h3>
+            <h3>Add Payable Entry</h3>
           </div>
         </div>
         <form data-khata-form class="form-grid">
           <input type="hidden" name="accountId" />
           <div class="field"><label>Date</label><input name="date" type="date" required /></div>
-          <div class="field"><label>Type</label><select name="type"><option>Debit</option><option>Credit</option></select></div>
-          <div class="field wide"><label>Description</label><input name="description" value="Transport billing entry" required /></div>
+          <div class="field"><label>Type</label><select name="type"><option value="Debit">Payable</option><option value="Credit">Paid</option></select></div>
+          <div class="field wide"><label>Description</label><input name="description" value="Vendor payment entry" required /></div>
           <div class="field"><label>Amount</label><input name="amount" type="number" value="50000" required /></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Entry</button>
@@ -111,9 +111,9 @@
             <tr>
               <th>Date</th>
               <th>Description</th>
-              <th>Debit (-)</th>
-              <th>Credit (+)</th>
-              <th>Balance</th>
+              <th>Payable</th>
+              <th>Paid</th>
+              <th>Outstanding</th>
               <th></th>
             </tr>
           </thead>

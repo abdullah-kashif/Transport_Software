@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Equipment &amp; Handling Fleet</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="equipment">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
+        <a href="equipment.html" data-page="equipment">Equipment &amp; Handling Fleet</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Accounts Receivable</a>
+        <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="admin-login.html" data-page="admin-login">Admin</a>
+      </nav>
+      <div class="tip"></div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <h2>Equipment &amp; Handling Fleet</h2>
+      </section>
+
+      <section class="screen">
+        <div class="grid" data-equipment-summary></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div><h3>Create / Update Equipment</h3></div>
+        </div>
+        <form class="form-grid" data-equipment-form>
+          <div class="field"><label>Truck No</label><input name="truckNo" required /></div>
+          <div class="field"><label>Chassis No</label><input name="chassisNo" required /></div>
+          <div class="field"><label>Engine No</label><input name="engineNo" required /></div>
+          <div class="field"><label>Make</label><input name="make" required /></div>
+
+          <div class="field"><label>Model</label><input name="model" required /></div>
+          <div class="field"><label>MRA</label><input name="mra" /></div>
+          <div class="field"><label>Banker</label><input name="banker" /></div>
+          <div class="field"><label>Fitness Expiry</label><input name="fitnessExpiry" type="date" /></div>
+
+          <div class="field"><label>Balochistan Permit Expiry</label><input name="balochistanPermitExpiry" type="date" /></div>
+          <div class="field"><label>Sindh Permit Expiry</label><input name="sindhPermitExpiry" type="date" /></div>
+          <div class="field"><label>KPK Permit Expiry</label><input name="kpkPermitExpiry" type="date" /></div>
+          <div class="field"><label>Punjab Permit Expiry</label><input name="punjabPermitExpiry" type="date" /></div>
+
+          <div class="field"><label>Tax Paid Up To</label><input name="taxPaidUpTo" type="date" /></div>
+          <div class="field wide"><label>Original Documents in File</label><input name="originalDocs" placeholder="Fitness, route permits, original card..." /></div>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save Equipment</button>
+            <button class="btn" type="button" data-reset-equipment-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice hidden></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head equipment-register-head">
+          <div><h3>Equipment Register</h3></div>
+          <div class="equipment-toolbar">
+            <label class="equipment-search">
+              <span>Search</span>
+              <input type="search" data-equipment-search placeholder="Truck, chassis, make or banker" />
+            </label>
+            <span class="ledger-count" data-equipment-count>0 record(s)</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="equipment-table">
+            <thead>
+              <tr>
+                <th>S.No</th>
+                <th>Truck No</th>
+                <th>Chassis No</th>
+                <th>Engine No</th>
+                <th>Make</th>
+                <th>Model</th>
+                <th>MRA</th>
+                <th>Banker</th>
+                <th>Fitness Expiry</th>
+                <th>Balochistan Permit</th>
+                <th>Sindh Permit</th>
+                <th>KPK Permit</th>
+                <th>Punjab Permit</th>
+                <th>Tax Paid Up To</th>
+                <th>Original Docs in File</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody data-equipment-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
