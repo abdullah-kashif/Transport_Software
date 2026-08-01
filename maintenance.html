@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Fleet Maintenance</title>
+  <link rel="stylesheet" href="styles.css?v=20260801-3" />
+</head>
+<body data-page="maintenance">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
+        <a href="equipment.html" data-page="equipment">Equipment &amp; Handling Fleet</a>
+        <a href="maintenance.html" data-page="maintenance">Fleet Maintenance</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Accounts Receivable</a>
+        <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="admin.html" data-page="admin">Admin</a>
+      </nav>
+      <div class="tip"></div>
+    </aside>
+
+    <main class="main">
+      <section class="hero"><h2>Fleet Maintenance</h2></section>
+
+      <section class="screen">
+        <div class="grid" data-maintenance-summary></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head"><div><h3>Create / Update Maintenance Job</h3></div></div>
+        <form class="form-grid" data-maintenance-form>
+          <div class="field quarter"><label>Maintenance Job No</label><input name="id" readonly /></div>
+          <div class="field quarter"><label>Truck No</label><input name="truckNo" list="maintenance-trucks" required /></div>
+          <div class="field quarter"><label>Complaint Date</label><input name="complaintDate" type="date" required /></div>
+          <div class="field quarter"><label>Repair Date</label><input name="repairDate" type="date" required /></div>
+
+          <div class="field quarter"><label>Part Name</label><input name="partName" required /></div>
+          <div class="field quarter"><label>Old Serial Number</label><input name="oldSerialNumber" /></div>
+          <div class="field quarter"><label>New Serial Number</label><input name="newSerialNumber" required /></div>
+          <div class="field quarter"><label>Part Cost</label><input class="manual-number-input" name="partCost" inputmode="decimal" required /></div>
+
+          <div class="field quarter"><label>Warranty Period</label><input name="warrantyPeriod" placeholder="Example: 12 Months" /></div>
+          <div class="field quarter"><label>Warranty Expiry</label><input name="warrantyExpiry" type="date" /></div>
+          <div class="field quarter"><label>Driver Name</label><input name="driverName" required /></div>
+          <div class="field quarter"><label>Approved By</label><input name="approvedBy" required /></div>
+
+          <div class="field full">
+            <label>Invoice / Part Image Upload</label>
+            <div class="maintenance-image-field">
+              <input name="imageFile" type="file" accept="image/*" data-maintenance-image-input />
+              <button class="maintenance-image-remove" type="button" data-remove-maintenance-image hidden aria-label="Remove selected image" title="Remove image">&times;</button>
+            </div>
+            <div class="maintenance-image-preview" data-maintenance-image-preview hidden></div>
+          </div>
+
+          <datalist id="maintenance-trucks" data-maintenance-truck-options></datalist>
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save Maintenance Job</button>
+            <button class="btn" type="button" data-reset-maintenance-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice hidden></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head maintenance-register-head">
+          <div><h3>Maintenance History</h3></div>
+          <div class="maintenance-toolbar">
+            <label><span>Truck No</span><select data-maintenance-truck-filter><option value="">All Trucks</option></select></label>
+            <label><span>Date Order</span><select data-maintenance-date-order><option value="desc">Descending (Newest First)</option><option value="asc">Ascending (Oldest First)</option></select></label>
+            <span class="ledger-count" data-maintenance-count>0 record(s)</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="maintenance-table">
+            <colgroup>
+              <col class="maintenance-col-job" />
+              <col class="maintenance-col-truck" />
+              <col class="maintenance-col-date" />
+              <col class="maintenance-col-date" />
+              <col class="maintenance-col-part" />
+              <col class="maintenance-col-serial" />
+              <col class="maintenance-col-serial" />
+              <col class="maintenance-col-cost" />
+              <col class="maintenance-col-warranty" />
+              <col class="maintenance-col-warranty" />
+              <col class="maintenance-col-status" />
+              <col class="maintenance-col-driver" />
+              <col class="maintenance-col-image" />
+              <col class="maintenance-col-approved" />
+              <col class="maintenance-col-actions" />
+            </colgroup>
+            <thead><tr>
+              <th>Job No</th><th>Truck No</th><th>Complaint Date</th><th>Repair Date</th><th>Part Name</th>
+              <th>Old Serial No</th><th>New Serial No</th><th>Part Cost</th><th>Warranty Period</th>
+              <th>Warranty Expiry</th><th>Warranty Status</th><th>Driver Name</th><th>Image</th><th>Approved By</th><th>Actions</th>
+            </tr></thead>
+            <tbody data-maintenance-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="bilty-modal maintenance-image-modal" data-maintenance-image-modal hidden>
+    <div class="bilty-modal-dialog" role="dialog" aria-modal="true" aria-label="Maintenance image preview">
+      <button class="bilty-modal-close" type="button" data-close-maintenance-image-modal aria-label="Close image preview">&times;</button>
+      <img data-maintenance-image-modal-image alt="Maintenance invoice or part" />
+    </div>
+  </div>
+  <script src="app.js?v=20260801-2"></script>
+</body>
+</html>

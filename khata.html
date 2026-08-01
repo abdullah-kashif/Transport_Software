@@ -33,7 +33,7 @@
         <a href="employees.html" data-page="employee">Employees</a>
         <a href="khata.html" data-page="khata">Accounts Receivable</a>
         <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
-        <a href="admin-login.html" data-page="admin-login">Admin</a>
+        <a href="admin.html" data-page="admin">Admin</a>
       </nav>
       <div class="tip"></div>
     </aside>
@@ -91,6 +91,13 @@
           <div class="field"><label>Date</label><input name="date" type="date" required /></div>
           <div class="field"><label>Type</label><select name="type"><option>Debit</option><option>Credit</option></select></div>
           <div class="field wide"><label>Description</label><input name="description" value="Transport billing entry" required /></div>
+          <div class="field bilty-upload-field">
+            <label for="receivable-entry-image">Image</label>
+            <div class="bilty-input-group">
+              <input id="receivable-entry-image" name="entryImageUpload" type="file" accept="image/*" data-entry-image-input />
+              <button class="bilty-clear" type="button" data-remove-entry-image aria-label="Remove selected image" title="Remove selected image" hidden>&times;</button>
+            </div>
+          </div>
           <div class="field"><label>Amount</label><input name="amount" type="number" value="50000" required /></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Entry</button>
@@ -111,6 +118,7 @@
             <tr>
               <th>Date</th>
               <th>Description</th>
+              <th>Image</th>
               <th>Debit (-)</th>
               <th>Credit (+)</th>
               <th>Balance</th>
@@ -122,6 +130,10 @@
       </section>
 
     </main>
+  </div>
+  <div class="bilty-modal" data-entry-image-modal hidden role="dialog" aria-modal="true" aria-label="Statement entry image preview">
+    <button class="bilty-modal-close" type="button" data-close-entry-image-modal aria-label="Close image preview" title="Close">&times;</button>
+    <img data-entry-image-modal-image alt="Statement entry attachment" />
   </div>
   <script src="app.js"></script>
 </body>

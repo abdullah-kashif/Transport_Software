@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Admin</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260801-2" />
 </head>
 <body data-page="admin">
   <div class="app">
@@ -77,10 +77,12 @@
               <label class="access-option"><input type="checkbox" name="access" value="completed-truck-summary" checked /> <span>Completed Truck Summary</span></label>
               <label class="access-option"><input type="checkbox" name="access" value="truck" checked /> <span>Truck Details</span></label>
               <label class="access-option"><input type="checkbox" name="access" value="equipment" checked /> <span>Equipment &amp; Handling Fleet</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="maintenance" checked /> <span>Fleet Maintenance</span></label>
               <label class="access-option"><input type="checkbox" name="access" value="employee" checked /> <span>Employees</span></label>
               <label class="access-option"><input type="checkbox" name="access" value="khata" checked /> <span>Accounts Receivable</span></label>
               <label class="access-option"><input type="checkbox" name="access" value="accounts-payable" checked /> <span>Accounts Payable</span></label>
               <label class="access-option"><input type="checkbox" name="access" value="admin" /> <span>Admin</span></label>
+              <label class="access-option"><input type="checkbox" name="access" value="activity-logs" /> <span>Activity Logs</span></label>
             </div>
           </div>
           <div class="field full actions">
@@ -97,24 +99,31 @@
             <h3>User Register</h3>
           </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>User ID</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Password</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Access</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody data-admin-rows></tbody>
-        </table>
+        <div class="table-wrap admin-user-table-wrap">
+          <table class="admin-user-table">
+            <colgroup>
+              <col class="admin-col-id" /><col class="admin-col-name" /><col class="admin-col-email" />
+              <col class="admin-col-password" /><col class="admin-col-role" /><col class="admin-col-status" />
+              <col class="admin-col-access" /><col class="admin-col-actions" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>User ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Password</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Module Access</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody data-admin-rows></tbody>
+          </table>
+        </div>
       </section>
     </main>
   </div>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260801-2"></script>
 </body>
 </html>

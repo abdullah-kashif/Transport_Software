@@ -10,14 +10,18 @@
     { value: "truck-summary", label: "Pending Truck Summary" },
     { value: "completed-truck-summary", label: "Completed Truck Summary" },
     { value: "equipment", label: "Equipment & Handling Fleet" },
+    { value: "maintenance", label: "Fleet Maintenance" },
     { value: "employee", label: "Employees" },
     { value: "khata", label: "Accounts Receivable" },
     { value: "accounts-payable", label: "Accounts Payable" },
-    { value: "admin", label: "Admin" }
+    { value: "admin", label: "Admin" },
+    { value: "activity-logs", label: "Activity Logs" }
   ];
-  const DEFAULT_USER_ACCESS = ACCESS_OPTIONS.map((item) => item.value).filter((item) => item !== "admin");
+  const DEFAULT_USER_ACCESS = ACCESS_OPTIONS.map((item) => item.value)
+    .filter((item) => !["admin", "activity-logs"].includes(item));
 
   const seed = {
+    activityLogs: [],
     bookings: [
       {
         id: "BK-24061",
@@ -298,6 +302,7 @@
         lastPaymentRef: "Awaiting payment"
       }
     ],
+    maintenanceJobs: [],
     employees: [
       {
         id: "EMP-1001",
@@ -451,6 +456,14 @@
       store.equipmentFleet = structuredClone(seed.equipmentFleet);
     }
 
+    if (!Array.isArray(store.maintenanceJobs)) {
+      store.maintenanceJobs = [];
+    }
+
+    if (!Array.isArray(store.activityLogs)) {
+      store.activityLogs = [];
+    }
+
     if (!Array.isArray(store.adminUsers) || store.adminUsers.length === 0) {
       store.adminUsers = structuredClone(seed.adminUsers);
     } else {
@@ -472,11 +485,129 @@
       store.bookings = store.bookings.map((booking) => normalizeBookingContainers(booking));
     }
 
-    saveStore(store);
+    saveStore(store, { skipAudit: true });
     return store;
   }
 
-  function saveStore(store) {
+  const AUDIT_SOURCES = [
+    { key: "bookings", module: "Booking Form" },
+    { key: "truckExpenses", module: "Truck Details", filter: (item) => Boolean(item.jobNo) },
+    { key: "equipmentFleet", module: "Equipment & Handling Fleet" },
+    { key: "maintenanceJobs", module: "Fleet Maintenance" },
+    { key: "employees", module: "Employees" },
+    { key: "adminUsers", module: "Admin Users" },
+    { key: "customerKhatas", module: "Accounts Receivable", nested: true },
+    { key: "vendorKhatas", module: "Accounts Payable", nested: true }
+  ];
+
+  function getAuditRecords(store, source) {
+    const records = Array.isArray(store?.[source.key]) ? store[source.key] : [];
+    if (!source.nested) return source.filter ? records.filter(source.filter) : records;
+
+    return records.flatMap((account) => {
+      const accountRecord = {
+        ...account,
+        entries: undefined,
+        _auditId: account.id,
+        _auditLabel: account.customer || account.id
+      };
+      const entryRecords = (Array.isArray(account.entries) ? account.entries : []).map((entry) => ({
+        ...entry,
+        _auditId: `${account.id}:${entry.id}`,
+        _auditRecordId: entry.id,
+        _auditLabel: `${account.customer || account.id} / ${entry.id}`
+      }));
+      return [accountRecord, ...entryRecords];
+    });
+  }
+
+  function getAuditRecordId(record = {}) {
+    return String(record._auditRecordId || record._auditId || record.id || "Record");
+  }
+
+  function getAuditRecordLabel(record = {}) {
+    return String(record._auditLabel || record.bookingNo || record.jobNo || record.name || record.customer || record.truckNo || record.id || "Record");
+  }
+
+  function getChangedAuditFields(before = {}, after = {}) {
+    const hiddenFields = new Set(["_auditId", "_auditRecordId", "_auditLabel", "password", "image", "biltyImage", "bilty"]);
+    return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+      .filter((key) => !hiddenFields.has(key) && !key.startsWith("_"))
+      .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+      .map((key) => key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase()));
+  }
+
+  function appendAuditLog(store, { action, module, recordId = "-", details = "" }, sessionOverride) {
+    if (!Array.isArray(store.activityLogs)) store.activityLogs = [];
+    const session = sessionOverride || getAdminSession() || {};
+    store.activityLogs.unshift({
+      id: `LOG-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      timestamp: new Date().toISOString(),
+      userId: session.id || "SYSTEM",
+      userName: session.name || "System",
+      userEmail: session.email || "-",
+      userRole: session.role || "System",
+      module,
+      action,
+      recordId: String(recordId || "-"),
+      details: String(details || "")
+    });
+    store.activityLogs = store.activityLogs.slice(0, 2000);
+  }
+
+  function collectAuditChanges(previousStore, nextStore) {
+    if (!previousStore) return;
+    AUDIT_SOURCES.forEach((source) => {
+      const beforeRecords = getAuditRecords(previousStore, source);
+      const afterRecords = getAuditRecords(nextStore, source);
+      const beforeMap = new Map(beforeRecords.map((record) => [String(record._auditId || record.id), record]));
+      const afterMap = new Map(afterRecords.map((record) => [String(record._auditId || record.id), record]));
+
+      afterMap.forEach((record, id) => {
+        const previous = beforeMap.get(id);
+        if (!previous) {
+          appendAuditLog(nextStore, {
+            action: "CREATE",
+            module: source.module,
+            recordId: getAuditRecordId(record),
+            details: `${getAuditRecordLabel(record)} created.`
+          });
+          return;
+        }
+        const changedFields = getChangedAuditFields(previous, record);
+        if (changedFields.length) {
+          appendAuditLog(nextStore, {
+            action: "UPDATE",
+            module: source.module,
+            recordId: getAuditRecordId(record),
+            details: `${getAuditRecordLabel(record)} updated: ${changedFields.join(", ")}.`
+          });
+        }
+      });
+
+      beforeMap.forEach((record, id) => {
+        if (afterMap.has(id)) return;
+        appendAuditLog(nextStore, {
+          action: "DELETE",
+          module: source.module,
+          recordId: getAuditRecordId(record),
+          details: `${getAuditRecordLabel(record)} deleted.`
+        });
+      });
+    });
+  }
+
+  function saveStore(store, options = {}) {
+    let previousStore = null;
+    if (!options.skipAudit) {
+      try {
+        const previousRaw = sessionStorage.getItem(KEY);
+        previousStore = previousRaw ? JSON.parse(previousRaw) : null;
+      } catch (error) {
+        previousStore = null;
+      }
+      collectAuditChanges(previousStore, store);
+    }
     sessionStorage.setItem(KEY, JSON.stringify(store));
   }
 
@@ -495,6 +626,9 @@
       : [...values];
     if (migratedValues.includes("truck") && !migratedValues.includes("equipment")) {
       migratedValues.push("equipment");
+    }
+    if (migratedValues.includes("truck") && !migratedValues.includes("maintenance")) {
+      migratedValues.push("maintenance");
     }
     const normalized = [...new Set(migratedValues
       .map((item) => String(item || "").trim())
@@ -552,6 +686,22 @@
 
   function clearAdminSession() {
     sessionStorage.removeItem(ADMIN_AUTH_KEY);
+  }
+
+  function recordAuthenticationActivity(action, sessionOverride) {
+    try {
+      const raw = sessionStorage.getItem(KEY);
+      const store = raw ? JSON.parse(raw) : structuredClone(seed);
+      appendAuditLog(store, {
+        action,
+        module: "Authentication",
+        recordId: sessionOverride?.id || "-",
+        details: action === "SIGN_IN" ? "User signed in." : "User signed out."
+      }, sessionOverride);
+      saveStore(store, { skipAudit: true });
+    } catch (error) {
+      return;
+    }
   }
 
   function getPasswordToggleIcon(isVisible) {
@@ -622,6 +772,7 @@
       }
 
       setAdminSession(user);
+      recordAuthenticationActivity("SIGN_IN", user);
       const firstPage = normalizeAdminAccess(user.access, user.role)[0] || "dashboard";
       navigateWithTransition(getPageFile(firstPage));
     });
@@ -710,6 +861,7 @@
       };
       modal.querySelector("[data-cancel-signout]").addEventListener("click", closeModal);
       modal.querySelector("[data-confirm-signout]").addEventListener("click", () => {
+        recordAuthenticationActivity("SIGN_OUT", getAdminSession());
         clearAdminSession();
         navigateWithTransition("index.html");
       });
@@ -1273,6 +1425,50 @@
     });
   }
 
+  function ensureAccountsNavigationOrder() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      const employeeLink = nav.querySelector('[data-page="employee"]');
+      const receivableLink = nav.querySelector('[data-page="khata"]');
+      const payableLink = nav.querySelector('[data-page="accounts-payable"]');
+      if (!employeeLink) return;
+      if (receivableLink) nav.insertBefore(receivableLink, employeeLink);
+      if (payableLink) nav.insertBefore(payableLink, employeeLink);
+    });
+  }
+
+  function ensureMaintenanceNavigation() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      if (nav.querySelector('[data-page="maintenance"]')) return;
+      const link = document.createElement("a");
+      link.href = "maintenance.html";
+      link.dataset.page = "maintenance";
+      link.textContent = "Fleet Maintenance";
+      const employeeLink = nav.querySelector('[data-page="employee"]');
+      nav.insertBefore(link, employeeLink || nav.querySelector('[data-page="admin"], [data-page="admin-login"]'));
+    });
+  }
+
+  function ensureActivityLogsNavigation() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      if (nav.querySelector('[data-page="activity-logs"]')) return;
+      const link = document.createElement("a");
+      link.href = "activity-logs.html";
+      link.dataset.page = "activity-logs";
+      link.textContent = "Activity Logs";
+      const adminLink = nav.querySelector('[data-page="admin"], [data-page="admin-login"]');
+      if (adminLink) adminLink.insertAdjacentElement("afterend", link);
+      else nav.appendChild(link);
+    });
+  }
+
+  function syncAdminNavigationRoute() {
+    const session = getAdminSession();
+    document.querySelectorAll('.nav a[data-page="admin-login"], .nav a[data-page="admin"]').forEach((link) => {
+      link.href = session ? "admin.html" : "admin-login.html";
+      link.dataset.page = session ? "admin" : "admin-login";
+    });
+  }
+
   function getNavigationIcon(page) {
     const icons = {
       dashboard: '<path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path>',
@@ -1282,9 +1478,11 @@
       "truck-summary": '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
       "completed-truck-summary": '<circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path>',
       equipment: '<path d="M4 14h11v5H4zM15 11h4l2 3v5h-6z"></path><path d="M7 14V8h6M13 8l3-3M3 19h19"></path><circle cx="8" cy="20" r="1.5"></circle><circle cx="18" cy="20" r="1.5"></circle>',
+      maintenance: '<path d="m14.7 6.3 3-3a4.2 4.2 0 0 1-5.5 5.5l-6.8 6.8a2.1 2.1 0 0 0 3 3l6.8-6.8a4.2 4.2 0 0 0 5.5-5.5l-3 3z"></path><circle cx="7" cy="17" r=".8"></circle>',
       employee: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c.8-4.2 3.5-6 8-6s7.2 1.8 8 6"></path>',
       khata: '<path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
       "accounts-payable": '<path d="M3 7h18v12H3z"></path><path d="M3 10h18M7 15h4"></path><path d="m16 14 2 2 3-4"></path>',
+      "activity-logs": '<path d="M5 3h14v18H5z"></path><path d="M9 3v3h6V3M8 10h8M8 14h8M8 18h5"></path>',
       "admin-login": '<circle cx="12" cy="8" r="4"></circle><path d="M5 21v-2a7 7 0 0 1 14 0v2"></path><path d="M18 5.5 20 4l1 2"></path>',
       admin: '<circle cx="12" cy="8" r="4"></circle><path d="M5 21v-2a7 7 0 0 1 14 0v2"></path><path d="M18 5.5 20 4l1 2"></path>'
     };
@@ -1373,20 +1571,84 @@
   }
 
   function dashboardPage(store) {
-    const activeTrips = store.bookings.filter((b) => b.status === "In Transit").length;
-    const pendingBills = store.bookings.filter((b) => String(b.accountFlow || "").trim() === "Awaited").length;
-    const delivered = store.bookings.filter((b) => b.status === "Delivered").length;
-    const activeEmployees = store.employees.filter((employee) => employee.status === "Active").length;
-    const totalReceipts = store.ledgerEntries.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0);
+    const bookings = Array.isArray(store.bookings) ? store.bookings : [];
+    const truckJobs = (Array.isArray(store.truckExpenses) ? store.truckExpenses : []).filter((item) => item.jobNo);
+    const maintenanceJobs = Array.isArray(store.maintenanceJobs) ? store.maintenanceJobs : [];
+    const equipmentFleet = Array.isArray(store.equipmentFleet) ? store.equipmentFleet : [];
+    const employees = Array.isArray(store.employees) ? store.employees : [];
+    const customerAccounts = Array.isArray(store.customerKhatas) ? store.customerKhatas : [];
+    const supplierAccounts = Array.isArray(store.vendorKhatas) ? store.vendorKhatas : [];
 
-    document.querySelector("[data-kpi='activeTrips']").textContent = activeTrips;
-    document.querySelector("[data-kpi='pendingBills']").textContent = pendingBills;
-    document.querySelector("[data-kpi='delivered']").textContent = delivered;
-    document.querySelector("[data-kpi='employees']").textContent = activeEmployees;
-    document.querySelector("[data-kpi='receipts']").textContent = money(totalReceipts);
+    function hasAllTruckPaymentsCredited(item) {
+      return [item.importPaymentStatus, item.exportPaymentStatus, item.mtyPaymentStatus]
+        .every((status) => String(status || "Awaited").trim().toLowerCase() === "credit");
+    }
+
+    function setKpi(name, value) {
+      const element = document.querySelector(`[data-kpi='${name}']`);
+      if (element) element.textContent = value;
+    }
+
+    function getBookingReceivable(item) {
+      const storedAmount = Number(item.receivableAmount);
+      if (Number.isFinite(storedAmount)) return storedAmount;
+      return calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount;
+    }
+
+    function getOutstanding(accounts) {
+      return accounts.reduce((total, account) => {
+        const balance = calculateKhataSummary({ ...account, entries: Array.isArray(account.entries) ? account.entries : [] }).closingBalance;
+        return total + Math.max(0, Number(balance || 0));
+      }, 0);
+    }
+
+    function hasDocumentAlert(item) {
+      const fields = [
+        item.fitnessExpiry,
+        item.balochistanPermitExpiry,
+        item.sindhPermitExpiry,
+        item.kpkPermitExpiry,
+        item.punjabPermitExpiry,
+        item.taxPaidUpTo
+      ].filter(Boolean);
+      const today = parseDateValue(getTodayIsoDate());
+      return fields.some((value) => {
+        const expiry = parseDateValue(value);
+        if (!expiry || !today) return false;
+        return Math.ceil((expiry - today) / 86400000) <= 90;
+      });
+    }
+
+    const activeTrips = bookings.filter((b) => b.status === "In Transit").length;
+    const awaitingBookings = bookings.filter((b) => String(b.accountFlow || "").trim().toLowerCase() === "awaited");
+    const pendingBills = awaitingBookings.length;
+    const delivered = bookings.filter((b) => b.status === "Delivered").length;
+    const activeEmployees = employees.filter((employee) => employee.status === "Active").length;
+    const totalReceipts = (Array.isArray(store.ledgerEntries) ? store.ledgerEntries : []).reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0);
+    const bookingReceivable = awaitingBookings.reduce((sum, item) => sum + getBookingReceivable(item), 0);
+    const completedTruckJobs = truckJobs.filter(hasAllTruckPaymentsCredited);
+    const pendingTruckJobs = truckJobs.length - completedTruckJobs.length;
+    const truckProfitLoss = completedTruckJobs.reduce((sum, item) => sum + calculateTruckTripFinancials(item).profitLoss, 0);
+    const maintenanceCost = maintenanceJobs.reduce((sum, item) => sum + Number(item.partCost || 0), 0);
+
+    setKpi("totalBookings", bookings.length);
+    setKpi("activeTrips", activeTrips);
+    setKpi("pendingBills", pendingBills);
+    setKpi("delivered", delivered);
+    setKpi("employees", activeEmployees);
+    setKpi("receipts", money(totalReceipts));
+    setKpi("bookingReceivable", money(bookingReceivable));
+    setKpi("accountsReceivable", money(getOutstanding(customerAccounts)));
+    setKpi("accountsPayable", money(getOutstanding(supplierAccounts)));
+    setKpi("pendingTruckJobs", pendingTruckJobs);
+    setKpi("completedTruckJobs", completedTruckJobs.length);
+    setKpi("truckProfitLoss", money(truckProfitLoss));
+    setKpi("fleetUnits", equipmentFleet.length);
+    setKpi("documentAlerts", equipmentFleet.filter(hasDocumentAlert).length);
+    setKpi("maintenanceCost", money(maintenanceCost));
 
     const bookingsBody = document.querySelector("[data-bookings-preview]");
-    bookingsBody.innerHTML = store.bookings.map((item) => `
+    bookingsBody.innerHTML = bookings.map((item) => `
       <tr>
         <td>${text(item.id)}</td>
         <td>${formatShortDate(item.date)}</td>
@@ -2740,6 +3002,303 @@
     render();
   }
 
+  function maintenancePage(store) {
+    const form = document.querySelector("[data-maintenance-form]");
+    const body = document.querySelector("[data-maintenance-rows]");
+    const summary = document.querySelector("[data-maintenance-summary]");
+    const truckFilter = document.querySelector("[data-maintenance-truck-filter]");
+    const dateOrder = document.querySelector("[data-maintenance-date-order]");
+    const count = document.querySelector("[data-maintenance-count]");
+    const notice = document.querySelector("[data-notice]");
+    const truckOptions = document.querySelector("[data-maintenance-truck-options]");
+    const imageInput = document.querySelector("[data-maintenance-image-input]");
+    const imagePreview = document.querySelector("[data-maintenance-image-preview]");
+    const removeImageButton = document.querySelector("[data-remove-maintenance-image]");
+    const imageModal = document.querySelector("[data-maintenance-image-modal]");
+    const imageModalImage = document.querySelector("[data-maintenance-image-modal-image]");
+    const closeImageModalButton = document.querySelector("[data-close-maintenance-image-modal]");
+    if (!form || !body || !summary) return;
+
+    let editingId = "";
+    let imageData = "";
+    let imagePromise = Promise.resolve("");
+
+    function setNotice(message = "", isError = false) {
+      if (!notice) return;
+      notice.textContent = message;
+      notice.hidden = !message;
+      notice.classList.toggle("error", isError);
+    }
+
+    function getNextJobNo() {
+      const nextNumber = store.maintenanceJobs.reduce((maximum, item) => {
+        const number = Number(String(item.id || "").replace(/\D/g, "")) || 0;
+        return Math.max(maximum, number);
+      }, 0) + 1;
+      return `MNT-${String(nextNumber).padStart(4, "0")}`;
+    }
+
+    function getTruckNumbers() {
+      const numbers = new Set();
+      (store.equipmentFleet || []).forEach((item) => numbers.add(String(item.truckNo || "").trim()));
+      (store.trucks || []).forEach((item) => numbers.add(String(item.registrationNo || "").trim()));
+      (store.truckExpenses || []).forEach((item) => {
+        numbers.add(String(item.truckNo || "").trim());
+        numbers.add(String(item.exportTruckNo || "").trim());
+      });
+      store.maintenanceJobs.forEach((item) => numbers.add(String(item.truckNo || "").trim()));
+      return [...numbers].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+    }
+
+    function populateTruckControls() {
+      const selectedTruck = truckFilter?.value || "";
+      const options = getTruckNumbers();
+      if (truckOptions) truckOptions.innerHTML = options.map((truckNo) => `<option value="${escapeHtml(truckNo)}"></option>`).join("");
+      if (truckFilter) {
+        truckFilter.innerHTML = `<option value="">All Trucks</option>${options.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${escapeHtml(truckNo)}</option>`).join("")}`;
+        truckFilter.value = options.includes(selectedTruck) ? selectedTruck : "";
+      }
+    }
+
+    function calculateWarrantyExpiry() {
+      const repairDate = parseDateValue(form.elements.repairDate.value);
+      const period = String(form.elements.warrantyPeriod.value || "").trim();
+      const match = period.match(/^(\d+(?:\.\d+)?)\s*(day|days|month|months|year|years)$/i);
+      if (!repairDate || !match) return;
+      const amount = Number(match[1]);
+      const unit = match[2].toLowerCase();
+      const expiry = new Date(repairDate);
+      if (unit.startsWith("day")) expiry.setDate(expiry.getDate() + amount);
+      else if (unit.startsWith("month")) expiry.setMonth(expiry.getMonth() + amount);
+      else expiry.setFullYear(expiry.getFullYear() + amount);
+      form.elements.warrantyExpiry.value = formatIsoDate(expiry);
+    }
+
+    function getWarrantyState(value) {
+      if (!value) return { className: "na", label: "Not Recorded" };
+      const expiry = parseDateValue(value);
+      const today = parseDateValue(getTodayIsoDate());
+      if (!expiry || !today) return { className: "na", label: "Not Recorded" };
+      const days = Math.ceil((expiry - today) / 86400000);
+      if (days < 0) return { className: "expired", label: "Expired" };
+      if (days <= 30) return { className: "due", label: `${days} day(s) left` };
+      return { className: "valid", label: "Active" };
+    }
+
+    function compressImage(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !String(file.type || "").startsWith("image/")) {
+          reject(new Error("Please select a valid image file."));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("The image could not be read."));
+        reader.onload = () => {
+          const image = new Image();
+          image.onerror = () => reject(new Error("The image format is not supported."));
+          image.onload = () => {
+            const maxDimension = 1200;
+            const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const context = canvas.getContext("2d");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            let quality = 0.76;
+            let result = canvas.toDataURL("image/jpeg", quality);
+            while (result.length > 460000 && quality > 0.4) {
+              quality -= 0.08;
+              result = canvas.toDataURL("image/jpeg", quality);
+            }
+            resolve(result);
+          };
+          image.src = String(reader.result || "");
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function setImage(nextImage = "") {
+      imageData = String(nextImage || "");
+      removeImageButton.hidden = !imageData;
+      imagePreview.hidden = !imageData;
+      imagePreview.innerHTML = imageData
+        ? `<button type="button" data-preview-current-maintenance-image><img src="${imageData}" alt="Selected maintenance invoice or part" /><span>View image</span></button>`
+        : "";
+    }
+
+    function openImageModal(source) {
+      if (!source) return;
+      imageModalImage.src = source;
+      imageModal.hidden = false;
+      document.body.classList.add("bilty-modal-open");
+      closeImageModalButton.focus();
+    }
+
+    function closeImageModal() {
+      imageModal.hidden = true;
+      imageModalImage.removeAttribute("src");
+      document.body.classList.remove("bilty-modal-open");
+    }
+
+    function getFilteredRows() {
+      return [...store.maintenanceJobs]
+        .filter((item) => !truckFilter?.value || item.truckNo === truckFilter.value)
+        .sort((left, right) => compareDateValues(left.repairDate || left.complaintDate, right.repairDate || right.complaintDate, dateOrder?.value || "desc"));
+    }
+
+    function updateSummary(rows) {
+      const underWarranty = rows.filter((item) => getWarrantyState(item.warrantyExpiry).className === "valid").length;
+      const expiringSoon = rows.filter((item) => getWarrantyState(item.warrantyExpiry).className === "due").length;
+      const totalCost = rows.reduce((total, item) => total + Number(item.partCost || 0), 0);
+      summary.innerHTML = `
+        <div class="card span-3"><span class="badge">Jobs</span><strong>${rows.length}</strong><div class="muted">Maintenance records</div></div>
+        <div class="card span-3"><span class="badge good">Warranty</span><strong>${underWarranty}</strong><div class="muted">Active warranties</div></div>
+        <div class="card span-3"><span class="badge ${expiringSoon ? "warn" : "good"}">Due Soon</span><strong>${expiringSoon}</strong><div class="muted">Within 30 days</div></div>
+        <div class="card span-3"><span class="badge warn">Parts Cost</span><strong>PKR ${money(totalCost)}</strong><div class="muted">Filtered maintenance cost</div></div>`;
+    }
+
+    function render() {
+      populateTruckControls();
+      const rows = getFilteredRows();
+      body.innerHTML = rows.map((item) => {
+        const warranty = getWarrantyState(item.warrantyExpiry);
+        return `<tr>
+          <td><strong>${text(item.id)}</strong></td><td>${text(item.truckNo)}</td>
+          <td>${formatShortDate(item.complaintDate)}</td><td>${formatShortDate(item.repairDate)}</td>
+          <td>${text(item.partName)}</td><td>${text(item.oldSerialNumber)}</td><td>${text(item.newSerialNumber)}</td>
+          <td>PKR ${money(item.partCost)}</td><td>${text(item.warrantyPeriod)}</td><td>${formatShortDate(item.warrantyExpiry)}</td>
+          <td><span class="expiry-status ${warranty.className}">${warranty.label}</span></td>
+          <td>${text(item.driverName)}</td>
+          <td>${item.image ? `<button class="maintenance-thumbnail" type="button" data-view-maintenance-image="${item.id}" aria-label="View image for ${escapeHtml(item.id)}"><img src="${item.image}" alt="" /></button>` : "-"}</td>
+          <td>${text(item.approvedBy)}</td>
+          <td><div class="table-actions"><button class="btn small" type="button" data-edit-maintenance="${item.id}">Edit</button><button class="btn small danger" type="button" data-delete-maintenance="${item.id}">Delete</button></div></td>
+        </tr>`;
+      }).join("");
+      updateSummary(rows);
+      if (count) count.textContent = `${rows.length} record(s)`;
+    }
+
+    function resetForm() {
+      form.reset();
+      editingId = "";
+      form.elements.id.value = getNextJobNo();
+      form.elements.complaintDate.value = getTodayIsoDate();
+      form.querySelector("[data-submit-label]").textContent = "Save Maintenance Job";
+      setImage("");
+      imagePromise = Promise.resolve("");
+      setNotice();
+    }
+
+    function fillForm(item) {
+      if (!item) return;
+      Object.keys(item).forEach((key) => {
+        if (form.elements[key] && key !== "imageFile") form.elements[key].value = item[key] || "";
+      });
+      editingId = item.id;
+      setImage(item.image || "");
+      imagePromise = Promise.resolve(imageData);
+      form.querySelector("[data-submit-label]").textContent = "Update Maintenance Job";
+      setNotice();
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    imageInput.addEventListener("change", () => {
+      const file = imageInput.files?.[0];
+      if (!file) return;
+      imagePromise = compressImage(file)
+        .then((result) => {
+          setImage(result);
+          setNotice();
+          return result;
+        })
+        .catch((error) => {
+          imageInput.value = "";
+          setNotice(error.message, true);
+          return imageData;
+        });
+    });
+
+    removeImageButton.addEventListener("click", () => {
+      imageInput.value = "";
+      setImage("");
+      imagePromise = Promise.resolve("");
+    });
+    imagePreview.addEventListener("click", (event) => {
+      if (event.target.closest("[data-preview-current-maintenance-image]")) openImageModal(imageData);
+    });
+    form.elements.repairDate.addEventListener("change", calculateWarrantyExpiry);
+    form.elements.warrantyPeriod.addEventListener("input", calculateWarrantyExpiry);
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await imagePromise;
+      const data = Object.fromEntries(new FormData(form).entries());
+      const normalized = Object.fromEntries(Object.entries(data)
+        .filter(([key]) => key !== "imageFile")
+        .map(([key, value]) => [key, String(value || "").trim()]));
+      normalized.partCost = Number(String(normalized.partCost || "0").replace(/,/g, "")) || 0;
+      normalized.image = imageData;
+
+      const duplicateSerial = store.maintenanceJobs.find((item) =>
+        item.id !== editingId && normalized.newSerialNumber &&
+        String(item.newSerialNumber || "").toLowerCase() === normalized.newSerialNumber.toLowerCase()
+      );
+      if (duplicateSerial) {
+        setNotice(`New Serial Number already exists in ${duplicateSerial.id} for truck ${duplicateSerial.truckNo}.`, true);
+        return;
+      }
+
+      if (!editingId) {
+        normalized.id = getNextJobNo();
+        store.maintenanceJobs.unshift(normalized);
+      } else {
+        const index = store.maintenanceJobs.findIndex((item) => item.id === editingId);
+        if (index === -1) return;
+        normalized.id = editingId;
+        store.maintenanceJobs[index] = normalized;
+      }
+
+      try {
+        saveStore(store);
+      } catch (error) {
+        setNotice("The image is too large for browser storage. Please choose a smaller image.", true);
+        return;
+      }
+      const savedId = normalized.id;
+      resetForm();
+      render();
+      setNotice(`${savedId} saved successfully.`);
+    });
+
+    body.addEventListener("click", (event) => {
+      const editId = event.target.closest("[data-edit-maintenance]")?.dataset.editMaintenance;
+      const deleteId = event.target.closest("[data-delete-maintenance]")?.dataset.deleteMaintenance;
+      const imageId = event.target.closest("[data-view-maintenance-image]")?.dataset.viewMaintenanceImage;
+      if (editId) fillForm(store.maintenanceJobs.find((item) => item.id === editId));
+      if (imageId) openImageModal(store.maintenanceJobs.find((item) => item.id === imageId)?.image);
+      if (deleteId) {
+        store.maintenanceJobs = store.maintenanceJobs.filter((item) => item.id !== deleteId);
+        saveStore(store);
+        if (editingId === deleteId) resetForm();
+        render();
+        setNotice(`${deleteId} deleted.`);
+      }
+    });
+
+    truckFilter?.addEventListener("change", render);
+    dateOrder?.addEventListener("change", render);
+    document.querySelector("[data-reset-maintenance-form]").addEventListener("click", resetForm);
+    closeImageModalButton.addEventListener("click", closeImageModal);
+    imageModal.addEventListener("click", (event) => { if (event.target === imageModal) closeImageModal(); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !imageModal.hidden) closeImageModal(); });
+    populateTruckControls();
+    resetForm();
+    render();
+  }
+
   function employeePage(store) {
     const form = document.querySelector("[data-employee-form]");
     const body = document.querySelector("[data-employee-rows]");
@@ -2875,6 +3434,7 @@
       }
 
       setAdminSession(user);
+      recordAuthenticationActivity("SIGN_IN", user);
       navigateWithTransition("admin.html");
     });
   }
@@ -2963,7 +3523,7 @@
           </td>
           <td>${text(item.role)}</td>
           <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
-          <td>${normalizeAdminAccess(item.access, item.role).map((access) => `<span class="badge">${text(ACCESS_OPTIONS.find((option) => option.value === access)?.label || access)}</span>`).join(" ")}</td>
+          <td><div class="admin-access-list">${normalizeAdminAccess(item.access, item.role).map((access) => `<span class="admin-access-chip">${text(ACCESS_OPTIONS.find((option) => option.value === access)?.label || access)}</span>`).join("")}</div></td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-edit-admin="${item.id}">Edit</button>
@@ -3070,6 +3630,89 @@
     resetForm();
   }
 
+  function activityLogsPage(store) {
+    const logs = Array.isArray(store.activityLogs) ? store.activityLogs : [];
+    const body = document.querySelector("[data-log-rows]");
+    const summary = document.querySelector("[data-log-summary]");
+    const count = document.querySelector("[data-log-count]");
+    const search = document.querySelector("[data-log-search]");
+    const moduleFilter = document.querySelector("[data-log-module]");
+    const actionFilter = document.querySelector("[data-log-action]");
+    const userFilter = document.querySelector("[data-log-user]");
+    const orderFilter = document.querySelector("[data-log-order]");
+
+    function populateFilter(select, values, allLabel) {
+      select.innerHTML = `<option value="">${allLabel}</option>${values.map((value) => `<option value="${escapeHtml(value)}">${text(value)}</option>`).join("")}`;
+    }
+
+    function formatLogTimestamp(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "-";
+      return new Intl.DateTimeFormat("en-PK", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(date);
+    }
+
+    function actionClass(action) {
+      if (action === "CREATE" || action === "SIGN_IN") return "good";
+      if (action === "DELETE" || action === "SIGN_OUT") return "bad";
+      return "warn";
+    }
+
+    function renderSummary() {
+      const countAction = (action) => logs.filter((item) => item.action === action).length;
+      summary.innerHTML = `
+        <div class="audit-stat"><span>Total Events</span><strong>${logs.length}</strong></div>
+        <div class="audit-stat"><span>Created</span><strong>${countAction("CREATE")}</strong></div>
+        <div class="audit-stat"><span>Updated</span><strong>${countAction("UPDATE")}</strong></div>
+        <div class="audit-stat"><span>Deleted</span><strong>${countAction("DELETE")}</strong></div>
+        <div class="audit-stat"><span>Active Users</span><strong>${new Set(logs.map((item) => item.userId).filter(Boolean)).size}</strong></div>
+      `;
+    }
+
+    function render() {
+      const query = search.value.trim().toLowerCase();
+      const direction = orderFilter.value === "oldest" ? 1 : -1;
+      const filtered = logs
+        .filter((item) => !moduleFilter.value || item.module === moduleFilter.value)
+        .filter((item) => !actionFilter.value || item.action === actionFilter.value)
+        .filter((item) => !userFilter.value || item.userId === userFilter.value)
+        .filter((item) => !query || [item.userName, item.userEmail, item.module, item.action, item.recordId, item.details]
+          .some((value) => String(value || "").toLowerCase().includes(query)))
+        .sort((a, b) => direction * (new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
+
+      count.textContent = `${filtered.length} event(s)`;
+      body.innerHTML = filtered.length ? filtered.map((item) => `
+        <tr>
+          <td class="audit-time">${formatLogTimestamp(item.timestamp)}</td>
+          <td><strong>${text(item.userName || "System")}</strong><small>${text(item.userEmail || "-")}</small></td>
+          <td>${text(item.userRole || "-")}</td>
+          <td>${text(item.module || "-")}</td>
+          <td><span class="badge ${actionClass(item.action)}">${text(item.action || "-")}</span></td>
+          <td>${text(item.recordId || "-")}</td>
+          <td class="audit-details">${text(item.details || "-")}</td>
+        </tr>
+      `).join("") : `<tr><td colspan="7" class="empty-state">No activity matches the selected filters.</td></tr>`;
+    }
+
+    populateFilter(moduleFilter, [...new Set(logs.map((item) => item.module).filter(Boolean))].sort(), "All Modules");
+    populateFilter(actionFilter, [...new Set(logs.map((item) => item.action).filter(Boolean))].sort(), "All Actions");
+    userFilter.innerHTML = `<option value="">All Users</option>${[...new Map(logs.filter((item) => item.userId).map((item) => [item.userId, item])).values()]
+      .sort((a, b) => String(a.userName).localeCompare(String(b.userName)))
+      .map((item) => `<option value="${escapeHtml(item.userId)}">${text(item.userName || item.userEmail || item.userId)}</option>`).join("")}`;
+
+    [search, moduleFilter, actionFilter, userFilter, orderFilter].forEach((control) => {
+      control.addEventListener(control === search ? "input" : "change", render);
+    });
+    renderSummary();
+    render();
+  }
+
   function khataPage(store) {
     const isPayable = document.body.dataset.page === "accounts-payable";
     const accounts = isPayable ? store.vendorKhatas : store.customerKhatas;
@@ -3093,8 +3736,69 @@
     const exportNotice = document.querySelector("[data-export-notice]");
     const printButton = document.querySelector("[data-print-statement]");
     const whatsappButton = document.querySelector("[data-whatsapp-statement]");
+    const entryImageInput = form.querySelector("[data-entry-image-input]");
+    const removeEntryImageButton = form.querySelector("[data-remove-entry-image]");
+    const entryImageModal = document.querySelector("[data-entry-image-modal]");
+    const entryImageModalImage = document.querySelector("[data-entry-image-modal-image]");
+    const closeEntryImageModalButton = document.querySelector("[data-close-entry-image-modal]");
     let editingId = "";
     let editingCustomerId = "";
+    let entryImageData = "";
+    let entryImagePromise = Promise.resolve("");
+
+    function setEntryImage(imageData = "") {
+      entryImageData = String(imageData || "");
+      removeEntryImageButton.hidden = !entryImageData;
+    }
+
+    function compressEntryImage(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !String(file.type || "").startsWith("image/")) {
+          reject(new Error("Please select a valid image file."));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("The image could not be read."));
+        reader.onload = () => {
+          const image = new Image();
+          image.onerror = () => reject(new Error("The image format is not supported."));
+          image.onload = () => {
+            const maxDimension = 1100;
+            const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const context = canvas.getContext("2d");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            let quality = 0.74;
+            let imageData = canvas.toDataURL("image/jpeg", quality);
+            while (imageData.length > 420000 && quality > 0.42) {
+              quality -= 0.08;
+              imageData = canvas.toDataURL("image/jpeg", quality);
+            }
+            resolve(imageData);
+          };
+          image.src = String(reader.result || "");
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function closeEntryImageModal() {
+      entryImageModal.hidden = true;
+      entryImageModalImage.removeAttribute("src");
+      document.body.classList.remove("bilty-modal-open");
+    }
+
+    function openEntryImageModal(imageData) {
+      if (!imageData) return;
+      entryImageModalImage.src = imageData;
+      entryImageModal.hidden = false;
+      document.body.classList.add("bilty-modal-open");
+      closeEntryImageModalButton.focus();
+    }
 
     function getSelectedAccount() {
       return accounts.find((item) => item.id === select.value) || accounts[0];
@@ -3422,6 +4126,11 @@
           <tr>
             <td>${formatStatementDate(entry.date)}</td>
             <td>${text(entry.description)}</td>
+            <td>${entry.image ? `
+              <button class="bilty-thumbnail" type="button" data-view-khata-image="${escapeHtml(entry.id)}" aria-label="View entry image" title="View image">
+                <img src="${escapeHtml(entry.image)}" alt="Entry attachment thumbnail" />
+              </button>
+            ` : "-"}</td>
             <td class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0
@@ -3450,6 +4159,9 @@
       form.elements.type.value = "";
       form.elements.description.value = "";
       form.elements.amount.value = "";
+      entryImageInput.value = "";
+      entryImagePromise = Promise.resolve("");
+      setEntryImage("");
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Entry";
     }
@@ -3461,6 +4173,9 @@
       form.elements.type.value = entry.type;
       form.elements.description.value = entry.description;
       form.elements.amount.value = entry.amount;
+      entryImageInput.value = "";
+      entryImagePromise = Promise.resolve(entry.image || "");
+      setEntryImage(entry.image);
       editingId = entry.id;
       form.querySelector("[data-submit-label]").textContent = "Update Entry";
     }
@@ -3509,8 +4224,35 @@
       resetCustomerForm();
     });
 
-    form.addEventListener("submit", (event) => {
+    entryImageInput.addEventListener("change", () => {
+      const file = entryImageInput.files && entryImageInput.files[0];
+      if (!file) return;
+      entryImageInput.disabled = true;
+      entryImagePromise = compressEntryImage(file)
+        .then((imageData) => {
+          setEntryImage(imageData);
+          return imageData;
+        })
+        .catch((error) => {
+          entryImageInput.value = "";
+          setEntryImage("");
+          notice.textContent = error.message;
+          return "";
+        })
+        .finally(() => {
+          entryImageInput.disabled = false;
+        });
+    });
+
+    removeEntryImageButton.addEventListener("click", () => {
+      entryImageInput.value = "";
+      entryImagePromise = Promise.resolve("");
+      setEntryImage("");
+    });
+
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      await entryImagePromise;
       const data = Object.fromEntries(new FormData(form).entries());
       const account = accounts.find((item) => item.id === data.accountId);
       if (!account) return;
@@ -3520,6 +4262,7 @@
         date: data.date,
         type: data.type,
         description: data.description,
+        image: entryImageData,
         amount: Number(data.amount || 0)
       };
 
@@ -3543,11 +4286,17 @@
     });
 
     body.addEventListener("click", (event) => {
+      const imageTrigger = event.target.closest("[data-view-khata-image]");
       const editId = event.target.getAttribute("data-edit-khata");
       const deleteId = event.target.getAttribute("data-delete-khata");
       const account = accounts.find((item) => item.id === select.value);
       if (!account) return;
 
+      if (imageTrigger) {
+        const entry = account.entries.find((item) => item.id === imageTrigger.getAttribute("data-view-khata-image"));
+        if (entry?.image) openEntryImageModal(entry.image);
+        return;
+      }
       if (editId) fillForm(account, account.entries.find((entry) => entry.id === editId));
       if (deleteId) {
         account.entries = account.entries.filter((entry) => entry.id !== deleteId);
@@ -3582,6 +4331,13 @@
       const account = getSelectedAccount();
       if (account) shareStatementOnWhatsapp(account);
     });
+    closeEntryImageModalButton.addEventListener("click", closeEntryImageModal);
+    entryImageModal.addEventListener("click", (event) => {
+      if (event.target === entryImageModal) closeEntryImageModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !entryImageModal.hidden) closeEntryImageModal();
+    });
     populateCustomers();
     renderAccount(accounts[0]?.id);
     resetForm();
@@ -3593,7 +4349,11 @@
     const page = document.body.dataset.page;
     if (!enforceSoftwareAccess(page)) return;
     bindPageTransitions();
+    syncAdminNavigationRoute();
     ensureEquipmentNavigation();
+    ensureMaintenanceNavigation();
+    ensureAccountsNavigationOrder();
+    ensureActivityLogsNavigation();
     applySessionAccess();
     setActiveNav();
     bindMobileNav();
@@ -3606,9 +4366,11 @@
     if (page === "truck") truckPage(store);
     if (page === "truck-summary" || page === "completed-truck-summary") truckSummaryPage(store);
     if (page === "equipment") equipmentPage(store);
+    if (page === "maintenance") maintenancePage(store);
     if (page === "employee") employeePage(store);
     if (page === "admin-login") adminLoginPage(store);
     if (page === "admin") adminPage(store);
+    if (page === "activity-logs") activityLogsPage(store);
     if (page === "khata" || page === "accounts-payable") khataPage(store);
     markPageReady();
   });

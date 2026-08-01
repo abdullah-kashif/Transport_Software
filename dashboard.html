@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Dashboard</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260801-4" />
 </head>
 <body data-page="dashboard">
   <div class="app">
@@ -31,7 +31,7 @@
         <a href="employees.html" data-page="employee">Employees</a>
         <a href="khata.html" data-page="khata">Accounts Receivable</a>
         <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
-        <a href="admin-login.html" data-page="admin-login">Admin</a>
+        <a href="admin.html" data-page="admin">Admin</a>
       </nav>
       <div class="tip"></div>
     </aside>
@@ -47,12 +47,75 @@
             <h3>Core KPIs</h3>
           </div>
         </div>
-        <div class="grid">
-          <div class="card span-3"><span class="badge good">Trips</span><strong data-kpi="activeTrips">0</strong><div class="muted">In Transit</div></div>
-          <div class="card span-3"><span class="badge warn">Billing</span><strong data-kpi="pendingBills">0</strong><div class="muted">Pending Bills</div></div>
-          <div class="card span-4"><span class="badge good">Delivered</span><strong data-kpi="delivered">0</strong><div class="muted">Delivered Bookings</div></div>
-          <div class="card span-4"><span class="badge good">Employees</span><strong data-kpi="employees">0</strong><div class="muted">Active Staff</div></div>
-          <div class="card span-4"><span class="badge good">Receipts</span><strong>PKR <span data-kpi="receipts">0</span></strong><div class="muted">Customer Collections</div></div>
+        <div class="dashboard-kpi-groups">
+          <section class="dashboard-kpi-group" aria-labelledby="booking-form-kpis-title">
+            <h4 id="booking-form-kpis-title">Booking Form</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card"><h5>Total Bookings</h5><strong data-kpi="totalBookings">0</strong></div>
+              <div class="dashboard-kpi-card"><h5>In Transit Bookings</h5><strong data-kpi="activeTrips">0</strong></div>
+              <div class="dashboard-kpi-card"><h5>Delivered Bookings</h5><strong data-kpi="delivered">0</strong></div>
+              <div class="dashboard-kpi-card"><h5>Awaiting Payment Bookings</h5><strong data-kpi="pendingBills">0</strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="booking-summary-kpis-title">
+            <h4 id="booking-summary-kpis-title">Booking Summary</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card currency"><h5>Booking Receivable Amount</h5><strong>PKR <span data-kpi="bookingReceivable">0</span></strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="pending-truck-kpis-title">
+            <h4 id="pending-truck-kpis-title">Pending Truck Summary</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card"><h5>Pending Truck Jobs</h5><strong data-kpi="pendingTruckJobs">0</strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="completed-truck-kpis-title">
+            <h4 id="completed-truck-kpis-title">Completed Truck Summary</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card"><h5>Completed Truck Jobs</h5><strong data-kpi="completedTruckJobs">0</strong></div>
+              <div class="dashboard-kpi-card currency"><h5>Completed Jobs P&amp;L</h5><strong>PKR <span data-kpi="truckProfitLoss">0</span></strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="equipment-kpis-title">
+            <h4 id="equipment-kpis-title">Equipment &amp; Handling Fleet</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card"><h5>Registered Fleet Units</h5><strong data-kpi="fleetUnits">0</strong></div>
+              <div class="dashboard-kpi-card"><h5>Document Expiry Alerts</h5><strong data-kpi="documentAlerts">0</strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="maintenance-kpis-title">
+            <h4 id="maintenance-kpis-title">Fleet Maintenance</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card currency"><h5>Recorded Parts Cost</h5><strong>PKR <span data-kpi="maintenanceCost">0</span></strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="receivable-kpis-title">
+            <h4 id="receivable-kpis-title">Accounts Receivable</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card currency"><h5>Customer Collections</h5><strong>PKR <span data-kpi="receipts">0</span></strong></div>
+              <div class="dashboard-kpi-card currency"><h5>Customer Outstanding</h5><strong>PKR <span data-kpi="accountsReceivable">0</span></strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="payable-kpis-title">
+            <h4 id="payable-kpis-title">Accounts Payable</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card currency"><h5>Supplier Outstanding</h5><strong>PKR <span data-kpi="accountsPayable">0</span></strong></div>
+            </div>
+          </section>
+
+          <section class="dashboard-kpi-group" aria-labelledby="employees-kpis-title">
+            <h4 id="employees-kpis-title">Employees</h4>
+            <div class="dashboard-kpi-grid">
+              <div class="dashboard-kpi-card"><h5>Active Staff</h5><strong data-kpi="employees">0</strong></div>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -65,6 +128,7 @@
             <a class="btn primary" href="booking.html">Open Booking CRUD</a>
           </div>
         </div>
+        <div class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -80,6 +144,7 @@
           </thead>
           <tbody data-bookings-preview></tbody>
         </table>
+        </div>
       </section>
 
       <section class="screen">
@@ -91,6 +156,7 @@
             <a class="btn" href="employees.html">Open Employee CRUD</a>
           </div>
         </div>
+        <div class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -104,6 +170,7 @@
           </thead>
           <tbody data-employee-preview></tbody>
         </table>
+        </div>
       </section>
     </main>
   </div>

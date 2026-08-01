@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Activity Logs</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="activity-logs">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Accounts Receivable</a>
+        <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="admin.html" data-page="admin">Admin</a>
+        <a href="activity-logs.html" data-page="activity-logs">Activity Logs</a>
+      </nav>
+      <div class="tip"></div>
+    </aside>
+
+    <main class="main">
+      <section class="hero"><h2>Activity Logs</h2></section>
+
+      <section class="screen audit-screen">
+        <div class="audit-summary" data-log-summary></div>
+        <div class="audit-toolbar">
+          <div class="field audit-search"><label>Search</label><input type="search" data-log-search placeholder="User, record or activity" /></div>
+          <div class="field"><label>Module</label><select data-log-module></select></div>
+          <div class="field"><label>Action</label><select data-log-action></select></div>
+          <div class="field"><label>User</label><select data-log-user></select></div>
+          <div class="field"><label>Date Order</label><select data-log-order><option value="newest">Newest First</option><option value="oldest">Oldest First</option></select></div>
+          <span class="record-count" data-log-count>0 event(s)</span>
+        </div>
+
+        <div class="table-wrap audit-table-wrap">
+          <table class="audit-table">
+            <thead><tr><th>Date &amp; Time</th><th>User</th><th>Role</th><th>Module</th><th>Action</th><th>Record</th><th>Details</th></tr></thead>
+            <tbody data-log-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
