@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Completed Truck Summary</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260805-12" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -25,13 +25,13 @@
         <div class="screen-head">
           <div></div>
           <div class="ledger-filter">
+            <div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div>
             <div class="ledger-filter-control"><label for="completed-truck-start-date">Start Date</label><input id="completed-truck-start-date" type="date" data-truck-summary-start-date /></div>
             <div class="ledger-filter-control"><label for="completed-truck-end-date">End Date</label><input id="completed-truck-end-date" type="date" data-truck-summary-end-date /></div>
+            <div class="ledger-filter-control"><label for="truck-summary-job-sort">Job Order</label><select id="truck-summary-job-sort" data-truck-summary-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div>
             <div class="ledger-total" aria-live="polite"><span>Total Trucks</span><strong data-truck-summary-total-trucks>0</strong></div>
             <div class="ledger-total" aria-live="polite"><span>P&amp;L</span><strong data-completed-profit-loss>PKR 0</strong></div>
             <div class="ledger-total" aria-live="polite"><span>Total Work Amount</span><strong data-completed-total-work>PKR 0</strong></div>
-            <div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div>
-            <div class="ledger-filter-control"><label for="truck-summary-job-sort">Job Order</label><select id="truck-summary-job-sort" data-truck-summary-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div>
             <span class="ledger-count" data-truck-summary-count>0 job(s)</span>
           </div>
         </div>
@@ -39,6 +39,8 @@
       </section>
     </main>
   </div>
-  <script src="app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js?v=20260805-13"></script>
 </body>
 </html>

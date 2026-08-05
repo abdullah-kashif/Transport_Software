@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Booking Form</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260805-12" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -39,8 +39,21 @@
     </aside>
 
     <main class="main">
-      <section class="hero">
+      <section class="hero dashboard-hero">
         <h2>Booking Form</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head">
+              <div><strong>Payment Alerts</strong><span data-notification-summary>No expired payments</span></div>
+              <button type="button" data-notification-close aria-label="Close payment notifications">&times;</button>
+            </div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
       </section>
       <section class="screen">
         <div class="screen-head">
@@ -154,6 +167,14 @@
               </select>
             </div>
             <div class="ledger-filter-control">
+              <label for="booking-start-date">Start Date</label>
+              <input id="booking-start-date" type="date" data-booking-start-date />
+            </div>
+            <div class="ledger-filter-control">
+              <label for="booking-end-date">End Date</label>
+              <input id="booking-end-date" type="date" data-booking-end-date />
+            </div>
+            <div class="ledger-filter-control">
               <label for="booking-date-sort">Date Order</label>
               <select id="booking-date-sort" data-booking-date-sort>
                 <option value="desc">Descending (Newest First)</option>
@@ -217,6 +238,8 @@
     <button class="bilty-modal-close" type="button" data-close-bilty-modal aria-label="Close Bilty preview" title="Close">&times;</button>
     <img data-bilty-modal-image alt="Bilty" />
   </div>
-  <script src="app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js?v=20260805-13"></script>
 </body>
 </html>

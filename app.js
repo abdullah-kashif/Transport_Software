@@ -667,6 +667,98 @@
     }));
   }
 
+  function getSupabaseClient() {
+    const config = window.GTLS_SUPABASE_CONFIG || {};
+    const publishableKey = String(config.publishableKey || "").trim();
+    const isConfigured = config.url && publishableKey && !publishableKey.startsWith("PASTE_");
+    if (!isConfigured || !window.supabase?.createClient) return null;
+
+    if (!window.GTLS_SUPABASE_CLIENT) {
+      window.GTLS_SUPABASE_CLIENT = window.supabase.createClient(config.url, publishableKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      });
+    }
+    return window.GTLS_SUPABASE_CLIENT;
+  }
+
+  function mapSupabaseProfile(profile, authUser) {
+    const isSuperAdmin = profile.role === "super_admin";
+    return {
+      id: profile.id || authUser.id,
+      name: profile.name || authUser.email || "User",
+      email: profile.email || authUser.email || "",
+      role: isSuperAdmin ? "Super Admin" : "Admin",
+      status: profile.status === "active" ? "Active" : "Inactive",
+      access: isSuperAdmin
+        ? ACCESS_OPTIONS.map((item) => item.value)
+        : normalizeAdminAccess(profile.access_modules || [], "Admin")
+    };
+  }
+
+  async function getSupabaseSessionUser() {
+    const client = getSupabaseClient();
+    if (!client) {
+      clearAdminSession();
+      return null;
+    }
+
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError || !sessionData.session?.user) {
+      clearAdminSession();
+      return null;
+    }
+
+    const authUser = sessionData.session.user;
+    const { data: profile, error: profileError } = await client
+      .from("profiles")
+      .select("id,name,email,role,status,access_modules")
+      .eq("id", authUser.id)
+      .single();
+
+    if (profileError || !profile || profile.status !== "active") {
+      await client.auth.signOut();
+      clearAdminSession();
+      return null;
+    }
+
+    const user = mapSupabaseProfile(profile, authUser);
+    setAdminSession(user);
+    return user;
+  }
+
+  async function signInWithSupabase(email, password) {
+    const client = getSupabaseClient();
+    if (!client) {
+      throw new Error("Supabase publishable key is not configured in supabase-config.js.");
+    }
+
+    const { data, error } = await client.auth.signInWithPassword({
+      email: String(email || "").trim(),
+      password: String(password || "")
+    });
+    if (error) throw error;
+
+    const { data: profile, error: profileError } = await client
+      .from("profiles")
+      .select("id,name,email,role,status,access_modules")
+      .eq("id", data.user.id)
+      .single();
+    if (profileError || !profile) {
+      await client.auth.signOut();
+      throw new Error("Your user profile is not available.");
+    }
+    if (profile.status !== "active") {
+      await client.auth.signOut();
+      throw new Error("Your account is inactive. Contact the Super Admin.");
+    }
+
+    return mapSupabaseProfile(profile, data.user);
+  }
+
   function getPageFile(page) {
     return `${page === "employee" ? "employees" : page}.html`;
   }
@@ -749,11 +841,6 @@
   }
 
   function softwareLoginPage(store) {
-    if (getAdminSession()) {
-      navigateWithTransition(getPageFile("dashboard"), { immediate: true });
-      return;
-    }
-
     const form = document.querySelector("[data-software-login-form]");
     const notice = document.querySelector("[data-notice]");
     const passwordField = form.querySelector("[name='password']");
@@ -761,26 +848,30 @@
 
     bindPasswordToggle(passwordField, passwordToggle);
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(form).entries());
-      const user = authenticateSoftwareUser(store, data.email, data.password);
-      if (!user) {
-        notice.hidden = false;
-        notice.textContent = "Incorrect email or password.";
-        return;
-      }
+      const submitButton = form.querySelector("[type='submit']");
+      submitButton.disabled = true;
+      notice.hidden = true;
 
-      setAdminSession(user);
-      recordAuthenticationActivity("SIGN_IN", user);
-      const firstPage = normalizeAdminAccess(user.access, user.role)[0] || "dashboard";
-      navigateWithTransition(getPageFile(firstPage));
+      try {
+        const user = await signInWithSupabase(data.email, data.password);
+        setAdminSession(user);
+        recordAuthenticationActivity("SIGN_IN", user);
+        const firstPage = normalizeAdminAccess(user.access, user.role)[0] || "dashboard";
+        navigateWithTransition(getPageFile(firstPage));
+      } catch (error) {
+        notice.hidden = false;
+        notice.textContent = error.message || "Incorrect email or password.";
+        submitButton.disabled = false;
+      }
     });
   }
 
-  function enforceSoftwareAccess(page) {
+  async function enforceSoftwareAccess(page) {
     const publicPages = new Set(["signin", "admin-login"]);
-    const session = getAdminSession();
+    const session = await getSupabaseSessionUser();
     const hasSession = Boolean(session);
 
     if (page === "signin" && hasSession) {
@@ -860,8 +951,10 @@
         document.body.classList.remove("confirm-modal-open");
       };
       modal.querySelector("[data-cancel-signout]").addEventListener("click", closeModal);
-      modal.querySelector("[data-confirm-signout]").addEventListener("click", () => {
+      modal.querySelector("[data-confirm-signout]").addEventListener("click", async () => {
         recordAuthenticationActivity("SIGN_OUT", getAdminSession());
+        const client = getSupabaseClient();
+        if (client) await client.auth.signOut();
         clearAdminSession();
         navigateWithTransition("index.html");
       });
@@ -1570,12 +1663,140 @@
     });
   }
 
+  const PAYMENT_ALERT_READ_KEY = "gtls-payment-alert-read-v1";
+
+  function getBookingReceivableAmount(item) {
+    const storedAmount = Number(item.receivableAmount);
+    if (Number.isFinite(storedAmount)) return storedAmount;
+    return calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount;
+  }
+
+  function getPaymentTermDays(value) {
+    const term = String(value || "").trim().toLowerCase();
+    if (!term) return null;
+    if (["immediate", "due immediately", "same day", "on delivery", "cash on delivery", "cod"].includes(term)) return 0;
+    const amount = Number((term.match(/\d+(?:\.\d+)?/) || [])[0]);
+    if (!Number.isFinite(amount)) return null;
+    if (term.includes("month")) return Math.round(amount * 30);
+    if (term.includes("week")) return Math.round(amount * 7);
+    return Math.round(amount);
+  }
+
+  function getPaymentDueDate(item) {
+    const bookingDate = parseDateValue(item.date);
+    const termDays = getPaymentTermDays(item.paymentTerm);
+    if (!bookingDate || termDays === null) return null;
+    const dueDate = new Date(bookingDate);
+    dueDate.setDate(dueDate.getDate() + termDays);
+    return dueDate;
+  }
+
+  function getPaymentAlertKey(item, dueDate) {
+    const dateKey = dueDate instanceof Date && !Number.isNaN(dueDate.getTime())
+      ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}`
+      : "unknown";
+    return `${item.id || item.invoiceNo || item.customer || "booking"}|${dateKey}`;
+  }
+
+  function getReadPaymentAlertKeys() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(PAYMENT_ALERT_READ_KEY) || "[]");
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function bindPaymentNotifications(bookingsSource) {
+    const center = document.querySelector("[data-payment-notifications]");
+    if (!center) return () => {};
+    const trigger = center.querySelector("[data-notification-trigger]");
+    const panel = center.querySelector("[data-notification-panel]");
+    const closeButton = center.querySelector("[data-notification-close]");
+    const count = center.querySelector("[data-notification-count]");
+    const summary = center.querySelector("[data-notification-summary]");
+    const list = center.querySelector("[data-notification-list]");
+    let expiredPayments = [];
+
+    function readBookings() {
+      const value = typeof bookingsSource === "function" ? bookingsSource() : bookingsSource;
+      return Array.isArray(value) ? value : [];
+    }
+
+    function renderNotifications() {
+      const today = parseDateValue(getTodayIsoDate());
+      expiredPayments = readBookings()
+        .filter((item) => String(item.accountFlow || "").trim().toLowerCase() === "awaited")
+        .map((item) => {
+          const dueDate = getPaymentDueDate(item);
+          const daysOverdue = dueDate && today ? Math.floor((today - dueDate) / 86400000) : -1;
+          return { item, dueDate, daysOverdue, key: getPaymentAlertKey(item, dueDate) };
+        })
+        .filter((entry) => entry.dueDate && entry.daysOverdue >= 0)
+        .sort((left, right) => right.daysOverdue - left.daysOverdue);
+
+      const readKeys = getReadPaymentAlertKeys();
+      const unreadCount = expiredPayments.filter((entry) => !readKeys.has(entry.key)).length;
+      count.textContent = unreadCount > 99 ? "99+" : unreadCount;
+      count.hidden = unreadCount === 0;
+      summary.textContent = expiredPayments.length
+        ? `${expiredPayments.length} expired payment${expiredPayments.length === 1 ? "" : "s"}`
+        : "No expired payments";
+      list.innerHTML = expiredPayments.length
+        ? expiredPayments.map(({ item, dueDate, daysOverdue }) => `
+          <a class="payment-notification" href="booking.html" title="Open Booking Form">
+            <span class="payment-notification-icon"><strong>${daysOverdue}</strong><small>${daysOverdue === 1 ? "day" : "days"}</small></span>
+            <span class="payment-notification-copy">
+              <span class="payment-notification-title">
+                <strong>${text(item.customer || "Customer")}</strong>
+                <em>${daysOverdue === 0 ? "Due today" : "Overdue"}</em>
+              </span>
+              <span class="payment-notification-meta">
+                <span>${text(item.invoiceNo || item.id || "Invoice")}</span>
+                <span>PKR ${money(getBookingReceivableAmount(item))}</span>
+              </span>
+              <span class="payment-notification-due">Due date: ${formatShortDate(dueDate)}</span>
+            </span>
+          </a>
+        `).join("")
+        : '<div class="notification-empty">No payment term has expired.</div>';
+    }
+
+    function setPanel(open) {
+      panel.hidden = !open;
+      trigger.setAttribute("aria-expanded", String(open));
+    }
+
+    trigger.addEventListener("click", () => {
+      const opening = panel.hidden;
+      if (opening && expiredPayments.length) {
+        const readKeys = getReadPaymentAlertKeys();
+        expiredPayments.forEach((entry) => readKeys.add(entry.key));
+        sessionStorage.setItem(PAYMENT_ALERT_READ_KEY, JSON.stringify([...readKeys]));
+        count.hidden = true;
+        count.textContent = "0";
+      }
+      setPanel(opening);
+    });
+    closeButton.addEventListener("click", () => setPanel(false));
+    document.addEventListener("click", (event) => {
+      if (!panel.hidden && !center.contains(event.target)) setPanel(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) {
+        setPanel(false);
+        trigger.focus();
+      }
+    });
+
+    renderNotifications();
+    return renderNotifications;
+  }
+
   function dashboardPage(store) {
     const bookings = Array.isArray(store.bookings) ? store.bookings : [];
     const truckJobs = (Array.isArray(store.truckExpenses) ? store.truckExpenses : []).filter((item) => item.jobNo);
-    const maintenanceJobs = Array.isArray(store.maintenanceJobs) ? store.maintenanceJobs : [];
     const equipmentFleet = Array.isArray(store.equipmentFleet) ? store.equipmentFleet : [];
-    const employees = Array.isArray(store.employees) ? store.employees : [];
     const customerAccounts = Array.isArray(store.customerKhatas) ? store.customerKhatas : [];
     const supplierAccounts = Array.isArray(store.vendorKhatas) ? store.vendorKhatas : [];
 
@@ -1584,68 +1805,132 @@
         .every((status) => String(status || "Awaited").trim().toLowerCase() === "credit");
     }
 
+    function isTruckPaymentCredited(status) {
+      return String(status || "Awaited").trim().toLowerCase() === "credit";
+    }
+
+    function getAwaitedTruckReceivable(item) {
+      const financials = calculateTruckTripFinancials(item);
+      let total = 0;
+      if (!isTruckPaymentCredited(item.importPaymentStatus)) total += financials.importReceivable;
+      if (!isTruckPaymentCredited(item.exportPaymentStatus)) total += financials.exportReceivable;
+      if (!isTruckPaymentCredited(item.mtyPaymentStatus)) total += Number(item.mtyBoxFreight || 0);
+      return total;
+    }
+
     function setKpi(name, value) {
       const element = document.querySelector(`[data-kpi='${name}']`);
       if (element) element.textContent = value;
     }
 
-    function getBookingReceivable(item) {
-      const storedAmount = Number(item.receivableAmount);
-      if (Number.isFinite(storedAmount)) return storedAmount;
-      return calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount;
+    function setExpiryKpi(name, summary) {
+      setKpi(name, summary.alerts);
+      const card = document.querySelector(`[data-expiry-card='${name}']`);
+      const detail = document.querySelector(`[data-expiry-detail='${name}']`);
+      if (card) {
+        card.classList.toggle("expiry-due", summary.due > 0 && summary.expired === 0);
+        card.classList.toggle("expiry-expired", summary.expired > 0);
+        card.title = summary.alerts
+          ? `${summary.expired} expired, ${summary.due} due within 90 days`
+          : "No expiry within 90 days";
+      }
+      if (detail) {
+        detail.textContent = summary.alerts
+          ? `${summary.expired} expired | ${summary.due} due soon`
+          : "No upcoming expiry";
+      }
     }
 
-    function getOutstanding(accounts) {
-      return accounts.reduce((total, account) => {
-        const balance = calculateKhataSummary({ ...account, entries: Array.isArray(account.entries) ? account.entries : [] }).closingBalance;
-        return total + Math.max(0, Number(balance || 0));
-      }, 0);
+    function setFinancialAlertKpi(name, value, formatted = false) {
+      setKpi(name, formatted ? money(value) : value);
+      const card = document.querySelector(`[data-financial-alert='${name}']`);
+      if (card) {
+        card.classList.toggle("financial-outstanding", Number(value || 0) > 0);
+      }
     }
 
-    function hasDocumentAlert(item) {
-      const fields = [
-        item.fitnessExpiry,
-        item.balochistanPermitExpiry,
-        item.sindhPermitExpiry,
-        item.kpkPermitExpiry,
-        item.punjabPermitExpiry,
-        item.taxPaidUpTo
-      ].filter(Boolean);
+    function getAccountMetrics(accounts) {
+      return accounts.reduce((metrics, account) => {
+        const summary = calculateKhataSummary({ ...account, entries: Array.isArray(account.entries) ? account.entries : [] });
+        const outstanding = Math.max(0, Number(summary.closingBalance || 0));
+        metrics.totalDebit += Number(summary.debit || 0);
+        metrics.totalCredit += Number(summary.credit || 0);
+        metrics.outstanding += outstanding;
+        if (outstanding > 0) metrics.pendingAccounts += 1;
+        return metrics;
+      }, { totalDebit: 0, totalCredit: 0, outstanding: 0, pendingAccounts: 0 });
+    }
+
+    function getDocumentExpiryState(value) {
+      if (!value) return "valid";
       const today = parseDateValue(getTodayIsoDate());
-      return fields.some((value) => {
-        const expiry = parseDateValue(value);
-        if (!expiry || !today) return false;
-        return Math.ceil((expiry - today) / 86400000) <= 90;
-      });
+      const expiry = parseDateValue(value);
+      if (!expiry || !today) return "valid";
+      const days = Math.ceil((expiry - today) / 86400000);
+      if (days < 0) return "expired";
+      if (days <= 90) return "due";
+      return "valid";
+    }
+
+    function getExpirySummary(field) {
+      return equipmentFleet.reduce((summary, item) => {
+        const state = getDocumentExpiryState(item[field]);
+        if (state === "expired") summary.expired += 1;
+        if (state === "due") summary.due += 1;
+        summary.alerts = summary.expired + summary.due;
+        return summary;
+      }, { alerts: 0, expired: 0, due: 0 });
     }
 
     const activeTrips = bookings.filter((b) => b.status === "In Transit").length;
     const awaitingBookings = bookings.filter((b) => String(b.accountFlow || "").trim().toLowerCase() === "awaited");
     const pendingBills = awaitingBookings.length;
     const delivered = bookings.filter((b) => b.status === "Delivered").length;
-    const activeEmployees = employees.filter((employee) => employee.status === "Active").length;
-    const totalReceipts = (Array.isArray(store.ledgerEntries) ? store.ledgerEntries : []).reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0);
-    const bookingReceivable = awaitingBookings.reduce((sum, item) => sum + getBookingReceivable(item), 0);
+    const bookingReceivable = awaitingBookings.reduce((sum, item) => sum + getBookingReceivableAmount(item), 0);
     const completedTruckJobs = truckJobs.filter(hasAllTruckPaymentsCredited);
-    const pendingTruckJobs = truckJobs.length - completedTruckJobs.length;
+    const pendingTruckJobRows = truckJobs.filter((item) => !hasAllTruckPaymentsCredited(item));
+    const pendingTruckJobs = pendingTruckJobRows.length;
+    const pendingTruckReceivable = pendingTruckJobRows.reduce((sum, item) => sum + getAwaitedTruckReceivable(item), 0);
+    const completedTruckWorkAmount = completedTruckJobs.reduce((sum, item) => sum + calculateTruckTripFinancials(item).grandTotal, 0);
     const truckProfitLoss = completedTruckJobs.reduce((sum, item) => sum + calculateTruckTripFinancials(item).profitLoss, 0);
-    const maintenanceCost = maintenanceJobs.reduce((sum, item) => sum + Number(item.partCost || 0), 0);
+    const customerAccountMetrics = getAccountMetrics(customerAccounts);
+    const supplierAccountMetrics = getAccountMetrics(supplierAccounts);
+    const equipmentExpirySummaries = {
+      fitnessAlerts: getExpirySummary("fitnessExpiry"),
+      balochistanPermitAlerts: getExpirySummary("balochistanPermitExpiry"),
+      sindhPermitAlerts: getExpirySummary("sindhPermitExpiry"),
+      kpkPermitAlerts: getExpirySummary("kpkPermitExpiry"),
+      punjabPermitAlerts: getExpirySummary("punjabPermitExpiry")
+    };
+    const documentAlerts = Object.values(equipmentExpirySummaries).reduce((total, summary) => ({
+      alerts: total.alerts + summary.alerts,
+      expired: total.expired + summary.expired,
+      due: total.due + summary.due
+    }), { alerts: 0, expired: 0, due: 0 });
 
     setKpi("totalBookings", bookings.length);
     setKpi("activeTrips", activeTrips);
     setKpi("pendingBills", pendingBills);
     setKpi("delivered", delivered);
-    setKpi("employees", activeEmployees);
-    setKpi("receipts", money(totalReceipts));
+    setKpi("customerBillingTotal", money(customerAccountMetrics.totalDebit));
+    setKpi("receipts", money(customerAccountMetrics.totalCredit));
     setKpi("bookingReceivable", money(bookingReceivable));
-    setKpi("accountsReceivable", money(getOutstanding(customerAccounts)));
-    setKpi("accountsPayable", money(getOutstanding(supplierAccounts)));
+    setFinancialAlertKpi("accountsReceivable", customerAccountMetrics.outstanding, true);
+    setFinancialAlertKpi("pendingCustomerCount", customerAccountMetrics.pendingAccounts);
+    setKpi("supplierPayableTotal", money(supplierAccountMetrics.totalDebit));
+    setKpi("supplierPaidTotal", money(supplierAccountMetrics.totalCredit));
+    setFinancialAlertKpi("accountsPayable", supplierAccountMetrics.outstanding, true);
+    setFinancialAlertKpi("pendingSupplierCount", supplierAccountMetrics.pendingAccounts);
+    setKpi("totalTruckJobs", truckJobs.length);
     setKpi("pendingTruckJobs", pendingTruckJobs);
     setKpi("completedTruckJobs", completedTruckJobs.length);
+    setKpi("pendingTruckReceivable", money(pendingTruckReceivable));
+    setKpi("completedTruckWorkAmount", money(completedTruckWorkAmount));
     setKpi("truckProfitLoss", money(truckProfitLoss));
     setKpi("fleetUnits", equipmentFleet.length);
-    setKpi("documentAlerts", equipmentFleet.filter(hasDocumentAlert).length);
-    setKpi("maintenanceCost", money(maintenanceCost));
+    setExpiryKpi("documentAlerts", documentAlerts);
+    Object.entries(equipmentExpirySummaries).forEach(([name, summary]) => setExpiryKpi(name, summary));
+    bindPaymentNotifications(bookings);
 
     const bookingsBody = document.querySelector("[data-bookings-preview]");
     bookingsBody.innerHTML = bookings.map((item) => `
@@ -1681,6 +1966,8 @@
     const body = document.querySelector("[data-booking-rows]");
     const notice = document.querySelector("[data-notice]");
     const customerFilter = document.querySelector("[data-booking-customer-filter]");
+    const startDateFilter = document.querySelector("[data-booking-start-date]");
+    const endDateFilter = document.querySelector("[data-booking-end-date]");
     const dateSort = document.querySelector("[data-booking-date-sort]");
     const bookingCount = document.querySelector("[data-booking-count]");
     const bookingTotal = document.querySelector("[data-booking-total]");
@@ -1707,6 +1994,7 @@
     let editingId = "";
     let biltyImageData = "";
     let biltyImagePromise = Promise.resolve("");
+    const refreshPaymentNotifications = bindPaymentNotifications(() => store.bookings);
 
     function setBiltyPreview(imageData = "") {
       biltyImageData = String(imageData || "");
@@ -1871,9 +2159,20 @@
     function render() {
       renderCustomerFilter();
       const selectedCustomer = customerFilter.value;
+      const startDate = parseDateValue(startDateFilter?.value);
+      const endDate = parseDateValue(endDateFilter?.value);
       const bookings = (selectedCustomer
         ? store.bookings.filter((item) => String(item.customer || "").trim() === selectedCustomer)
         : [...store.bookings])
+        .filter((item) => {
+          if (startDate && endDate && startDate > endDate) return false;
+          if (!startDate && !endDate) return true;
+          const bookingDate = parseDateValue(item.date);
+          if (!bookingDate) return false;
+          if (startDate && bookingDate < startDate) return false;
+          if (endDate && bookingDate > endDate) return false;
+          return true;
+        })
         .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
 
       bookingCount.textContent = `${bookings.length} record(s)`;
@@ -2074,6 +2373,7 @@
       }
       saveStore(store);
       render();
+      refreshPaymentNotifications();
       resetForm();
     });
 
@@ -2097,12 +2397,17 @@
       }
       if (editId) {
         const item = store.bookings.find((entry) => entry.id === editId);
-        if (item) fillForm(item);
+        if (item) {
+          fillForm(item);
+          const formSection = form.closest(".screen");
+          (formSection || form).scrollIntoView({ behavior: "smooth", block: "start" });
+        }
       }
       if (deleteId) {
         store.bookings = store.bookings.filter((entry) => entry.id !== deleteId);
         saveStore(store);
         render();
+        refreshPaymentNotifications();
         notice.textContent = `Booking ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
@@ -2117,6 +2422,10 @@
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
+    if (customerFilter) customerFilter.addEventListener("change", render);
+    if (startDateFilter) startDateFilter.addEventListener("change", render);
+    if (endDateFilter) endDateFilter.addEventListener("change", render);
+    if (dateSort) dateSort.addEventListener("change", render);
     resetForm();
     render();
   }
@@ -2885,7 +3194,7 @@
       const completeFiles = rows.filter((item) => String(item.originalDocs || "").trim()).length;
 
       summary.innerHTML = `
-        <div class="card span-3"><span class="badge">Fleet</span><strong>${rows.length}</strong><div class="muted">Registered equipment</div></div>
+        <div class="card span-3"><span class="badge neutral">Fleet</span><strong>${rows.length}</strong><div class="muted">Registered equipment</div></div>
         <div class="card span-3"><span class="badge ${fitnessAlerts ? "bad" : "good"}">Fitness</span><strong>${fitnessAlerts}</strong><div class="muted">Expiry alerts</div></div>
         <div class="card span-3"><span class="badge ${permitAlerts ? "warn" : "good"}">Permits</span><strong>${permitAlerts}</strong><div class="muted">Permit alerts</div></div>
         <div class="card span-3"><span class="badge good">Documents</span><strong>${completeFiles}</strong><div class="muted">Files recorded</div></div>
@@ -3154,7 +3463,7 @@
       const expiringSoon = rows.filter((item) => getWarrantyState(item.warrantyExpiry).className === "due").length;
       const totalCost = rows.reduce((total, item) => total + Number(item.partCost || 0), 0);
       summary.innerHTML = `
-        <div class="card span-3"><span class="badge">Jobs</span><strong>${rows.length}</strong><div class="muted">Maintenance records</div></div>
+        <div class="card span-3"><span class="badge neutral">Jobs</span><strong>${rows.length}</strong><div class="muted">Maintenance records</div></div>
         <div class="card span-3"><span class="badge good">Warranty</span><strong>${underWarranty}</strong><div class="muted">Active warranties</div></div>
         <div class="card span-3"><span class="badge ${expiringSoon ? "warn" : "good"}">Due Soon</span><strong>${expiringSoon}</strong><div class="muted">Within 30 days</div></div>
         <div class="card span-3"><span class="badge warn">Parts Cost</span><strong>PKR ${money(totalCost)}</strong><div class="muted">Filtered maintenance cost</div></div>`;
@@ -3411,35 +3720,36 @@
   }
 
   function adminLoginPage(store) {
-    if (getAdminSession()) {
-      navigateWithTransition("admin.html", { immediate: true });
-      return;
-    }
-
     const form = document.querySelector("[data-admin-login-form]");
     const notice = document.querySelector("[data-notice]");
     const passwordField = form.querySelector("[name='password']");
     const passwordToggle = form.querySelector("[data-password-toggle]");
     bindPasswordToggle(passwordField, passwordToggle);
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(form).entries());
-      const user = authenticateSoftwareUser(store, data.email, data.password);
+      const submitButton = form.querySelector("[type='submit']");
+      submitButton.disabled = true;
+      notice.hidden = true;
 
-      if (!user) {
+      try {
+        const user = await signInWithSupabase(data.email, data.password);
+        if (user.role !== "Super Admin") {
+          throw new Error("Super Admin access is required.");
+        }
+        setAdminSession(user);
+        recordAuthenticationActivity("SIGN_IN", user);
+        navigateWithTransition("admin.html");
+      } catch (error) {
         notice.hidden = false;
-        notice.textContent = "Incorrect email or password.";
-        return;
+        notice.textContent = error.message || "Incorrect email or password.";
+        submitButton.disabled = false;
       }
-
-      setAdminSession(user);
-      recordAuthenticationActivity("SIGN_IN", user);
-      navigateWithTransition("admin.html");
     });
   }
 
-  function adminPage(store) {
+  async function adminPage(store) {
     const session = getAdminSession();
     if (!session) {
       navigateWithTransition("admin-login.html", { immediate: true });
@@ -3456,7 +3766,7 @@
     const accessCheckboxes = Array.from(form.querySelectorAll("input[name='access']"));
     const logoutButton = document.querySelector("[data-admin-logout]");
     let editingId = "";
-    const visiblePasswords = new Set();
+    let adminUsers = [];
 
     function setNotice(message = "") {
       notice.textContent = message;
@@ -3464,14 +3774,14 @@
     }
 
     function updateSummary() {
-      const totalUsers = store.adminUsers.length;
-      const superAdmins = store.adminUsers.filter((item) => item.role === "Super Admin").length;
-      const activeUsers = store.adminUsers.filter((item) => item.status === "Active").length;
+      const totalUsers = adminUsers.length;
+      const superAdmins = adminUsers.filter((item) => item.role === "Super Admin").length;
+      const activeUsers = adminUsers.filter((item) => item.status === "Active").length;
 
       summary.innerHTML = `
         <div class="card span-4"><span class="badge warn">Super Admin</span><strong>${superAdmins}</strong></div>
         <div class="card span-4"><span class="badge good">Active Users</span><strong>${activeUsers}</strong></div>
-        <div class="card span-4"><span class="badge">Total Users</span><strong>${totalUsers}</strong></div>
+        <div class="card span-4"><span class="badge neutral">Total Users</span><strong>${totalUsers}</strong></div>
       `;
     }
 
@@ -3500,26 +3810,20 @@
         checkbox.disabled = false;
       });
       passwordField.type = "password";
+      passwordField.required = true;
       syncPasswordToggle();
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save User";
     }
 
     function render() {
-      body.innerHTML = store.adminUsers.map((item) => `
+      body.innerHTML = adminUsers.map((item) => `
         <tr>
           <td>${text(item.id)}</td>
           <td>${text(item.name)}</td>
           <td>${text(item.email)}</td>
           <td>
-            ${item.role === "Super Admin" ? `<span class="muted">-</span>` : `
-              <div class="password-display">
-                <span>${visiblePasswords.has(item.id) ? text(item.password) : "........"}</span>
-                <button class="password-toggle inline" type="button" data-toggle-admin-password="${item.id}" aria-label="${visiblePasswords.has(item.id) ? "Hide password" : "Show password"}" title="${visiblePasswords.has(item.id) ? "Hide password" : "Show password"}">
-                  ${getPasswordToggleIcon(visiblePasswords.has(item.id))}
-                </button>
-              </div>
-            `}
+            <span class="muted">Managed by Supabase Auth</span>
           </td>
           <td>${text(item.role)}</td>
           <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
@@ -3546,6 +3850,7 @@
       });
       syncAccessState(item.role);
       passwordField.type = "password";
+      passwordField.required = false;
       syncPasswordToggle();
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update User";
@@ -3566,7 +3871,58 @@
       });
     }
 
-    form.addEventListener("submit", (event) => {
+    async function loadAdminUsers() {
+      const client = getSupabaseClient();
+      if (!client) throw new Error("Supabase is not configured.");
+      const { data, error } = await client
+        .from("profiles")
+        .select("id,name,email,role,status,access_modules")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      adminUsers = (data || []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        email: item.email,
+        password: "",
+        role: item.role === "super_admin" ? "Super Admin" : "Admin",
+        status: item.status === "active" ? "Active" : "Inactive",
+        access: item.role === "super_admin"
+          ? ACCESS_OPTIONS.map((option) => option.value)
+          : item.access_modules || []
+      }));
+      render();
+    }
+
+    async function invokeUserManager(body) {
+      const client = getSupabaseClient();
+      if (!client) throw new Error("Supabase is not configured.");
+
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error("Your login session has expired. Please sign in again.");
+      }
+
+      const { data: result, error } = await client.functions.invoke("manage-user", {
+        body,
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      if (error) {
+        let message = error.message || "Unable to contact the user management service.";
+        try {
+          const details = await error.context?.json();
+          if (details?.error) message = details.error;
+        } catch (_) {
+          // Keep the original Functions client message when no JSON body is available.
+        }
+        throw new Error(message);
+      }
+      if (result?.error) throw new Error(result.error);
+      return result;
+    }
+
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const formData = new FormData(form);
       const data = Object.fromEntries(formData.entries());
@@ -3578,55 +3934,54 @@
         access: normalizeAdminAccess(formData.getAll("access"), data.role)
       };
 
-      if (!editingId) {
-        const nextNumber = store.adminUsers.reduce((max, item) => {
-          const current = Number(String(item.id).replace("ADM-", "")) || 0;
-          return Math.max(max, current);
-        }, 1000) + 1;
-        normalized.id = `ADM-${nextNumber}`;
-        store.adminUsers.unshift(normalized);
-        setNotice(`User ${normalized.name} was added successfully.`);
-      } else {
-        const index = store.adminUsers.findIndex((item) => item.id === editingId);
-        if (index === -1) {
-          setNotice("User record not found. Please try again.");
-          return;
-        }
-        normalized.id = editingId;
-        store.adminUsers[index] = normalized;
-        setNotice(`User ${normalized.name} updated successfully.`);
+      const submitButton = form.querySelector("[type='submit']");
+      submitButton.disabled = true;
+      try {
+        await invokeUserManager({
+          action: editingId ? "update" : "create",
+          user_id: editingId || undefined,
+          name: normalized.name,
+          email: normalized.email,
+          password: normalized.password,
+          role: normalized.role === "Super Admin" ? "super_admin" : "admin",
+          status: normalized.status === "Active" ? "active" : "inactive",
+          access_modules: normalized.access
+        });
+        setNotice(`User ${normalized.name} ${editingId ? "updated" : "added"} successfully.`);
+        await loadAdminUsers();
+        resetForm();
+      } catch (error) {
+        setNotice(error.message || "Unable to save the Supabase user.");
+      } finally {
+        submitButton.disabled = false;
       }
-
-      saveStore(store);
-      render();
-      resetForm();
     });
 
     body.addEventListener("click", (event) => {
       const editId = event.target.getAttribute("data-edit-admin");
       const deleteId = event.target.getAttribute("data-delete-admin");
-      const togglePasswordButton = event.target.closest("[data-toggle-admin-password]");
-      const toggleId = togglePasswordButton?.getAttribute("data-toggle-admin-password");
-
-      if (editId) fillForm(store.adminUsers.find((item) => item.id === editId));
-      if (toggleId) {
-        if (visiblePasswords.has(toggleId)) visiblePasswords.delete(toggleId);
-        else visiblePasswords.add(toggleId);
-        render();
-        return;
-      }
+      if (editId) fillForm(adminUsers.find((item) => item.id === editId));
       if (deleteId) {
-        store.adminUsers = store.adminUsers.filter((item) => item.id !== deleteId);
-        saveStore(store);
-        render();
-        setNotice(`User ${deleteId} deleted successfully.`);
-        if (editingId === deleteId) resetForm();
+        (async () => {
+          try {
+            await invokeUserManager({ action: "delete", user_id: deleteId });
+            setNotice("User deleted successfully.");
+            await loadAdminUsers();
+            if (editingId === deleteId) resetForm();
+          } catch (error) {
+            setNotice(error.message || "Unable to delete the Supabase user.");
+          }
+        })();
       }
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     setNotice("");
-    render();
+    try {
+      await loadAdminUsers();
+    } catch (error) {
+      setNotice(error.message || "Unable to load Supabase users.");
+    }
     resetForm();
   }
 
@@ -3717,7 +4072,7 @@
     const isPayable = document.body.dataset.page === "accounts-payable";
     const accounts = isPayable ? store.vendorKhatas : store.customerKhatas;
     const partyLabel = isPayable ? "Payee" : "Customer";
-    const statementLabel = isPayable ? "PAYABLE STATEMENT" : "CUSTOMER STATEMENT";
+    const statementLabel = isPayable ? "PAYABLE STATEMENT" : "RECEIVABLE STATEMENT";
     const debitLabel = isPayable ? "Total Payable" : "Total Debit";
     const creditLabel = isPayable ? "Total Paid" : "Total Credit";
     const balanceLabel = isPayable ? "Outstanding Payable" : "Net Balance";
@@ -3855,18 +4210,17 @@
 
       pdf.setTextColor(24, 48, 77);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(17);
-      pdf.text(statementLabel, pageWidth - left, 154, { align: "right" });
-
       pdf.setFontSize(18);
-      pdf.text(`${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`, left, 170);
+      pdf.text(account.customer, left, 164);
+      pdf.setFontSize(12);
+      pdf.text(statementLabel, left, 181);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
       pdf.setTextColor(75, 75, 75);
-      pdf.text(account.phone || "-", left, 188);
-      pdf.text(`${statement.startDate} - ${statement.endDate}`, left, 204);
+      pdf.text(account.phone || "-", left, 197);
+      pdf.text(`${statement.startDate} - ${statement.endDate}`, left, 213);
 
-      const statsTop = 236;
+      const statsTop = 245;
       const statWidth = contentWidth / 3;
       pdf.setDrawColor(228, 232, 238);
       pdf.setLineWidth(1);
@@ -4344,10 +4698,10 @@
     resetCustomerForm();
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     const store = loadStore();
     const page = document.body.dataset.page;
-    if (!enforceSoftwareAccess(page)) return;
+    if (!await enforceSoftwareAccess(page)) return;
     bindPageTransitions();
     syncAdminNavigationRoute();
     ensureEquipmentNavigation();

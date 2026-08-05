@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=20260801-4" />
+  <link rel="stylesheet" href="styles.css?v=20260805-13" />
 </head>
 <body data-page="dashboard">
   <div class="app">
@@ -37,8 +37,27 @@
     </aside>
 
     <main class="main">
-      <section class="hero">
+      <section class="hero dashboard-hero">
         <h2>Dashboard</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+              <path d="M10 21h4"></path>
+            </svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head">
+              <div>
+                <strong>Payment Alerts</strong>
+                <span data-notification-summary>No expired payments</span>
+              </div>
+              <button class="notification-close" type="button" data-notification-close aria-label="Close notifications">&times;</button>
+            </div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
       </section>
 
       <section class="screen">
@@ -48,74 +67,62 @@
           </div>
         </div>
         <div class="dashboard-kpi-groups">
-          <section class="dashboard-kpi-group" aria-labelledby="booking-form-kpis-title">
+          <section class="dashboard-kpi-group kpi-module kpi-module-booking" aria-labelledby="booking-form-kpis-title">
             <h4 id="booking-form-kpis-title">Booking Form</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card"><h5>Total Bookings</h5><strong data-kpi="totalBookings">0</strong></div>
-              <div class="dashboard-kpi-card"><h5>In Transit Bookings</h5><strong data-kpi="activeTrips">0</strong></div>
-              <div class="dashboard-kpi-card"><h5>Delivered Bookings</h5><strong data-kpi="delivered">0</strong></div>
-              <div class="dashboard-kpi-card"><h5>Awaiting Payment Bookings</h5><strong data-kpi="pendingBills">0</strong></div>
+            <div class="dashboard-kpi-grid booking-kpi-grid">
+              <a class="dashboard-kpi-card compact-kpi-card" href="booking.html"><h5>Total Bookings</h5><strong data-kpi="totalBookings">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" href="booking.html"><h5>In Transit Bookings</h5><strong data-kpi="activeTrips">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" href="booking.html"><h5>Delivered Bookings</h5><strong data-kpi="delivered">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" href="booking.html"><h5>Awaiting Payment Bookings</h5><strong data-kpi="pendingBills">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="ledger.html"><h5>Booking Summary</h5><strong>PKR <span data-kpi="bookingReceivable">0</span></strong><span class="compact-kpi-caption">Receivable Amount</span></a>
             </div>
           </section>
 
-          <section class="dashboard-kpi-group" aria-labelledby="booking-summary-kpis-title">
-            <h4 id="booking-summary-kpis-title">Booking Summary</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card currency"><h5>Booking Receivable Amount</h5><strong>PKR <span data-kpi="bookingReceivable">0</span></strong></div>
+          <section class="dashboard-kpi-group kpi-module kpi-module-truck" aria-labelledby="truck-summary-kpis-title">
+            <h4 id="truck-summary-kpis-title">Truck Summary</h4>
+            <div class="dashboard-kpi-grid truck-kpi-grid">
+              <a class="dashboard-kpi-card compact-kpi-card" href="truck.html"><h5>Total Truck Jobs</h5><strong data-kpi="totalTruckJobs">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" href="truck-summary.html"><h5>Awaited Truck Jobs</h5><strong data-kpi="pendingTruckJobs">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" href="completed-truck-summary.html"><h5>Completed Truck Jobs</h5><strong data-kpi="completedTruckJobs">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="truck-summary.html"><h5>Awaited Receivable Amount</h5><strong>PKR <span data-kpi="pendingTruckReceivable">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="completed-truck-summary.html"><h5>Completed Work Amount</h5><strong>PKR <span data-kpi="completedTruckWorkAmount">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="completed-truck-summary.html"><h5>Completed Jobs P&amp;L</h5><strong>PKR <span data-kpi="truckProfitLoss">0</span></strong></a>
             </div>
           </section>
 
-          <section class="dashboard-kpi-group" aria-labelledby="pending-truck-kpis-title">
-            <h4 id="pending-truck-kpis-title">Pending Truck Summary</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card"><h5>Pending Truck Jobs</h5><strong data-kpi="pendingTruckJobs">0</strong></div>
-            </div>
-          </section>
-
-          <section class="dashboard-kpi-group" aria-labelledby="completed-truck-kpis-title">
-            <h4 id="completed-truck-kpis-title">Completed Truck Summary</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card"><h5>Completed Truck Jobs</h5><strong data-kpi="completedTruckJobs">0</strong></div>
-              <div class="dashboard-kpi-card currency"><h5>Completed Jobs P&amp;L</h5><strong>PKR <span data-kpi="truckProfitLoss">0</span></strong></div>
-            </div>
-          </section>
-
-          <section class="dashboard-kpi-group" aria-labelledby="equipment-kpis-title">
+          <section class="dashboard-kpi-group kpi-module kpi-module-equipment" aria-labelledby="equipment-kpis-title">
             <h4 id="equipment-kpis-title">Equipment &amp; Handling Fleet</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card"><h5>Registered Fleet Units</h5><strong data-kpi="fleetUnits">0</strong></div>
-              <div class="dashboard-kpi-card"><h5>Document Expiry Alerts</h5><strong data-kpi="documentAlerts">0</strong></div>
+            <div class="dashboard-kpi-grid equipment-kpi-grid">
+              <a class="dashboard-kpi-card compact-kpi-card" href="equipment.html"><h5>Registered Fleet Units</h5><strong data-kpi="fleetUnits">0</strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-expiry-card="documentAlerts" href="equipment.html"><h5>Total Expiry Alerts</h5><strong data-kpi="documentAlerts">0</strong><span class="compact-kpi-caption" data-expiry-detail="documentAlerts">No upcoming expiry</span></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-expiry-card="fitnessAlerts" href="equipment.html"><h5>Fitness Expiry Alerts</h5><strong data-kpi="fitnessAlerts">0</strong><span class="compact-kpi-caption" data-expiry-detail="fitnessAlerts">No upcoming expiry</span></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-expiry-card="balochistanPermitAlerts" href="equipment.html"><h5>Balochistan Permit Expiry</h5><strong data-kpi="balochistanPermitAlerts">0</strong><span class="compact-kpi-caption" data-expiry-detail="balochistanPermitAlerts">No upcoming expiry</span></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-expiry-card="sindhPermitAlerts" href="equipment.html"><h5>Sindh Permit Expiry</h5><strong data-kpi="sindhPermitAlerts">0</strong><span class="compact-kpi-caption" data-expiry-detail="sindhPermitAlerts">No upcoming expiry</span></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-expiry-card="kpkPermitAlerts" href="equipment.html"><h5>KPK Permit Expiry</h5><strong data-kpi="kpkPermitAlerts">0</strong><span class="compact-kpi-caption" data-expiry-detail="kpkPermitAlerts">No upcoming expiry</span></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-expiry-card="punjabPermitAlerts" href="equipment.html"><h5>Punjab Permit Expiry</h5><strong data-kpi="punjabPermitAlerts">0</strong><span class="compact-kpi-caption" data-expiry-detail="punjabPermitAlerts">No upcoming expiry</span></a>
             </div>
           </section>
 
-          <section class="dashboard-kpi-group" aria-labelledby="maintenance-kpis-title">
-            <h4 id="maintenance-kpis-title">Fleet Maintenance</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card currency"><h5>Recorded Parts Cost</h5><strong>PKR <span data-kpi="maintenanceCost">0</span></strong></div>
-            </div>
-          </section>
-
-          <section class="dashboard-kpi-group" aria-labelledby="receivable-kpis-title">
+          <section class="dashboard-kpi-group kpi-module kpi-module-receivable" aria-labelledby="receivable-kpis-title">
             <h4 id="receivable-kpis-title">Accounts Receivable</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card currency"><h5>Customer Collections</h5><strong>PKR <span data-kpi="receipts">0</span></strong></div>
-              <div class="dashboard-kpi-card currency"><h5>Customer Outstanding</h5><strong>PKR <span data-kpi="accountsReceivable">0</span></strong></div>
+            <div class="dashboard-kpi-grid accounts-kpi-grid">
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="khata.html"><h5>Total Client Billing</h5><strong>PKR <span data-kpi="customerBillingTotal">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="khata.html"><h5>Total Amount Received</h5><strong>PKR <span data-kpi="receipts">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" data-financial-alert="accountsReceivable" href="khata.html"><h5>Pending Client Amount</h5><strong>PKR <span data-kpi="accountsReceivable">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-financial-alert="pendingCustomerCount" href="khata.html"><h5>Clients With Pending Balance</h5><strong data-kpi="pendingCustomerCount">0</strong></a>
             </div>
           </section>
 
-          <section class="dashboard-kpi-group" aria-labelledby="payable-kpis-title">
+          <section class="dashboard-kpi-group kpi-module kpi-module-payable" aria-labelledby="payable-kpis-title">
             <h4 id="payable-kpis-title">Accounts Payable</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card currency"><h5>Supplier Outstanding</h5><strong>PKR <span data-kpi="accountsPayable">0</span></strong></div>
+            <div class="dashboard-kpi-grid accounts-kpi-grid">
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="accounts-payable.html"><h5>Total Supplier Payable</h5><strong>PKR <span data-kpi="supplierPayableTotal">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" href="accounts-payable.html"><h5>Total Amount Paid</h5><strong>PKR <span data-kpi="supplierPaidTotal">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card currency" data-financial-alert="accountsPayable" href="accounts-payable.html"><h5>Pending Payable Amount</h5><strong>PKR <span data-kpi="accountsPayable">0</span></strong></a>
+              <a class="dashboard-kpi-card compact-kpi-card" data-financial-alert="pendingSupplierCount" href="accounts-payable.html"><h5>Payees With Pending Balance</h5><strong data-kpi="pendingSupplierCount">0</strong></a>
             </div>
           </section>
 
-          <section class="dashboard-kpi-group" aria-labelledby="employees-kpis-title">
-            <h4 id="employees-kpis-title">Employees</h4>
-            <div class="dashboard-kpi-grid">
-              <div class="dashboard-kpi-card"><h5>Active Staff</h5><strong data-kpi="employees">0</strong></div>
-            </div>
-          </section>
         </div>
       </section>
 
@@ -174,6 +181,8 @@
       </section>
     </main>
   </div>
-  <script src="app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js?v=20260805-13"></script>
 </body>
 </html>
