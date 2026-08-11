@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Equipment &amp; Handling Fleet</title>
-  <link rel="stylesheet" href="styles.css?v=20260805-12" />
+  <link rel="stylesheet" href="styles.css?v=20260811-17" />
 </head>
 <body data-page="equipment">
   <div class="app">
@@ -65,7 +65,14 @@
           <div class="field"><label>Punjab Permit Expiry</label><input name="punjabPermitExpiry" type="date" /></div>
 
           <div class="field"><label>Tax Paid Up To</label><input name="taxPaidUpTo" type="date" /></div>
-          <div class="field wide"><label>Original Documents in File</label><input name="originalDocs" placeholder="Fitness, route permits, original card..." /></div>
+          <div class="field wide">
+            <label>Original Documents Upload</label>
+            <div class="maintenance-image-field">
+              <input name="equipmentDocumentFile" type="file" accept="image/*,application/pdf,.pdf" data-equipment-document-input />
+              <button class="maintenance-image-remove" type="button" data-remove-equipment-document hidden aria-label="Remove selected document" title="Remove document">&times;</button>
+            </div>
+            <div class="attachment-file-name" data-equipment-document-name hidden></div>
+          </div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Equipment</button>
             <button class="btn" type="button" data-reset-equipment-form>Clear Form</button>
@@ -103,7 +110,7 @@
                 <th>KPK Permit</th>
                 <th>Punjab Permit</th>
                 <th>Tax Paid Up To</th>
-                <th>Original Docs in File</th>
+                <th>Original Documents Upload</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -115,6 +122,9 @@
   </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
-<script src="app.js?v=20260805-13"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="app.js?v=20260811-17"></script>
 </body>
 </html>
+

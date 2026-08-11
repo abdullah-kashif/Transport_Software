@@ -411,13 +411,72 @@
     ]
   };
 
+  function assignSequentialIds(items = [], prefix, field = "id") {
+    return items.map((item, index) => ({
+      ...item,
+      [field]: `${prefix}-${index + 1}`
+    }));
+  }
+
+  function migrateReadableIds(store) {
+    store.bookings = assignSequentialIds(store.bookings || [], "Job");
+    store.equipmentFleet = assignSequentialIds(store.equipmentFleet || [], "EQP");
+    store.maintenanceJobs = assignSequentialIds(store.maintenanceJobs || [], "MNT");
+    store.employees = assignSequentialIds(store.employees || [], "EMP");
+    store.adminUsers = assignSequentialIds(store.adminUsers || [], "ADM");
+    store.ledgerEntries = assignSequentialIds(store.ledgerEntries || [], "LED");
+    store.activityLogs = assignSequentialIds(store.activityLogs || [], "LOG");
+
+    let customerEntryNumber = 1;
+    store.customerKhatas = assignSequentialIds(store.customerKhatas || [], "CUS").map((account) => ({
+      ...account,
+      entries: (account.entries || []).map((entry) => ({
+        ...entry,
+        id: `KHT-${customerEntryNumber++}`
+      }))
+    }));
+
+    let payableEntryNumber = 1;
+    store.vendorKhatas = assignSequentialIds(store.vendorKhatas || [], "PAY").map((account) => ({
+      ...account,
+      entries: (account.entries || []).map((entry) => ({
+        ...entry,
+        id: `PAYE-${payableEntryNumber++}`
+      }))
+    }));
+
+    const truckJobIds = new Map();
+    let truckJobNumber = 1;
+    store.truckExpenses = (store.truckExpenses || []).map((item, index) => {
+      const currentJobNo = String(item.jobNo || "").trim();
+      if (!currentJobNo) return { ...item, id: `TRIP-${index + 1}` };
+      if (!truckJobIds.has(currentJobNo)) truckJobIds.set(currentJobNo, `Job-${truckJobNumber++}`);
+      return { ...item, id: `TRIP-${index + 1}`, jobNo: truckJobIds.get(currentJobNo) };
+    });
+
+    store.readableIdVersion = 2;
+    return store;
+  }
+
+  function getNextSequentialId(items = [], prefix, field = "id") {
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const matcher = new RegExp(`^${escapedPrefix}-(\\d+)$`, "i");
+    const highest = items.reduce((max, item) => {
+      const match = String(item?.[field] || "").trim().match(matcher);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+    return `${prefix}-${highest + 1}`;
+  }
+
   function loadStore() {
     const raw = sessionStorage.getItem(KEY);
     if (!raw) {
-      sessionStorage.setItem(KEY, JSON.stringify(seed));
-      return structuredClone(seed);
+      const initialStore = migrateReadableIds(structuredClone(seed));
+      sessionStorage.setItem(KEY, JSON.stringify(initialStore));
+      return initialStore;
     }
     const parsed = JSON.parse(raw);
+    const requiresReadableIdMigration = Number(parsed.readableIdVersion || 0) < 2;
     const store = {
       ...structuredClone(seed),
       ...parsed
@@ -463,6 +522,7 @@
     if (!Array.isArray(store.activityLogs)) {
       store.activityLogs = [];
     }
+    store.activityLogs = pruneActivityLogs(store.activityLogs);
 
     if (!Array.isArray(store.adminUsers) || store.adminUsers.length === 0) {
       store.adminUsers = structuredClone(seed.adminUsers);
@@ -485,8 +545,19 @@
       store.bookings = store.bookings.map((booking) => normalizeBookingContainers(booking));
     }
 
+    if (requiresReadableIdMigration) migrateReadableIds(store);
+
     saveStore(store, { skipAudit: true });
     return store;
+  }
+
+  function pruneActivityLogs(logs = []) {
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 3);
+    return logs.filter((log) => {
+      const timestamp = new Date(log.timestamp || log.createdAt || log.date || "");
+      return Number.isNaN(timestamp.getTime()) || timestamp >= cutoff;
+    });
   }
 
   const AUDIT_SOURCES = [
@@ -541,7 +612,7 @@
     if (!Array.isArray(store.activityLogs)) store.activityLogs = [];
     const session = sessionOverride || getAdminSession() || {};
     store.activityLogs.unshift({
-      id: `LOG-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      id: getNextSequentialId(store.activityLogs || [], "LOG"),
       timestamp: new Date().toISOString(),
       userId: session.id || "SYSTEM",
       userName: session.name || "System",
@@ -552,7 +623,7 @@
       recordId: String(recordId || "-"),
       details: String(details || "")
     });
-    store.activityLogs = store.activityLogs.slice(0, 2000);
+    store.activityLogs = pruneActivityLogs(store.activityLogs).slice(0, 2000);
   }
 
   function collectAuditChanges(previousStore, nextStore) {
@@ -608,6 +679,7 @@
       }
       collectAuditChanges(previousStore, store);
     }
+    store.activityLogs = pruneActivityLogs(store.activityLogs || []);
     sessionStorage.setItem(KEY, JSON.stringify(store));
   }
 
@@ -773,7 +845,14 @@
   }
 
   function bindPageTransitions() {
-    return;
+    document.querySelectorAll('a[href$=".html"]').forEach((link) => {
+      const href = link.getAttribute("href");
+      if (!href || document.head.querySelector(`link[rel="prefetch"][href="${href}"]`)) return;
+      const prefetch = document.createElement("link");
+      prefetch.rel = "prefetch";
+      prefetch.href = href;
+      document.head.appendChild(prefetch);
+    });
   }
 
   function clearAdminSession() {
@@ -1020,7 +1099,7 @@
       return match ? Math.max(highest, Number(match[1])) : highest;
     }, 0);
 
-    return `Job-${String(highestJobNumber + 1).padStart(2, "0")}`;
+    return `Job-${highestJobNumber + 1}`;
   }
 
   function normalizeBookingContainers(booking = {}) {
@@ -1260,6 +1339,105 @@
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+  }
+
+  function compressImageFile(file, maxDimension = 1100, maxLength = 420000) {
+    return new Promise((resolve, reject) => {
+      if (!file || !String(file.type || "").startsWith("image/")) {
+        reject(new Error("Please select a valid image file."));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("The image could not be read."));
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = () => reject(new Error("The image format is not supported."));
+        image.onload = () => {
+          const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+          canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+          const context = canvas.getContext("2d");
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          let quality = 0.74;
+          let result = canvas.toDataURL("image/jpeg", quality);
+          while (result.length > maxLength && quality > 0.42) {
+            quality -= 0.08;
+            result = canvas.toDataURL("image/jpeg", quality);
+          }
+          resolve(result);
+        };
+        image.src = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function readDocumentFile(file) {
+    if (!file) return Promise.reject(new Error("Please select a document."));
+    if (String(file.type || "").startsWith("image/")) {
+      return compressImageFile(file).then((data) => ({ name: file.name, type: "image/jpeg", data }));
+    }
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name || "")) {
+      if (file.size > 1500000) return Promise.reject(new Error("Please select a PDF smaller than 1.5 MB."));
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("The document could not be read."));
+        reader.onload = () => resolve({ name: file.name, type: "application/pdf", data: String(reader.result || "") });
+        reader.readAsDataURL(file);
+      });
+    }
+    return Promise.reject(new Error("Please select an image or PDF document."));
+  }
+
+  function safePdfFileName(value, fallback = "record") {
+    return String(value || fallback).trim().replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || fallback;
+  }
+
+  async function createRegisterPdf(title, headers, row, fileName, imageData = "") {
+    if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("l", "pt", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const letterhead = await loadInvoiceTemplateDataUrl();
+    const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    if (letterheadHeader) {
+      const headerWidth = 390;
+      const headerHeight = headerWidth * (270 / 1131);
+      pdf.addImage(letterheadHeader, "JPEG", 28, 10, headerWidth, headerHeight, undefined, "FAST");
+    }
+    pdf.setTextColor(18, 54, 91);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text(title.toUpperCase(), 36, 125);
+    pdf.autoTable({
+      startY: 142,
+      margin: { left: 36, right: 36, bottom: 62 },
+      head: [headers],
+      body: [row],
+      theme: "grid",
+      styles: { fontSize: 7.5, cellPadding: 5, halign: "center", valign: "middle", lineColor: [93, 72, 52], lineWidth: 0.55 },
+      headStyles: { fillColor: [240, 225, 208], textColor: [25, 42, 62], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [255, 251, 247] }
+    });
+    if (imageData) {
+      const y = Math.min((pdf.lastAutoTable?.finalY || 170) + 18, pageHeight - 165);
+      pdf.setFontSize(10);
+      pdf.text("Attached Image", 36, y);
+      const imageType = imageData.startsWith("data:image/png") ? "PNG" : "JPEG";
+      pdf.addImage(imageData, imageType, 36, y + 8, 120, 90, undefined, "FAST");
+    }
+    pdf.setDrawColor(35, 35, 35);
+    pdf.setLineWidth(0.7);
+    pdf.line(36, pageHeight - 48, pageWidth - 36, pageHeight - 48);
+    pdf.setTextColor(18, 54, 91);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8.5);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 44, pageHeight - 30);
+    pdf.save(`${safePdfFileName(fileName)}.pdf`);
   }
 
   let invoiceTemplateDataUrlPromise = null;
@@ -1831,8 +2009,8 @@
         card.classList.toggle("expiry-due", summary.due > 0 && summary.expired === 0);
         card.classList.toggle("expiry-expired", summary.expired > 0);
         card.title = summary.alerts
-          ? `${summary.expired} expired, ${summary.due} due within 90 days`
-          : "No expiry within 90 days";
+          ? `${summary.expired} expired, ${summary.due} due within 30 days`
+          : "No expiry within 30 days";
       }
       if (detail) {
         detail.textContent = summary.alerts
@@ -1868,7 +2046,7 @@
       if (!expiry || !today) return "valid";
       const days = Math.ceil((expiry - today) / 86400000);
       if (days < 0) return "expired";
-      if (days <= 90) return "due";
+      if (days <= 30) return "due";
       return "valid";
     }
 
@@ -2791,8 +2969,9 @@
     pdf.setTextColor(32, 32, 32);
     pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
 
-    const safeJobNo = String(trip.jobNo || "truck").replace(/[^\w-]+/g, "_");
-    pdf.save(`${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
+    const safeJobNo = safePdfFileName(trip.jobNo || "truck");
+    const clientName = safePdfFileName(trip.customer || trip.importBroker || trip.exportBroker || "client");
+    pdf.save(`${clientName}_${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
   }
 
   function calculateTruckTripFinancials(trip = {}) {
@@ -2815,8 +2994,13 @@
     const customerFilter = document.querySelector("[data-truck-customer-filter]");
     const jobSort = document.querySelector("[data-truck-job-sort]");
     const profitLossTotal = document.querySelector("[data-truck-ledger-profit-loss]");
+    const imageInput = form?.querySelector("[data-truck-image-input]");
+    const imagePreview = form?.querySelector("[data-truck-image-preview]");
+    const removeImageButton = form?.querySelector("[data-remove-truck-image]");
     if (!body || !form) return;
     let editingId = "";
+    let tripImageData = "";
+    let tripImagePromise = Promise.resolve("");
 
     const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount", "grandTotal", "roundTripExpense", "profitLoss"];
 
@@ -2842,7 +3026,7 @@
         const match = String(item.jobNo || "").trim().match(/^Job-(\d+)$/i);
         return match ? Math.max(highest, Number(match[1])) : highest;
       }, 0);
-      return `Job-${String(highestJobNumber + 1).padStart(2, "0")}`;
+      return `Job-${highestJobNumber + 1}`;
     }
 
     function resetForm() {
@@ -2854,8 +3038,22 @@
       form.elements.mtyPaymentStatus.value = "Awaited";
       form.elements.exportPaymentStatus.value = "Awaited";
       calculateTrip();
+      if (imageInput) imageInput.value = "";
+      setTripImage("");
+      tripImagePromise = Promise.resolve("");
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Trip";
+    }
+
+    function setTripImage(imageData = "") {
+      tripImageData = String(imageData || "");
+      if (removeImageButton) removeImageButton.hidden = !tripImageData;
+      if (imagePreview) {
+        imagePreview.hidden = !tripImageData;
+        imagePreview.innerHTML = tripImageData
+          ? `<img src="${tripImageData}" alt="Selected truck details attachment" />`
+          : "";
+      }
     }
 
     function render() {
@@ -2905,6 +3103,8 @@
         if (form.elements[key]) form.elements[key].value = item[key];
       });
       calculateTrip();
+      setTripImage(item.image || "");
+      tripImagePromise = Promise.resolve(tripImageData);
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Trip";
     }
@@ -2913,16 +3113,38 @@
       form.elements[name].addEventListener("input", calculateTrip);
     });
 
-    form.addEventListener("submit", (event) => {
+    imageInput?.addEventListener("change", () => {
+      const file = imageInput.files?.[0];
+      if (!file) return;
+      tripImagePromise = compressImageFile(file)
+        .then((result) => {
+          setTripImage(result);
+          return result;
+        })
+        .catch((error) => {
+          imageInput.value = "";
+          notice.textContent = error.message;
+          return tripImageData;
+        });
+    });
+
+    removeImageButton?.addEventListener("click", () => {
+      imageInput.value = "";
+      setTripImage("");
+      tripImagePromise = Promise.resolve("");
+    });
+
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const data = Object.fromEntries(new FormData(form).entries());
+      await tripImagePromise;
       calculateTrip();
       const calculatedData = Object.fromEntries(new FormData(form).entries());
-      const normalized = { ...calculatedData };
+      const normalized = Object.fromEntries(Object.entries(calculatedData).filter(([key]) => key !== "tripImageFile"));
       numberFields.forEach((name) => { normalized[name] = Number(calculatedData[name] || 0); });
+      normalized.image = tripImageData;
       if (!editingId) {
         normalized.jobNo = getNextTruckJobNo();
-        normalized.id = `TRIP-${Date.now().toString().slice(-6)}`;
+        normalized.id = getNextSequentialId(store.truckExpenses, "TRIP");
         store.truckExpenses.unshift(normalized);
         notice.textContent = `Truck trip ${normalized.jobNo} saved successfully.`;
       } else {
@@ -2932,7 +3154,12 @@
         store.truckExpenses[index] = normalized;
         notice.textContent = `Truck trip ${normalized.jobNo} updated successfully.`;
       }
-      saveStore(store);
+      try {
+        saveStore(store);
+      } catch (error) {
+        notice.textContent = "The image is too large for browser storage. Please choose a smaller image.";
+        return;
+      }
       render();
       resetForm();
     });
@@ -3150,7 +3377,12 @@
     const search = document.querySelector("[data-equipment-search]");
     const count = document.querySelector("[data-equipment-count]");
     const notice = document.querySelector("[data-notice]");
+    const documentInput = document.querySelector("[data-equipment-document-input]");
+    const documentName = document.querySelector("[data-equipment-document-name]");
+    const removeDocumentButton = document.querySelector("[data-remove-equipment-document]");
     let editingId = "";
+    let equipmentDocument = { name: "", type: "", data: "" };
+    let equipmentDocumentPromise = Promise.resolve(equipmentDocument);
     if (!form || !body || !summary) return;
 
     const permitFields = [
@@ -3164,6 +3396,19 @@
       if (!notice) return;
       notice.textContent = message;
       notice.hidden = !message;
+    }
+
+    function setEquipmentDocument(document = {}) {
+      equipmentDocument = {
+        name: String(document.name || ""),
+        type: String(document.type || ""),
+        data: String(document.data || "")
+      };
+      if (documentName) {
+        documentName.textContent = equipmentDocument.name;
+        documentName.hidden = !equipmentDocument.name;
+      }
+      if (removeDocumentButton) removeDocumentButton.hidden = !equipmentDocument.name;
     }
 
     function getExpiryState(value) {
@@ -3191,7 +3436,7 @@
         const state = getExpiryState(item[field]).className;
         return state === "expired" || state === "due";
       })).length;
-      const completeFiles = rows.filter((item) => String(item.originalDocs || "").trim()).length;
+      const completeFiles = rows.filter((item) => String(item.documentData || item.originalDocs || "").trim()).length;
 
       summary.innerHTML = `
         <div class="card span-3"><span class="badge neutral">Fleet</span><strong>${rows.length}</strong><div class="muted">Registered equipment</div></div>
@@ -3212,6 +3457,7 @@
           item.model,
           item.mra,
           item.banker,
+          item.documentName,
           item.originalDocs
         ].some((value) => String(value || "").toLowerCase().includes(query)))
         .sort((left, right) => String(left.truckNo || "").localeCompare(String(right.truckNo || "")));
@@ -3235,9 +3481,12 @@
           <td>${expiryCell(item.kpkPermitExpiry)}</td>
           <td>${expiryCell(item.punjabPermitExpiry)}</td>
           <td>${expiryCell(item.taxPaidUpTo)}</td>
-          <td class="equipment-docs">${text(item.originalDocs || "-")}</td>
+          <td class="equipment-docs">${item.documentData
+            ? `<button class="btn small" type="button" data-view-equipment-document="${item.id}">${escapeHtml(item.documentName || "View File")}</button>`
+            : text(item.originalDocs || "-")}</td>
           <td>
             <div class="table-actions">
+              <button class="btn small" type="button" data-download-equipment="${item.id}">Download PDF</button>
               <button class="btn small" type="button" data-edit-equipment="${item.id}">Edit</button>
               <button class="btn small danger" type="button" data-delete-equipment="${item.id}">Delete</button>
             </div>
@@ -3251,32 +3500,65 @@
     function resetForm() {
       form.reset();
       editingId = "";
+      setEquipmentDocument();
+      equipmentDocumentPromise = Promise.resolve(equipmentDocument);
       form.querySelector("[data-submit-label]").textContent = "Save Equipment";
     }
 
     function fillForm(item) {
       if (!item) return;
       Object.keys(item).forEach((key) => {
-        if (form.elements[key]) form.elements[key].value = item[key] || "";
+        if (form.elements[key] && form.elements[key].type !== "file") form.elements[key].value = item[key] || "";
       });
+      setEquipmentDocument({
+        name: item.documentName || item.originalDocs || "",
+        type: item.documentType || "",
+        data: item.documentData || ""
+      });
+      equipmentDocumentPromise = Promise.resolve(equipmentDocument);
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Equipment";
       form.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    form.addEventListener("submit", (event) => {
+    documentInput?.addEventListener("change", () => {
+      const file = documentInput.files?.[0];
+      if (!file) return;
+      equipmentDocumentPromise = readDocumentFile(file)
+        .then((document) => {
+          setEquipmentDocument(document);
+          setNotice("");
+          return document;
+        })
+        .catch((error) => {
+          documentInput.value = "";
+          setNotice(error.message);
+          return equipmentDocument;
+        });
+    });
+
+    removeDocumentButton?.addEventListener("click", () => {
+      if (documentInput) documentInput.value = "";
+      setEquipmentDocument();
+      equipmentDocumentPromise = Promise.resolve(equipmentDocument);
+    });
+
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      await equipmentDocumentPromise;
       const data = Object.fromEntries(new FormData(form).entries());
       const normalized = Object.fromEntries(
-        Object.entries(data).map(([key, value]) => [key, String(value || "").trim()])
+        Object.entries(data)
+          .filter(([key]) => key !== "equipmentDocumentFile")
+          .map(([key, value]) => [key, String(value || "").trim()])
       );
+      normalized.documentName = equipmentDocument.name;
+      normalized.documentType = equipmentDocument.type;
+      normalized.documentData = equipmentDocument.data;
+      normalized.originalDocs = equipmentDocument.name;
 
       if (!editingId) {
-        const nextNumber = store.equipmentFleet.reduce((max, item) => {
-          const current = Number(String(item.id || "").replace(/\D/g, "")) || 0;
-          return Math.max(max, current);
-        }, 0) + 1;
-        normalized.id = `EQP-${String(nextNumber).padStart(3, "0")}`;
+        normalized.id = getNextSequentialId(store.equipmentFleet, "EQP");
         store.equipmentFleet.unshift(normalized);
         setNotice(`${normalized.truckNo} added to the equipment register.`);
       } else {
@@ -3292,9 +3574,32 @@
       render();
     });
 
-    body.addEventListener("click", (event) => {
+    body.addEventListener("click", async (event) => {
+      const downloadId = event.target.closest("[data-download-equipment]")?.dataset.downloadEquipment;
+      const viewDocumentId = event.target.closest("[data-view-equipment-document]")?.dataset.viewEquipmentDocument;
       const editId = event.target.getAttribute("data-edit-equipment");
       const deleteId = event.target.getAttribute("data-delete-equipment");
+      if (downloadId) {
+        const item = store.equipmentFleet.find((entry) => entry.id === downloadId);
+        if (item) {
+          try {
+            await createRegisterPdf(
+              "Equipment & Handling Fleet",
+              ["S.No", "Truck No", "Chassis No", "Engine No", "Make", "Model", "MRA"],
+              ["1", item.truckNo, item.chassisNo, item.engineNo, item.make, item.model, item.mra],
+              `${safePdfFileName(item.truckNo || item.id)}_equipment_fleet`
+            );
+          } catch (error) {
+            setNotice(error.message);
+          }
+        }
+        return;
+      }
+      if (viewDocumentId) {
+        const item = store.equipmentFleet.find((entry) => entry.id === viewDocumentId);
+        if (item?.documentData) window.open(item.documentData, "_blank", "noopener,noreferrer");
+        return;
+      }
       if (editId) fillForm(store.equipmentFleet.find((item) => item.id === editId));
       if (deleteId) {
         store.equipmentFleet = store.equipmentFleet.filter((item) => item.id !== deleteId);
@@ -3344,7 +3649,7 @@
         const number = Number(String(item.id || "").replace(/\D/g, "")) || 0;
         return Math.max(maximum, number);
       }, 0) + 1;
-      return `MNT-${String(nextNumber).padStart(4, "0")}`;
+      return `MNT-${nextNumber}`;
     }
 
     function getTruckNumbers() {
@@ -3483,7 +3788,7 @@
           <td>${text(item.driverName)}</td>
           <td>${item.image ? `<button class="maintenance-thumbnail" type="button" data-view-maintenance-image="${item.id}" aria-label="View image for ${escapeHtml(item.id)}"><img src="${item.image}" alt="" /></button>` : "-"}</td>
           <td>${text(item.approvedBy)}</td>
-          <td><div class="table-actions"><button class="btn small" type="button" data-edit-maintenance="${item.id}">Edit</button><button class="btn small danger" type="button" data-delete-maintenance="${item.id}">Delete</button></div></td>
+          <td><div class="table-actions"><button class="btn small" type="button" data-download-maintenance="${item.id}">Download PDF</button><button class="btn small" type="button" data-edit-maintenance="${item.id}">Edit</button><button class="btn small danger" type="button" data-delete-maintenance="${item.id}">Delete</button></div></td>
         </tr>`;
       }).join("");
       updateSummary(rows);
@@ -3582,10 +3887,28 @@
       setNotice(`${savedId} saved successfully.`);
     });
 
-    body.addEventListener("click", (event) => {
+    body.addEventListener("click", async (event) => {
+      const downloadId = event.target.closest("[data-download-maintenance]")?.dataset.downloadMaintenance;
       const editId = event.target.closest("[data-edit-maintenance]")?.dataset.editMaintenance;
       const deleteId = event.target.closest("[data-delete-maintenance]")?.dataset.deleteMaintenance;
       const imageId = event.target.closest("[data-view-maintenance-image]")?.dataset.viewMaintenanceImage;
+      if (downloadId) {
+        const item = store.maintenanceJobs.find((record) => record.id === downloadId);
+        if (item) {
+          try {
+            await createRegisterPdf(
+              "Fleet Maintenance Record",
+              ["Job No", "Truck No", "Complaint Date", "Repair Date", "Part Name", "Old Serial No", "New Serial No", "Part Cost", "Warranty Period", "Warranty Expiry", "Warranty Status", "Driver Name", "Image", "Approved By"],
+              [item.id, item.truckNo, formatShortDate(item.complaintDate), formatShortDate(item.repairDate), item.partName, item.oldSerialNumber, item.newSerialNumber, `PKR ${money(item.partCost)}`, item.warrantyPeriod, formatShortDate(item.warrantyExpiry), getWarrantyState(item.warrantyExpiry).label, item.driverName, item.image ? "Attached" : "-", item.approvedBy],
+              `${safePdfFileName(item.truckNo || item.id)}_${safePdfFileName(item.id)}_maintenance`,
+              item.image || ""
+            );
+          } catch (error) {
+            setNotice(error.message, true);
+          }
+        }
+        return;
+      }
       if (editId) fillForm(store.maintenanceJobs.find((item) => item.id === editId));
       if (imageId) openImageModal(store.maintenanceJobs.find((item) => item.id === imageId)?.image);
       if (deleteId) {
@@ -3613,7 +3936,23 @@
     const body = document.querySelector("[data-employee-rows]");
     const notice = document.querySelector("[data-notice]");
     const summary = document.querySelector("[data-employee-summary]");
+    const imageInput = document.querySelector("[data-employee-image-input]");
+    const imagePreview = document.querySelector("[data-employee-image-preview]");
+    const removeImageButton = document.querySelector("[data-remove-employee-image]");
     let editingId = "";
+    let employeeImageData = "";
+    let employeeImagePromise = Promise.resolve("");
+
+    function setEmployeeImage(image = "") {
+      employeeImageData = String(image || "");
+      if (removeImageButton) removeImageButton.hidden = !employeeImageData;
+      if (imagePreview) {
+        imagePreview.hidden = !employeeImageData;
+        imagePreview.innerHTML = employeeImageData
+          ? `<img src="${employeeImageData}" alt="Selected employee" />`
+          : "";
+      }
+    }
 
     function updateSummary() {
       const active = store.employees.filter((item) => item.status === "Active").length;
@@ -3636,6 +3975,9 @@
       form.elements.department.value = "Operations";
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Employee";
+      if (imageInput) imageInput.value = "";
+      employeeImagePromise = Promise.resolve("");
+      setEmployeeImage("");
     }
 
     function render() {
@@ -3648,7 +3990,7 @@
           <td>${money(item.salary)}</td>
           <td>${text(item.joiningDate)}</td>
           <td>${text(item.phone)}</td>
-          <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
+          <td><div class="employee-status-actions"><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span><button class="btn small" type="button" data-download-employee="${item.id}">Download PDF</button></div></td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-edit-employee="${item.id}">Edit</button>
@@ -3666,23 +4008,45 @@
         if (form.elements[key]) form.elements[key].value = item[key];
       });
       editingId = item.id;
+      setEmployeeImage(item.image || "");
+      employeeImagePromise = Promise.resolve(employeeImageData);
       form.querySelector("[data-submit-label]").textContent = "Update Employee";
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    form.addEventListener("submit", (event) => {
+    imageInput?.addEventListener("change", () => {
+      const file = imageInput.files?.[0];
+      if (!file) return;
+      employeeImagePromise = compressImageFile(file)
+        .then((image) => {
+          setEmployeeImage(image);
+          return image;
+        })
+        .catch((error) => {
+          imageInput.value = "";
+          notice.textContent = error.message;
+          return employeeImageData;
+        });
+    });
+
+    removeImageButton?.addEventListener("click", () => {
+      imageInput.value = "";
+      employeeImagePromise = Promise.resolve("");
+      setEmployeeImage("");
+    });
+
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const data = Object.fromEntries(new FormData(form).entries());
+      await employeeImagePromise;
+      const data = Object.fromEntries([...new FormData(form).entries()].filter(([key]) => key !== "employeeImageFile"));
       const normalized = {
         ...data,
-        salary: Number(data.salary || 0)
+        salary: Number(data.salary || 0),
+        image: employeeImageData
       };
 
       if (!editingId) {
-        const nextNumber = store.employees.reduce((max, item) => {
-          const current = Number(String(item.id).replace("EMP-", "")) || 0;
-          return Math.max(max, current);
-        }, 1000) + 1;
-        normalized.id = `EMP-${nextNumber}`;
+        normalized.id = getNextSequentialId(store.employees, "EMP");
         store.employees.unshift(normalized);
         notice.textContent = `Employee ${normalized.id} saved successfully.`;
       } else {
@@ -3696,14 +4060,37 @@
         notice.textContent = `Employee ${editingId} updated successfully.`;
       }
 
-      saveStore(store);
+      try {
+        saveStore(store);
+      } catch (error) {
+        notice.textContent = "The image is too large for browser storage. Please choose a smaller image.";
+        return;
+      }
       render();
       resetForm();
     });
 
-    body.addEventListener("click", (event) => {
-      const editId = event.target.getAttribute("data-edit-employee");
-      const deleteId = event.target.getAttribute("data-delete-employee");
+    body.addEventListener("click", async (event) => {
+      const downloadId = event.target.closest("[data-download-employee]")?.dataset.downloadEmployee;
+      const editId = event.target.closest("[data-edit-employee]")?.dataset.editEmployee;
+      const deleteId = event.target.closest("[data-delete-employee]")?.dataset.deleteEmployee;
+      if (downloadId) {
+        const item = store.employees.find((record) => record.id === downloadId);
+        if (item) {
+          try {
+            await createRegisterPdf(
+              "Employee Record",
+              ["Employee ID", "Name", "Designation", "Department", "Salary", "Joining Date", "Phone", "Status"],
+              [item.id, item.name, item.designation, item.department, `PKR ${money(item.salary)}`, formatShortDate(item.joiningDate), item.phone, item.status],
+              `${safePdfFileName(item.name || item.id)}_employee_record`,
+              item.image || ""
+            );
+          } catch (error) {
+            notice.textContent = error.message;
+          }
+        }
+        return;
+      }
       if (editId) fillForm(store.employees.find((item) => item.id === editId));
       if (deleteId) {
         store.employees = store.employees.filter((item) => item.id !== deleteId);
@@ -3817,17 +4204,21 @@
     }
 
     function render() {
-      body.innerHTML = adminUsers.map((item) => `
+      body.innerHTML = adminUsers.map((item, index) => {
+        const accessLabels = normalizeAdminAccess(item.access, item.role)
+          .map((access) => ACCESS_OPTIONS.find((option) => option.value === access)?.label || access);
+        const visibleAccess = accessLabels.slice(0, 4);
+        return `
         <tr>
-          <td>${text(item.id)}</td>
+          <td><strong class="admin-display-id">ADM-${index + 1}</strong></td>
           <td>${text(item.name)}</td>
-          <td>${text(item.email)}</td>
+          <td class="admin-email-cell">${text(item.email)}</td>
           <td>
             <span class="muted">Managed by Supabase Auth</span>
           </td>
           <td>${text(item.role)}</td>
           <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
-          <td><div class="admin-access-list">${normalizeAdminAccess(item.access, item.role).map((access) => `<span class="admin-access-chip">${text(ACCESS_OPTIONS.find((option) => option.value === access)?.label || access)}</span>`).join("")}</div></td>
+          <td><div class="admin-access-list" title="${text(accessLabels.join(", "))}">${visibleAccess.map((label) => `<span class="admin-access-chip">${text(label)}</span>`).join("")}${accessLabels.length > visibleAccess.length ? `<span class="admin-access-more">+${accessLabels.length - visibleAccess.length} more</span>` : ""}</div></td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-edit-admin="${item.id}">Edit</button>
@@ -3835,7 +4226,8 @@
             </div>
           </td>
         </tr>
-      `).join("");
+      `;
+      }).join("");
       updateSummary();
     }
 
@@ -3877,7 +4269,7 @@
       const { data, error } = await client
         .from("profiles")
         .select("id,name,email,role,status,access_modules")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
       if (error) throw error;
       adminUsers = (data || []).map((item) => ({
         id: item.id,
@@ -4100,6 +4492,27 @@
     let editingCustomerId = "";
     let entryImageData = "";
     let entryImagePromise = Promise.resolve("");
+    let pendingAccountId = "";
+    const allAccountsValue = "__all_accounts__";
+
+    function getVisibleAccounts() {
+      return accounts.filter((account) => (account.entries || []).length > 0 || account.id === pendingAccountId);
+    }
+
+    function getAggregateAccount() {
+      return {
+        id: allAccountsValue,
+        customer: isPayable ? "All Payees" : "All Customers",
+        phone: "-",
+        city: "-",
+        entries: getVisibleAccounts().flatMap((account) => (account.entries || []).map((entry) => ({
+          ...entry,
+          sourceAccountId: account.id,
+          sourceAccountName: account.customer,
+          description: `${account.customer}: ${entry.description || "-"}`
+        })))
+      };
+    }
 
     function setEntryImage(imageData = "") {
       entryImageData = String(imageData || "");
@@ -4156,7 +4569,8 @@
     }
 
     function getSelectedAccount() {
-      return accounts.find((item) => item.id === select.value) || accounts[0];
+      if (select.value === allAccountsValue) return getAggregateAccount();
+      return accounts.find((item) => item.id === select.value) || getAggregateAccount();
     }
 
     function getStatementData(account) {
@@ -4378,10 +4792,14 @@
       }
     }
 
-    function populateCustomers() {
-      select.innerHTML = accounts.map((account) => `
+    function populateCustomers(preferredValue = select.value || allAccountsValue) {
+      const visibleAccounts = getVisibleAccounts();
+      select.innerHTML = `<option value="${allAccountsValue}">${isPayable ? "All Payees" : "All Customers"}</option>${visibleAccounts.map((account) => `
         <option value="${account.id}">${account.customer}</option>
-      `).join("");
+      `).join("")}`;
+      select.value = preferredValue === allAccountsValue || visibleAccounts.some((account) => account.id === preferredValue)
+        ? preferredValue
+        : allAccountsValue;
     }
 
     function resetCustomerForm() {
@@ -4404,7 +4822,7 @@
 
     function renderCustomerList() {
       if (!customerListBody) return;
-      customerListBody.innerHTML = accounts.map((account) => {
+      customerListBody.innerHTML = getVisibleAccounts().map((account) => {
         const totals = calculateKhataSummary(account);
         return `
           <tr>
@@ -4431,7 +4849,10 @@
     }
 
     function renderAccount(accountId) {
-      const account = accounts.find((item) => item.id === accountId) || accounts[0];
+      const isAggregate = accountId === allAccountsValue;
+      const account = isAggregate
+        ? getAggregateAccount()
+        : accounts.find((item) => item.id === accountId) || getAggregateAccount();
       if (!account) return;
 
       const totals = calculateKhataSummary(account);
@@ -4480,11 +4901,11 @@
           <tr>
             <td>${formatStatementDate(entry.date)}</td>
             <td>${text(entry.description)}</td>
-            <td>${entry.image ? `
+            <td>${entry.image && !isAggregate ? `
               <button class="bilty-thumbnail" type="button" data-view-khata-image="${escapeHtml(entry.id)}" aria-label="View entry image" title="View image">
                 <img src="${escapeHtml(entry.image)}" alt="Entry attachment thumbnail" />
               </button>
-            ` : "-"}</td>
+            ` : entry.image ? '<span class="muted">Attached</span>' : "-"}</td>
             <td class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0
@@ -4494,21 +4915,24 @@
                 : (isPayable ? "Advance" : "(+)")}`}</td>
             <td>
               <div class="table-actions">
-                <button class="btn small" data-edit-khata="${entry.id}">Edit</button>
-                <button class="btn small danger" data-delete-khata="${entry.id}">Delete</button>
+                ${isAggregate ? "-" : `<button class="btn small" data-edit-khata="${entry.id}">Edit</button><button class="btn small danger" data-delete-khata="${entry.id}">Delete</button>`}
               </div>
             </td>
           </tr>
         `;
       }).join("");
 
-      form.elements.accountId.value = account.id;
+      form.elements.accountId.value = isAggregate ? "" : account.id;
+      Array.from(form.elements).forEach((control) => {
+        if (control.name !== "accountId") control.disabled = isAggregate;
+      });
       select.value = account.id;
       renderCustomerList();
     }
 
     function resetForm() {
-      form.elements.accountId.value = select.value;
+      const isAggregate = select.value === allAccountsValue;
+      form.elements.accountId.value = isAggregate ? "" : select.value;
       form.elements.date.value = "";
       form.elements.type.value = "";
       form.elements.description.value = "";
@@ -4518,6 +4942,9 @@
       setEntryImage("");
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Entry";
+      Array.from(form.elements).forEach((control) => {
+        if (control.name !== "accountId") control.disabled = isAggregate;
+      });
     }
 
     function fillForm(account, entry) {
@@ -4557,8 +4984,9 @@
       }
 
       if (!editingCustomerId) {
-        normalized.id = `${isPayable ? "PAY" : "CUS"}-${Date.now().toString().slice(-6)}`;
+        normalized.id = getNextSequentialId(accounts, isPayable ? "PAY" : "CUS");
         accounts.unshift(normalized);
+        pendingAccountId = normalized.id;
         customerNotice.textContent = `${partyLabel} ${normalized.customer} was added successfully.`;
       } else {
         const index = accounts.findIndex((item) => item.id === editingCustomerId);
@@ -4573,7 +5001,7 @@
       }
 
       saveStore(store);
-      populateCustomers();
+      populateCustomers(normalized.id);
       renderAccount(normalized.id);
       resetCustomerForm();
     });
@@ -4621,8 +5049,10 @@
       };
 
       if (!editingId) {
-        normalized.id = `${entryPrefix}-${Date.now().toString().slice(-6)}`;
+        const allEntries = accounts.flatMap((item) => Array.isArray(item.entries) ? item.entries : []);
+        normalized.id = getNextSequentialId(allEntries, entryPrefix);
         account.entries.unshift(normalized);
+        pendingAccountId = "";
         notice.textContent = `Statement entry ${normalized.id} saved successfully.`;
       } else {
         const index = account.entries.findIndex((entry) => entry.id === editingId);
@@ -4635,6 +5065,7 @@
       }
 
       saveStore(store);
+      populateCustomers(account.id);
       renderAccount(account.id);
       resetForm();
     });
@@ -4655,7 +5086,14 @@
       if (deleteId) {
         account.entries = account.entries.filter((entry) => entry.id !== deleteId);
         saveStore(store);
-        renderAccount(account.id);
+        if (!account.entries.length) {
+          pendingAccountId = "";
+          populateCustomers(allAccountsValue);
+          renderAccount(allAccountsValue);
+        } else {
+          populateCustomers(account.id);
+          renderAccount(account.id);
+        }
         notice.textContent = `Statement entry ${deleteId} deleted successfully.`;
         if (editingId === deleteId) resetForm();
       }
@@ -4692,11 +5130,49 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !entryImageModal.hidden) closeEntryImageModal();
     });
-    populateCustomers();
-    renderAccount(accounts[0]?.id);
+    populateCustomers(allAccountsValue);
+    renderAccount(allAccountsValue);
     resetForm();
     resetCustomerForm();
   }
+
+  function enhanceFileInputs(root = document) {
+    root.querySelectorAll('input[type="file"]:not([data-upload-enhanced])').forEach((input) => {
+      input.dataset.uploadEnhanced = "true";
+      const wrapper = document.createElement("div");
+      wrapper.className = "file-upload-control";
+      const visual = document.createElement("div");
+      visual.className = "file-upload-visual";
+      visual.setAttribute("aria-hidden", "true");
+      visual.innerHTML = `
+        <span class="file-upload-icon">&#8593;</span>
+        <span class="file-upload-action">Select File</span>
+        <span class="file-upload-name">No file selected</span>
+      `;
+      input.parentNode.insertBefore(wrapper, input);
+      wrapper.append(input, visual);
+
+      const syncFileName = () => {
+        const file = input.files?.[0];
+        wrapper.classList.toggle("has-file", Boolean(file));
+        visual.querySelector(".file-upload-name").textContent = file?.name || "No file selected";
+      };
+      input.addEventListener("change", syncFileName);
+      wrapper._syncFileName = syncFileName;
+      syncFileName();
+    });
+  }
+
+  function refreshFileInputs() {
+    document.querySelectorAll(".file-upload-control").forEach((wrapper) => wrapper._syncFileName?.());
+  }
+
+  document.addEventListener("reset", () => setTimeout(refreshFileInputs));
+  document.addEventListener("click", (event) => {
+    if (event.target.closest('[data-remove-equipment-document], [data-remove-maintenance-image], [data-remove-employee-image], [data-clear-bilty], [data-remove-entry-image], [data-remove-truck-image]')) {
+      setTimeout(refreshFileInputs);
+    }
+  });
 
   document.addEventListener("DOMContentLoaded", async () => {
     const store = loadStore();
@@ -4726,6 +5202,7 @@
     if (page === "admin") adminPage(store);
     if (page === "activity-logs") activityLogsPage(store);
     if (page === "khata" || page === "accounts-payable") khataPage(store);
+    enhanceFileInputs();
     markPageReady();
   });
 })();
