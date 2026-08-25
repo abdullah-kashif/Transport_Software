@@ -20,7 +20,28 @@
       </nav><div class="tip"></div>
     </aside>
     <main class="main">
-      <section class="hero"><h2>Pending Truck Summary</h2></section>
+      <section class="hero dashboard-hero">
+        <h2>Pending Truck Summary</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+              <path d="M10 21h4"></path>
+            </svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head">
+              <div>
+                <strong>Payment Alerts</strong>
+                <span data-notification-summary>No expired payments</span>
+              </div>
+              <button class="notification-close" type="button" data-notification-close aria-label="Close notifications">&times;</button>
+            </div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
+      </section>
       <section class="screen">
         <div class="screen-head">
           <div></div>

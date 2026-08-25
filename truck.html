@@ -18,7 +18,28 @@
       </nav><div class="tip"></div>
     </aside>
     <main class="main">
-      <section class="hero"><h2>Truck Details</h2></section>
+      <section class="hero dashboard-hero">
+        <h2>Truck Details</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+              <path d="M10 21h4"></path>
+            </svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head">
+              <div>
+                <strong>Payment Alerts</strong>
+                <span data-notification-summary>No expired payments</span>
+              </div>
+              <button class="notification-close" type="button" data-notification-close aria-label="Close notifications">&times;</button>
+            </div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
+      </section>
       <section class="screen">
         <div class="screen-head"><div><h3>Create / Update Truck Trip</h3></div></div>
         <form data-truck-trip-form class="form-grid">
@@ -69,16 +90,20 @@
       <section class="screen">
         <div class="screen-head"><div><h3>Truck Trip Ledger</h3></div><div class="ledger-filter"><div class="ledger-total" aria-live="polite"><span>P&amp;L</span><strong data-truck-ledger-profit-loss>PKR 0</strong></div><div class="ledger-filter-control"><label for="truck-customer-filter">Truck No</label><select id="truck-customer-filter" data-truck-customer-filter><option value="">All Trucks</option></select></div><div class="ledger-filter-control"><label for="truck-job-sort">Job Order</label><select id="truck-job-sort" data-truck-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div><span class="ledger-count" data-truck-trip-count>0 record(s)</span></div></div>
         <div class="table-wrap"><table class="ledger-table truck-trip-table"><thead><tr>
-          <th>S.No</th><th>Job No</th><th>Date</th><th>Import Truck Registration No</th><th>Origin</th><th>Destination</th><th>Customer/Payer</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Import Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export - Broker</th><th>Export Freight</th><th>Broker Commission</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Export Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Export Payment Status</th><th>Export Remarks</th><th>Grand Total</th><th>Round Trip Expense</th><th>P&amp;L</th><th>Actions</th>
+          <th>S.No</th><th>Job No</th><th>Date</th><th>Import Truck Registration No</th><th>Origin</th><th>Destination</th><th>Customer/Payer</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Import Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export - Broker</th><th>Export Freight</th><th>Broker Commission</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Export Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Export Payment Status</th><th>Export Remarks</th><th>Grand Total</th><th>Round Trip Expense</th><th>P&amp;L</th><th>Image</th><th>Actions</th>
         </tr></thead><tbody data-truck-trip-rows></tbody></table></div>
       </section>
     </main>
+  </div>
+  <div class="bilty-modal" data-truck-image-modal hidden role="dialog" aria-modal="true" aria-label="Truck details image preview">
+    <button class="bilty-modal-close" type="button" data-close-truck-image-modal aria-label="Close image preview" title="Close">&times;</button>
+    <img data-truck-image-modal-image alt="Truck details attachment" />
   </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20260811-17"></script>
+<script src="app.js?v=20260817-18"></script>
 </body>
 </html>
 

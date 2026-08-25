@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,6 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
+
 <body data-page="booking">
   <div class="app">
     <div class="mobile-topbar">
@@ -42,8 +44,12 @@
       <section class="hero dashboard-hero">
         <h2>Booking Form</h2>
         <div class="notification-center" data-payment-notifications>
-          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+          <button class="notification-trigger" type="button" data-notification-trigger
+            aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+              <path d="M10 21h4"></path>
+            </svg>
             <span class="notification-badge" data-notification-count hidden>0</span>
           </button>
           <div class="notification-panel" data-notification-panel hidden>
@@ -62,27 +68,37 @@
           </div>
         </div>
         <form data-booking-form class="form-grid">
-          <div class="field quarter"><label>Booking No</label><input name="bookingNo" value="BKG-24061" placeholder="Example: BKG-24061" required /></div>
-          <div class="field quarter"><label>Invoice</label><input name="invoiceNo" value="INV-24061" placeholder="Example: INV-24061" /></div>
+          <div class="field quarter"><label>Booking No</label><input name="bookingNo" value="BKG-24061"
+              placeholder="Example: BKG-24061" required /></div>
+          <div class="field quarter"><label>Invoice</label><input name="invoiceNo" value="INV-24061"
+              placeholder="Example: INV-24061" /></div>
           <div class="field quarter">
             <label>Booking Date</label>
             <div class="date-input-group">
               <input name="date" type="text" placeholder="10 Jun 2026" autocomplete="off" required />
               <input name="datePicker" type="date" class="native-date-picker" tabindex="-1" aria-hidden="true" />
-              <button class="date-picker-btn" type="button" data-open-date-picker aria-label="Open booking date calendar">
-                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M7 3V6M17 3V6M4.5 9H19.5M6 5H18C19.1046 5 20 5.89543 20 7V19C20 20.1046 19.1046 21 18 21H6C4.89543 21 4 20.1046 4 19V7C4 5.89543 4.89543 5 6 5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <button class="date-picker-btn" type="button" data-open-date-picker
+                aria-label="Open booking date calendar">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M7 3V6M17 3V6M4.5 9H19.5M6 5H18C19.1046 5 20 5.89543 20 7V19C20 20.1046 19.1046 21 18 21H6C4.89543 21 4 20.1046 4 19V7C4 5.89543 4.89543 5 6 5Z"
+                    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </button>
             </div>
           </div>
           <div class="field quarter"><label>BL No</label><input name="blNo" value="ONEYSINE22550700" /></div>
-          <div class="field quarter"><label>NTN</label><input name="gatePass" type="text" value="GP-001" placeholder="Example: 1234567-8" /></div>
-          <div class="field quarter"><label>Customer / Payer</label><input name="customer" value="Cherat Packaging Ltd" required /></div>
-          <div class="field quarter"><label>Consignee Address</label><input name="consignee" value="Cherat Packaging Gadoon" required /></div>
+          <div class="field quarter"><label>NTN</label><input name="gatePass" type="text" value="GP-001"
+              placeholder="Example: 1234567-8" /></div>
+          <div class="field quarter"><label>Customer / Payer</label><input name="customer" value="Cherat Packaging Ltd"
+              required /></div>
+          <div class="field quarter"><label>Consignee Address</label><input name="consignee"
+              value="Cherat Packaging Gadoon" required /></div>
           <div class="field quarter"><label>Route</label><input name="route" value="Karachi to Gadoon" required /></div>
           <div class="field quarter"><label>Origin</label><input name="origin" value="Karachi Port" required /></div>
-          <div class="field quarter"><label>Destination</label><input name="destination" value="Gadoon" required /></div>
+          <div class="field quarter"><label>Destination</label><input name="destination" value="Gadoon" required />
+          </div>
           <div class="field quarter">
             <label>Category</label>
             <select name="category">
@@ -96,7 +112,8 @@
           </div>
           <div class="field quarter"><label>Goods Type</label><input name="goodsType" value="Plastic Dana" /></div>
           <div class="field quarter"><label>Quantity</label><input name="quantity" value="990 Bags" /></div>
-          <div class="field quarter"><label>Road Haulage Charges</label><input name="rate" type="number" value="145000" /></div>
+          <div class="field quarter"><label>Road Haulage Charges</label><input name="rate" type="number"
+              value="145000" /></div>
           <div class="field quarter">
             <label>Sales Tax Authority</label>
             <select name="salesTaxAuthority">
@@ -108,17 +125,30 @@
               <option>Other</option>
             </select>
           </div>
-          <div class="field quarter"><label>Detention</label><input name="detention" type="number" inputmode="numeric" class="manual-number-input" value="0" /></div>
-          <div class="field quarter"><label>15% Sales Tax</label><input name="salesTaxAmount" type="text" value="21750" readonly /></div>
-          <div class="field quarter"><label>Total Amount</label><input name="totalAmount" type="text" value="166750" readonly /></div>
-          <div class="field quarter"><label>Income Tax 7%</label><input name="incomeTaxAmount" type="text" value="11672.5" readonly /></div>
-          <div class="field quarter"><label>Sale Tax With Held 20%</label><input name="salesTaxWithheldAmount" type="text" value="4350" readonly /></div>
-          <div class="field quarter"><label>Sale Tax 80% by us</label><input name="salesTaxByUsAmount" type="text" value="17400" readonly /></div>
-          <div class="field quarter"><label>Receivable Amount</label><input name="receivableAmount" type="text" value="150727.5" readonly /></div>
-          <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days" placeholder="Example: 30 Days" /></div>
-          <div class="field quarter"><label>Payment Received Date</label><input name="paymentReceivedDate" type="date" /></div>
-          <div class="field quarter"><label>Cheque Number</label><input name="chequeNumber" placeholder="Example: 1005782261" /></div>
-          <div class="field quarter"><label>Status</label><select name="status"><option>Delivered</option><option>In Transit</option></select></div>
+          <div class="field quarter"><label>Detention</label><input name="detention" type="number" inputmode="numeric"
+              class="manual-number-input" value="0" /></div>
+          <div class="field quarter"><label>15% Sales Tax</label><input name="salesTaxAmount" type="text" value="21750"
+              readonly /></div>
+          <div class="field quarter"><label>Total Amount</label><input name="totalAmount" type="text" value="166750"
+              readonly /></div>
+          <div class="field quarter"><label>Income Tax 7%</label><input name="incomeTaxAmount" type="text"
+              value="11672.5" readonly /></div>
+          <div class="field quarter"><label>Sale Tax With Held 20%</label><input name="salesTaxWithheldAmount"
+              type="text" value="4350" readonly /></div>
+          <div class="field quarter"><label>Sale Tax 80% by us</label><input name="salesTaxByUsAmount" type="text"
+              value="17400" readonly /></div>
+          <div class="field quarter"><label>Receivable Amount</label><input name="receivableAmount" type="text"
+              value="150727.5" readonly /></div>
+          <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days"
+              placeholder="Example: 30 Days" /></div>
+          <div class="field quarter"><label>Payment Received Date</label><input name="paymentReceivedDate"
+              type="date" /></div>
+          <div class="field quarter"><label>Cheque Number</label><input name="chequeNumber"
+              placeholder="Example: 1005782261" /></div>
+          <div class="field quarter"><label>Status</label><select name="status">
+              <option>Delivered</option>
+              <option>In Transit</option>
+            </select></div>
           <div class="field quarter">
             <label>Payment Status</label>
             <select name="accountFlow">
@@ -130,7 +160,8 @@
             <label for="bilty-upload">Bilty</label>
             <div class="bilty-input-group">
               <input id="bilty-upload" name="biltyUpload" type="file" accept="image/*" data-bilty-input />
-              <button class="bilty-clear" type="button" data-remove-bilty aria-label="Remove selected Bilty" title="Remove selected Bilty" hidden>&times;</button>
+              <button class="bilty-clear" type="button" data-remove-bilty aria-label="Remove selected Bilty"
+                title="Remove selected Bilty" hidden>&times;</button>
             </div>
           </div>
           <div class="field full">
@@ -145,7 +176,8 @@
               <button class="btn" type="button" data-add-container-row>Add Container Row</button>
             </div>
           </div>
-          <div class="field full"><label>Remarks</label><textarea name="remarks">PO submitted, dispatch ready.</textarea></div>
+          <div class="field full"><label>Remarks</label><textarea
+              name="remarks">PO submitted, dispatch ready.</textarea></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Booking</button>
             <button class="btn" type="button" data-reset-form>Clear Form</button>
@@ -194,33 +226,33 @@
               <tr>
                 <th>Job No</th>
                 <th>Booking No</th>
-                <th>Date</th>
                 <th>Invoice</th>
-                <th>Customer</th>
+                <th>Booking Date</th>
+                <th>BL No</th>
+                <th>NTN</th>
+                <th>Customer / Payer</th>
                 <th>Consignee Address</th>
                 <th>Route</th>
                 <th>Origin</th>
                 <th>Destination</th>
                 <th>Category</th>
-                <th>BL No</th>
-                <th>Container</th>
-                <th>Size</th>
-                <th>Truck</th>
                 <th>Goods Type</th>
                 <th>Quantity</th>
                 <th>Road Haulage Charges</th>
                 <th>Sales Tax Authority</th>
+                <th>Detention</th>
                 <th>15% Sales Tax</th>
                 <th>Total Amount</th>
                 <th>Income Tax 7%</th>
-                <th>Sales Tax With Held 20%</th>
-                <th>Sales Tax 80% by us</th>
-                <th>NTN</th>
-                <th>Detention</th>
+                <th>Sale Tax With Held 20%</th>
+                <th>Sale Tax 80% by us</th>
                 <th>Receivable Amount</th>
                 <th>Payment Term</th>
                 <th>Payment Received Date</th>
                 <th>Cheque Number</th>
+                <th>Container No</th>
+                <th>Container Size</th>
+                <th>Truck No</th>
                 <th>Status</th>
                 <th>Payment Status</th>
                 <th>Bilty</th>
@@ -235,12 +267,13 @@
     </main>
   </div>
   <div class="bilty-modal" data-bilty-modal hidden role="dialog" aria-modal="true" aria-label="Bilty image preview">
-    <button class="bilty-modal-close" type="button" data-close-bilty-modal aria-label="Close Bilty preview" title="Close">&times;</button>
+    <button class="bilty-modal-close" type="button" data-close-bilty-modal aria-label="Close Bilty preview"
+      title="Close">&times;</button>
     <img data-bilty-modal-image alt="Bilty" />
   </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="app.js?v=20260811-17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js?v=20260817-18"></script>
 </body>
-</html>
 
+</html>

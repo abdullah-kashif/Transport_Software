@@ -31,13 +31,15 @@ Deno.serve(async (request) => {
   const { data: callerData, error: callerError } = await admin.auth.getUser(accessToken);
   if (callerError || !callerData.user) return json({ error: "Invalid session." }, 401);
 
-  const { data: callerProfile, error: accessError } = await admin
-    .from("profiles")
-    .select("role, status")
-    .eq("id", callerData.user.id)
-    .maybeSingle();
-  if (accessError) return json({ error: `Unable to verify Super Admin access: ${accessError.message}` }, 403);
-  if (callerProfile?.role !== "super_admin" || callerProfile.status !== "active") {
+  const caller = createClient(supabaseUrl, serviceRoleKey, {
+    global: { headers: { Authorization: authorization } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: hasSuperAdminAccess, error: accessError } = await caller.rpc("is_super_admin");
+  if (accessError) {
+    return json({ error: `Unable to verify Super Admin access: ${accessError.message}` }, 403);
+  }
+  if (!hasSuperAdminAccess) {
     return json({ error: "Super Admin access is required." }, 403);
   }
 
@@ -66,14 +68,13 @@ Deno.serve(async (request) => {
       });
       if (createError) return json({ error: createError.message }, 400);
 
-      const { error: profileError } = await admin.from("profiles").upsert({
-        id: created.user.id,
+      const { error: profileError } = await caller.from("profiles").update({
         name,
         email,
         role,
         status,
         access_modules: role === "super_admin" ? [] : accessModules,
-      }, { onConflict: "id" });
+      }).eq("id", created.user.id);
       if (profileError) {
         await admin.auth.admin.deleteUser(created.user.id);
         return json({ error: profileError.message }, 400);
@@ -90,7 +91,7 @@ Deno.serve(async (request) => {
       const { error: authError } = await admin.auth.admin.updateUserById(userId, authChanges);
       if (authError) return json({ error: authError.message }, 400);
 
-      const { error: profileError } = await admin.from("profiles").update({
+      const { error: profileError } = await caller.from("profiles").update({
         name,
         email,
         role,

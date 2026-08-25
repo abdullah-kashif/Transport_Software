@@ -458,42 +458,6 @@
     return store;
   }
 
-  const SIGNED_URL_CACHE_KEY = "gtls-signed-url-cache";
-
-  function getCachedSignedUrl(path) {
-    if (!path) return "";
-    try {
-      const cache = JSON.parse(sessionStorage.getItem(SIGNED_URL_CACHE_KEY) || "{}");
-      const item = cache[path];
-      if (item && item.url && item.expiresAt > Date.now()) {
-        return item.url;
-      }
-    } catch (err) {
-      console.warn("Failed to read signed URL cache:", err.message);
-    }
-    return "";
-  }
-
-  function cacheSignedUrl(path, url) {
-    if (!path || !url) return;
-    try {
-      const cache = JSON.parse(sessionStorage.getItem(SIGNED_URL_CACHE_KEY) || "{}");
-      cache[path] = {
-        url,
-        expiresAt: Date.now() + 50 * 60 * 1000
-      };
-      sessionStorage.setItem(SIGNED_URL_CACHE_KEY, JSON.stringify(cache));
-    } catch (err) {
-      console.warn("Failed to write signed URL cache:", err.message);
-    }
-  }
-
-  function replaceArrayContents(target, source) {
-    if (!Array.isArray(target) || !Array.isArray(source)) return;
-    target.length = 0;
-    target.push(...source);
-  }
-
   function getNextSequentialId(items = [], prefix, field = "id") {
     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const matcher = new RegExp(`^${escapedPrefix}-(\\d+)$`, "i");
@@ -717,7 +681,6 @@
     }
     store.activityLogs = pruneActivityLogs(store.activityLogs || []);
     sessionStorage.setItem(KEY, JSON.stringify(store));
-    if (!options.skipRemote) scheduleOperationalSync(previousStore, store);
   }
 
   function normalizeAdminAccess(access, role = "Admin") {
@@ -728,12 +691,23 @@
       ? access
       : typeof access === "string" && access
         ? [access]
-        : [];
+        : structuredClone(DEFAULT_USER_ACCESS);
 
-    return [...new Set(values
+    let migratedValues = values.includes("khata") && !values.includes("accounts-payable")
+      ? [...values, "accounts-payable"]
+      : [...values];
+    if (migratedValues.includes("truck") && !migratedValues.includes("equipment")) {
+      migratedValues.push("equipment");
+    }
+    if (migratedValues.includes("truck") && !migratedValues.includes("maintenance")) {
+      migratedValues.push("maintenance");
+    }
+    const normalized = [...new Set(migratedValues
       .map((item) => String(item || "").trim())
       .filter((item) => allowedValues.has(item))
     )];
+
+    return normalized.length ? normalized : structuredClone(DEFAULT_USER_ACCESS);
   }
 
   function normalizeAdminUser(user = {}) {
@@ -857,1059 +831,30 @@
     return mapSupabaseProfile(profile, data.user);
   }
 
-  const SUPABASE_DOCUMENT_BUCKET = "gtls-private-documents";
-
-  function mapBookingRowFromSupabase(row = {}) {
-    const containerLines = (row.booking_containers || [])
-      .slice()
-      .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
-      .map((line) => normalizeContainerLine({
-        containerNo: line.container_no,
-        size: line.container_size,
-        truckNo: line.truck_no
-      }));
-    const primaryLine = containerLines[0] || normalizeContainerLine();
-    return normalizeBookingContainers({
-      id: row.job_no,
-      remoteId: row.id,
-      bookingNo: row.booking_no,
-      invoiceNo: row.invoice_no,
-      date: formatShortDate(row.booking_date),
-      blNo: row.bl_no,
-      gatePass: row.ntn,
-      customer: row.customer,
-      consignee: row.consignee_address,
-      route: row.route,
-      origin: row.origin,
-      destination: row.destination,
-      category: row.category,
-      goodsType: row.goods_type,
-      quantity: row.quantity,
-      rate: Number(row.road_haulage_charges || 0),
-      salesTaxAuthority: row.sales_tax_authority,
-      detention: Number(row.detention || 0),
-      salesTaxAmount: Number(row.sales_tax_amount || 0),
-      totalAmount: Number(row.total_amount || 0),
-      incomeTaxAmount: Number(row.income_tax_amount || 0),
-      salesTaxWithheldAmount: Number(row.sales_tax_withheld_amount || 0),
-      salesTaxByUsAmount: Number(row.sales_tax_by_us_amount || 0),
-      receivableAmount: Number(row.receivable_amount || 0),
-      paymentTerm: row.payment_term,
-      paymentReceivedDate: row.payment_received_date || "",
-      chequeNumber: row.cheque_number,
-      status: row.status,
-      accountFlow: row.payment_status,
-      biltyPath: row.bilty_path || "",
-      biltyImage: "",
-      remarks: row.remarks,
-      containerLines,
-      containerNo: primaryLine.containerNo,
-      size: primaryLine.size,
-      truckNo: primaryLine.truckNo
-    });
-  }
-
-  function mapBookingForSupabase(booking = {}) {
-    return {
-      job_no: booking.id,
-      booking_no: booking.bookingNo,
-      invoice_no: booking.invoiceNo || null,
-      booking_date: formatIsoDate(booking.date),
-      bl_no: booking.blNo || null,
-      ntn: booking.gatePass || null,
-      customer: booking.customer,
-      consignee_address: booking.consignee || null,
-      route: booking.route || null,
-      origin: booking.origin || null,
-      destination: booking.destination || null,
-      category: booking.category || null,
-      goods_type: booking.goodsType || null,
-      quantity: booking.quantity || null,
-      road_haulage_charges: Number(booking.rate || 0),
-      sales_tax_authority: booking.salesTaxAuthority || null,
-      detention: Number(booking.detention || 0),
-      sales_tax_amount: Number(booking.salesTaxAmount || 0),
-      total_amount: Number(booking.totalAmount || 0),
-      income_tax_amount: Number(booking.incomeTaxAmount || 0),
-      sales_tax_withheld_amount: Number(booking.salesTaxWithheldAmount || 0),
-      sales_tax_by_us_amount: Number(booking.salesTaxByUsAmount || 0),
-      receivable_amount: Number(booking.receivableAmount || 0),
-      payment_term: booking.paymentTerm || null,
-      payment_received_date: formatIsoDate(booking.paymentReceivedDate) || null,
-      cheque_number: booking.chequeNumber || null,
-      status: booking.status === "In Transit" ? "In Transit" : "Delivered",
-      payment_status: booking.accountFlow === "Credit" ? "Credit" : "Awaited",
-      bilty_path: booking.biltyPath || null,
-      remarks: booking.remarks || null,
-      updated_at: new Date().toISOString()
-    };
-  }
-
-  function dataUrlToBlob(dataUrl) {
-    const [metadata, content] = String(dataUrl || "").split(",");
-    const mimeType = metadata.match(/data:([^;]+)/)?.[1] || "image/jpeg";
-    const binary = atob(content || "");
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return new Blob([bytes], { type: mimeType });
-  }
-
-async function getPrivateDocumentUrl(path) {
-  if (!path) return "";
-  const cached = getCachedSignedUrl(path);
-  if (cached) return cached;
-  const client = getSupabaseClient();
-  if (!client) return "";
-  const { data, error } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).createSignedUrl(path, 3600);
-  if (error || !data?.signedUrl) return "";
-  cacheSignedUrl(path, data.signedUrl);
-  return data.signedUrl;
-}
-
-function getBookingBiltyFolder(booking) {
-  const safeJobNo = String(booking.id || "booking").replace(/[^a-z0-9_-]/gi, "-");
-  return `bookings/${safeJobNo}`;
-}
-
-async function removeStaleBookingBiltyFiles(booking, keepPath = "") {
-  const client = getSupabaseClient();
-  if (!client) return;
-
-  const folder = getBookingBiltyFolder(booking);
-  const bucket = client.storage.from(SUPABASE_DOCUMENT_BUCKET);
-  const { data: files, error } = await bucket.list(folder, { limit: 100 });
-  if (error) throw error;
-
-  const paths = (files || [])
-    .filter((file) => file?.name && file.name !== ".emptyFolderPlaceholder")
-    .map((file) => `${folder}/${file.name}`)
-    .filter((path) => path !== keepPath);
-  const previousPath = String(booking.biltyPath || "");
-  if (previousPath && previousPath !== keepPath && !paths.includes(previousPath)) {
-    paths.push(previousPath);
-  }
-  if (!paths.length) return;
-
-  const { error: removeError } = await bucket.remove(paths);
-  if (removeError) throw removeError;
-}
-
-async function uploadBookingBilty(booking) {
-  const client = getSupabaseClient();
-  if (!client) return booking.biltyPath || "";
-
-  const imageData = String(booking.biltyImage || "");
-
-  // Case 1: Bilty image cleared/removed by the user
-  if (!imageData) {
-    if (booking.biltyPath) {
-      try {
-        const folder = getBookingBiltyFolder(booking);
-        const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(folder, { limit: 100 });
-        const paths = (files || [])
-          .map((file) => `${folder}/${file.name}`)
-          .filter((file) => file !== ".emptyFolderPlaceholder");
-        if (paths.length) {
-          await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(paths);
-        }
-      } catch (err) {
-        console.warn("Failed to clear Bilty files from storage:", err.message);
-      }
-    }
-    return "";
-  }
-
-  // Case 2: Bilty image is unchanged
-  if (imageData.startsWith("http://") || imageData.startsWith("https://")) {
-    return booking.biltyPath || "";
-  }
-
-  // Case 3: New Bilty image uploaded
-  if (imageData.startsWith("data:")) {
-    const safeJobNo = String(booking.id || "booking").replace(/[^a-z0-9_-]/gi, "-");
-    const path = `bookings/${safeJobNo}/${Date.now()}.jpg`;
-    const { error } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET)
-      .upload(path, dataUrlToBlob(imageData), { contentType: "image/jpeg", upsert: false });
-    if (error) throw error;
-    return path;
-  }
-
-  return booking.biltyPath || "";
-}
-
-  async function saveBookingToSupabase(booking) {
-    const client = getSupabaseClient();
-    if (!client) return null;
-    const biltyPath = await uploadBookingBilty(booking);
-    const payload = mapBookingForSupabase({ ...booking, biltyPath });
-    const { data: saved, error } = await client.from("bookings")
-      .upsert(payload, { onConflict: "job_no" })
-      .select("id,bilty_path")
-      .single();
-    if (error) throw error;
-
-    const { error: deleteError } = await client.from("booking_containers")
-      .delete()
-      .eq("booking_id", saved.id);
-    if (deleteError) throw deleteError;
-    const lines = getBookingContainerLines(booking).map((line, index) => ({
-      booking_id: saved.id,
-      container_no: line.containerNo,
-      container_size: line.size || null,
-      truck_no: line.truckNo || null,
-      sort_order: index
-    }));
-  if (lines.length) {
-    const { error: linesError } = await client.from("booking_containers").insert(lines);
-    if (linesError) throw linesError;
-  }
-  const savedPath = String(saved.bilty_path || biltyPath || "");
-  await removeStaleBookingBiltyFiles(booking, savedPath);
-  return { remoteId: saved.id, biltyPath: savedPath };
-}
-
-  async function deleteBookingFromSupabase(booking) {
-    const client = getSupabaseClient();
-    if (!client) return;
-    const query = client.from("bookings").delete();
-  const { error } = booking.remoteId
-    ? await query.eq("id", booking.remoteId)
-    : await query.eq("job_no", booking.id);
-  if (error) throw error;
-  await removeStaleBookingBiltyFiles(booking);
-}
-
-  async function hydrateBookingsFromSupabase(store) {
-    const client = getSupabaseClient();
-    if (!client) return;
-    const { data, error } = await client.from("bookings")
-      .select("*,booking_containers(*)")
-      .order("booking_date", { ascending: false });
-    if (error) {
-      console.warn("Supabase booking load failed; browser data remains available.", error.message);
-      return;
-    }
-    const session = getAdminSession();
-    const canWriteBookings = session?.role === "Super Admin" || normalizeAdminAccess(session?.access || [], session?.role).includes("booking");
-    if (!data.length && canWriteBookings) {
-      for (const booking of store.bookings || []) {
-        try {
-          const remote = await saveBookingToSupabase(booking);
-          Object.assign(booking, remote || {});
-        } catch (migrationError) {
-          console.warn("Initial booking sync skipped.", migrationError.message);
-          break;
-        }
-      }
-      saveStore(store, { skipAudit: true });
-      return;
-    }
-    const mapped = data.map((row) => {
-      const booking = mapBookingRowFromSupabase(row);
-      booking.biltyImage = getCachedSignedUrl(booking.biltyPath);
-      return booking;
-    });
-    replaceArrayContents(store.bookings, mapped);
-    saveStore(store, { skipAudit: true });
-  }
-
-  let operationalSyncTimer = null;
-  let operationalSyncQueue = Promise.resolve();
-
-  function hasModuleAccessForSync(module) {
-    const session = getAdminSession();
-    if (!session) return false;
-    return session.role === "Super Admin" || normalizeAdminAccess(session.access || [], session.role).includes(module);
-  }
-
-  function collectionChanged(previousStore, nextStore, key) {
-    if (!previousStore) return false;
-    return JSON.stringify(previousStore[key] || []) !== JSON.stringify(nextStore[key] || []);
-  }
-
-  function scheduleOperationalSync(previousStore, store) {
-    if (!getSupabaseClient() || !getAdminSession() || !previousStore) return;
-    const changed = {
-      truckExpenses: collectionChanged(previousStore, store, "truckExpenses"),
-      equipmentFleet: collectionChanged(previousStore, store, "equipmentFleet"),
-      maintenanceJobs: collectionChanged(previousStore, store, "maintenanceJobs"),
-      employees: collectionChanged(previousStore, store, "employees"),
-      customerKhatas: collectionChanged(previousStore, store, "customerKhatas"),
-      vendorKhatas: collectionChanged(previousStore, store, "vendorKhatas"),
-      activityLogs: collectionChanged(previousStore, store, "activityLogs")
-    };
-    if (!Object.values(changed).some(Boolean)) return;
-    clearTimeout(operationalSyncTimer);
-    const snapshot = structuredClone(store);
-    operationalSyncTimer = setTimeout(() => {
-      operationalSyncQueue = operationalSyncQueue
-        .then(() => syncOperationalStore(snapshot, changed))
-        .catch((error) => console.warn("Supabase background sync failed.", error.message));
-    }, 250);
-  }
-
-  function safeStorageName(value) {
-    return String(value || "record").replace(/[^a-z0-9_-]/gi, "-");
-  }
-
-async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, options = {}) {
-  const client = getSupabaseClient();
-  if (!client) return currentPath || "";
-
-  // Case 1: Image cleared/removed by the user
-  if (!dataUrl) {
-    if (currentPath) {
-      try {
-        await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([currentPath]);
-        if (options.replaceFolder) {
-          const recordFolder = `${folder}/${safeStorageName(recordId)}`;
-          const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(recordFolder, { limit: 100 });
-          const obsoletePaths = (files || [])
-            .map((file) => `${recordFolder}/${file.name}`)
-            .filter((file) => file !== ".emptyFolderPlaceholder");
-          if (obsoletePaths.length) {
-            await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(obsoletePaths);
-          }
-        }
-      } catch (err) {
-        console.warn("Error deleting cleared image from storage:", err.message);
-      }
-    }
-    return "";
-  }
-
-  // Case 2: Image is unchanged
-  if (String(dataUrl).startsWith("http://") || String(dataUrl).startsWith("https://")) {
-    return currentPath || "";
-  }
-
-  // Case 3: New image uploaded
-  if (String(dataUrl).startsWith("data:")) {
-    const mimeType = String(dataUrl).match(/data:([^;]+)/)?.[1] || "image/jpeg";
-    const extension = mimeType === "application/pdf" ? "pdf" : (mimeType.split("/")[1] || "jpg").replace("jpeg", "jpg");
-    const recordFolder = `${folder}/${safeStorageName(recordId)}`;
-    const path = Boolean(options.replaceFolder)
-      ? `${recordFolder}/latest.${extension}`
-      : `${recordFolder}/${Date.now()}.${extension}`;
-    const bucket = client.storage.from(SUPABASE_DOCUMENT_BUCKET);
-    const { error } = await bucket.upload(path, dataUrlToBlob(dataUrl), {
-      contentType: mimeType,
-      upsert: Boolean(options.replaceFolder)
-    });
-    if (error) throw error;
-
-    if (options.replaceFolder) {
-      const { data: files, error: listError } = await bucket.list(recordFolder, { limit: 100 });
-      if (!listError) {
-        const obsoletePaths = (files || [])
-          .map((file) => `${recordFolder}/${file.name}`)
-          .filter((filePath) => filePath !== path);
-        if (obsoletePaths.length) {
-          await bucket.remove(obsoletePaths).catch((err) => console.warn("Failed to remove obsolete paths", err.message));
-        }
-      }
-    } else if (currentPath && currentPath !== path) {
-      await bucket.remove([currentPath]).catch((err) => console.warn("Failed to remove currentPath", err.message));
-    }
-
-    return path;
-  }
-
-  return currentPath || "";
-}
-
-  const TABLE_IMAGE_COLUMNS = {
-    truck_jobs: { col: "image_path", folder: "trucks" },
-    equipment_fleet: { col: "original_documents_path", folder: "equipment" },
-    maintenance_jobs: { col: "image_path", folder: "maintenance" },
-    employees: { col: "image_path", folder: "employees" }
-  };
-
-  async function syncRows(table, key, rows) {
-    const client = getSupabaseClient();
-    const imgInfo = TABLE_IMAGE_COLUMNS[table];
-    const selectFields = imgInfo ? `${key},${imgInfo.col}` : key;
-    const { data: existing, error: readError } = await client.from(table).select(selectFields);
-    if (readError) throw readError;
-    if (rows.length) {
-      const { error } = await client.from(table).upsert(rows, { onConflict: key });
-      if (error) throw error;
-    }
-    const keep = new Set(rows.map((row) => String(row[key])));
-    const removedRows = (existing || []).filter((row) => !keep.has(String(row[key])));
-    if (removedRows.length) {
-      const removedKeys = removedRows.map((row) => row[key]);
-      if (imgInfo) {
-        for (const row of removedRows) {
-          const path = row[imgInfo.col];
-          if (path) {
-            try {
-              await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([path]);
-            } catch (err) {
-              console.warn(`Failed to delete file ${path}:`, err.message);
-            }
-          }
-          const recordFolder = `${imgInfo.folder}/${safeStorageName(row[key])}`;
-          try {
-            const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(recordFolder, { limit: 100 });
-            const obsoletePaths = (files || [])
-              .map((file) => `${recordFolder}/${file.name}`)
-              .filter((file) => file !== ".emptyFolderPlaceholder");
-            if (obsoletePaths.length) {
-              await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(obsoletePaths);
-            }
-          } catch (err) {
-            console.warn(`Failed to clean record folder ${recordFolder}:`, err.message);
-          }
-        }
-      }
-      const { error } = await client.from(table).delete().in(key, removedKeys);
-      if (error) throw error;
-    }
-  }
-
-  async function syncTruckJobs(records) {
-    const rows = [];
-    for (const item of records || []) {
-      const imagePath = await uploadPrivateDataUrl(
-        item.image,
-        item.imagePath,
-        "trucks",
-        item.jobNo || item.id,
-        { replaceFolder: true }
-      );
-      rows.push({
-        job_no: item.jobNo || item.id, import_truck_no: item.truckNo || "-", import_date: formatIsoDate(item.date),
-        customer: item.customer || null, import_origin: item.origin || null, import_destination: item.destination || null,
-        import_size: item.size || null, import_weight: item.weight || null, cargo_description: item.cargoDescription || null,
-        mty_box_freight: Number(item.mtyBoxFreight || 0), mty_broker: item.mtyBroker || null,
-        import_freight: Number(item.importFreight || 0), import_broker_commission: Number(item.importBrokerCommission || 0),
-        import_broker: item.importBroker || null, import_receivable_amount: Number(item.importReceivedAmount || 0),
-        import_cheque_details: item.importChequeDetails || null, import_payment_date: formatIsoDate(item.importPaymentDate) || null,
-        import_payment_status: item.importPaymentStatus === "Credit" ? "Credit" : "Awaited",
-        mty_payment_date: formatIsoDate(item.mtyPaymentDate) || null, mty_payment_status: item.mtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
-        import_remarks: item.importRemarks || null, export_load_date: formatIsoDate(item.exportLoadDate) || null,
-        export_truck_no: item.exportTruckNo || null, export_broker: item.exportBroker || null,
-        export_freight: Number(item.exportFreight || 0), export_broker_commission: Number(item.exportBrokerCommission || 0),
-        export_origin: item.exportOrigin || null, export_destination: item.exportDestination || null,
-        export_size: item.exportSize || null, export_weight: item.exportWeight || null,
-        export_receivable_amount: Number(item.exportReceivedAmount || 0), export_cheque_details: item.exportChequeDetails || null,
-        export_payment_date: formatIsoDate(item.exportPaymentDate) || null, export_payment_status: item.exportPaymentStatus === "Credit" ? "Credit" : "Awaited",
-        export_remarks: item.exportRemarks || null, grand_total: Number(item.grandTotal || 0),
-        round_trip_expense: Number(item.roundTripExpense || 0), profit_loss: Number(item.profitLoss || 0), image_path: imagePath || null,
-        updated_at: new Date().toISOString()
-      });
-    }
-    await syncRows("truck_jobs", "job_no", rows);
-  }
-
-  async function syncEquipment(records) {
-    const rows = [];
-    for (const item of records || []) {
-      const path = await uploadPrivateDataUrl(item.documentData, item.documentPath, "equipment", item.truckNo || item.id);
-      rows.push({ truck_no: item.truckNo, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make, model: item.model,
-        mra: item.mra || null, banker: item.banker || null, fitness_expiry: formatIsoDate(item.fitnessExpiry) || null,
-        balochistan_permit_expiry: formatIsoDate(item.balochistanPermitExpiry) || null, sindh_permit_expiry: formatIsoDate(item.sindhPermitExpiry) || null,
-        kpk_permit_expiry: formatIsoDate(item.kpkPermitExpiry) || null, punjab_permit_expiry: formatIsoDate(item.punjabPermitExpiry) || null,
-        tax_paid_up_to: formatIsoDate(item.taxPaidUpTo) || null, original_documents: item.documentName || item.originalDocs || null,
-        original_documents_path: path || null, updated_at: new Date().toISOString() });
-    }
-    await syncRows("equipment_fleet", "truck_no", rows);
-  }
-
-  async function syncMaintenance(records) {
-    const rows = [];
-    for (const item of records || []) {
-      const path = await uploadPrivateDataUrl(item.image, item.imagePath, "maintenance", item.id);
-      rows.push({ maintenance_job_no: item.id, truck_no: item.truckNo, complaint_date: formatIsoDate(item.complaintDate),
-        repair_date: formatIsoDate(item.repairDate), part_name: item.partName, old_serial_number: item.oldSerialNumber || null,
-        new_serial_number: item.newSerialNumber, part_cost: Number(item.partCost || 0), warranty_period: item.warrantyPeriod || null,
-        warranty_expiry: formatIsoDate(item.warrantyExpiry) || null, driver_name: item.driverName, image_path: path || null,
-        approved_by: item.approvedBy, updated_at: new Date().toISOString() });
-    }
-    await syncRows("maintenance_jobs", "maintenance_job_no", rows);
-  }
-
-  async function syncEmployees(records) {
-    const rows = [];
-    for (const item of records || []) {
-      const path = await uploadPrivateDataUrl(item.image, item.imagePath, "employees", item.id);
-      rows.push({ employee_no: item.id, name: item.name, designation: item.designation, department: item.department || null,
-        salary: Number(item.salary || 0), joining_date: formatIsoDate(item.joiningDate), status: item.status === "Inactive" ? "Inactive" : "Active",
-        phone: item.phone || null, image_path: path || null, updated_at: new Date().toISOString() });
-    }
-    await syncRows("employees", "employee_no", rows);
-  }
-
-  async function syncAccounts(records, accountType) {
-    const client = getSupabaseClient();
-    const parties = [];
-    for (const account of records || []) {
-      const { data: saved, error } = await client.from("accounts").upsert({ account_type: accountType, party_name: account.customer,
-        phone: account.phone || null, city: account.city || null, opening_balance: Number(account.openingBalance || 0), updated_at: new Date().toISOString()
-      }, { onConflict: "account_type,party_name" }).select("id").single();
-      if (error) throw error;
-      parties.push(account.customer);
-      const entryRows = [];
-      for (const entry of account.entries || []) {
-        const path = await uploadPrivateDataUrl(entry.image, entry.imagePath, accountType, `${account.id}-${entry.id}`);
-        entryRows.push({ account_id: saved.id, entry_date: formatIsoDate(entry.date), entry_type: entry.type === "Credit" ? "Credit" : "Debit",
-          description: entry.description || "Entry", amount: Number(entry.amount || 0), image_path: path || null, updated_at: new Date().toISOString() });
-      }
-      const { data: existingEntries, error: entryReadError } = await client.from("account_entries").select("id,image_path").eq("account_id", saved.id);
-      if (entryReadError) throw entryReadError;
-      
-      const activeEntryIds = new Set((account.entries || []).map((e) => e.id));
-      const deletedEntries = (existingEntries || []).filter((e) => !activeEntryIds.has(e.id));
-      const pathsToDelete = deletedEntries.map((e) => e.image_path).filter(Boolean);
-      if (pathsToDelete.length) {
-        try {
-          await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(pathsToDelete);
-        } catch (err) {
-          console.warn("Failed to delete removed khata entry images:", err.message);
-        }
-      }
-
-      if (existingEntries?.length) await client.from("account_entries").delete().eq("account_id", saved.id);
-      if (entryRows.length) {
-        const { error: entryError } = await client.from("account_entries").insert(entryRows);
-        if (entryError) throw entryError;
-      }
-    }
-    const { data: existing, error } = await client.from("accounts").select("id,party_name").eq("account_type", accountType);
-    if (error) throw error;
-    const removed = (existing || []).filter((row) => !parties.includes(row.party_name)).map((row) => row.id);
-    if (removed.length) {
-      const { data: deletedAccountEntries } = await client.from("account_entries").select("image_path").in("account_id", removed);
-      const pathsToDelete = (deletedAccountEntries || []).map((e) => e.image_path).filter(Boolean);
-      if (pathsToDelete.length) {
-        try {
-          await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(pathsToDelete);
-        } catch (err) {
-          console.warn("Failed to delete khata images for deleted accounts:", err.message);
-        }
-      }
-      await client.from("accounts").delete().in("id", removed);
-    }
-  }
-
-  async function syncActivityLogs(logs) {
-    const client = getSupabaseClient();
-    const syncedKey = "gtls-supabase-synced-log-ids";
-    const synced = new Set(JSON.parse(localStorage.getItem(syncedKey) || "[]"));
-    const pending = (logs || []).filter((log) => !synced.has(log.id));
-    if (!pending.length) return;
-    const actionMap = { CREATE: "create", UPDATE: "update", DELETE: "delete", SIGN_IN: "login", SIGN_OUT: "logout", DOWNLOAD: "download", VIEW: "view" };
-    const rows = pending.map((log) => ({ user_name: log.userName || null, module: log.module || "System",
-      action: actionMap[log.action] || "view", record_id: log.recordId || null, description: log.details || null,
-      metadata: { local_id: log.id, user_email: log.userEmail || "", user_role: log.userRole || "" }, created_at: log.timestamp || new Date().toISOString() }));
-    const { error } = await client.from("activity_logs").insert(rows);
-    if (error) throw error;
-    pending.forEach((log) => synced.add(log.id));
-    localStorage.setItem(syncedKey, JSON.stringify([...synced].slice(-2000)));
-  }
-
-  async function syncOperationalStore(store, changed) {
-    const jobs = [];
-    if (changed.truckExpenses && hasModuleAccessForSync("truck")) jobs.push(syncTruckJobs(store.truckExpenses));
-    if (changed.equipmentFleet && hasModuleAccessForSync("equipment")) jobs.push(syncEquipment(store.equipmentFleet));
-    if (changed.maintenanceJobs && hasModuleAccessForSync("maintenance")) jobs.push(syncMaintenance(store.maintenanceJobs));
-    if (changed.employees && hasModuleAccessForSync("employee")) jobs.push(syncEmployees(store.employees));
-    if (changed.customerKhatas && hasModuleAccessForSync("khata")) jobs.push(syncAccounts(store.customerKhatas, "receivable"));
-    if (changed.vendorKhatas && hasModuleAccessForSync("accounts-payable")) jobs.push(syncAccounts(store.vendorKhatas, "payable"));
-    if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs));
-    await Promise.all(jobs);
-  }
-
-  async function signedImage(path) {
-    return path ? await getPrivateDocumentUrl(path) : "";
-  }
-
-  async function hydrateOperationalStore(store) {
-    const client = getSupabaseClient();
-    if (!client) return;
-    const load = async (table, allowed, order = "created_at") => {
-      if (!allowed) return null;
-      const { data, error } = await client.from(table).select("*").order(order, { ascending: false });
-      if (error) { console.warn(`${table} load skipped.`, error.message); return null; }
-      return data;
-    };
-    const [trucks, equipment, maintenance, employees, accounts, logs] = await Promise.all([
-      load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
-      load("equipment_fleet", hasModuleAccessForSync("equipment") || hasModuleAccessForSync("maintenance"), "truck_no"),
-      load("maintenance_jobs", hasModuleAccessForSync("maintenance"), "repair_date"),
-      load("employees", hasModuleAccessForSync("employee"), "joining_date"),
-      load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
-      load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at")
-    ]);
-    const migrationKey = "gtls-supabase-operational-migrated";
-    const canMigrate = getAdminSession()?.role === "Super Admin" && localStorage.getItem(migrationKey) !== "1";
-    
-    if (trucks?.length) {
-      const mappedTrucks = trucks.map((r) => ({
-        id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
-        date: r.import_date, customer: r.customer || "", origin: r.import_origin || "", destination: r.import_destination || "", size: r.import_size || "",
-        weight: r.import_weight || "", cargoDescription: r.cargo_description || "", mtyBoxFreight: Number(r.mty_box_freight || 0), mtyBroker: r.mty_broker || "",
-        importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
-        importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
-        importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
-        importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "", exportBroker: r.export_broker || "",
-        exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
-        exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
-        exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
-        exportPaymentStatus: r.export_payment_status, exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-        roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
-        image: getCachedSignedUrl(r.image_path)
-      }));
-      replaceArrayContents(store.truckExpenses, mappedTrucks);
-    } else if (trucks && !canMigrate) {
-      replaceArrayContents(store.truckExpenses, []);
-    }
-
-    if (equipment?.length) {
-      const mappedEquip = equipment.map((r) => ({
-        id: r.truck_no, truckNo: r.truck_no, chassisNo: r.chassis_no,
-        engineNo: r.engine_no, make: r.make, model: r.model, mra: r.mra || "", banker: r.banker || "", fitnessExpiry: r.fitness_expiry || "",
-        balochistanPermitExpiry: r.balochistan_permit_expiry || "", sindhPermitExpiry: r.sindh_permit_expiry || "", kpkPermitExpiry: r.kpk_permit_expiry || "",
-        punjabPermitExpiry: r.punjab_permit_expiry || "", taxPaidUpTo: r.tax_paid_up_to || "", originalDocs: r.original_documents || "",
-        documentName: r.original_documents || "", documentPath: r.original_documents_path || "",
-        documentData: getCachedSignedUrl(r.original_documents_path)
-      }));
-      replaceArrayContents(store.equipmentFleet, mappedEquip);
-    } else if (equipment && !canMigrate) {
-      replaceArrayContents(store.equipmentFleet, []);
-    }
-
-    if (maintenance?.length) {
-      const mappedMaint = maintenance.map((r) => ({
-        id: r.maintenance_job_no, truckNo: r.truck_no,
-        complaintDate: r.complaint_date, repairDate: r.repair_date, partName: r.part_name, oldSerialNumber: r.old_serial_number || "", newSerialNumber: r.new_serial_number,
-        partCost: Number(r.part_cost || 0), warrantyPeriod: r.warranty_period || "", warrantyExpiry: r.warranty_expiry || "", driverName: r.driver_name,
-        approvedBy: r.approved_by, imagePath: r.image_path || "", image: getCachedSignedUrl(r.image_path)
-      }));
-      replaceArrayContents(store.maintenanceJobs, mappedMaint);
-    } else if (maintenance && !canMigrate) {
-      replaceArrayContents(store.maintenanceJobs, []);
-    }
-
-    if (employees?.length) {
-      const mappedEmp = employees.map((r) => ({
-        id: r.employee_no, name: r.name, designation: r.designation,
-        department: r.department || "", salary: Number(r.salary || 0), joiningDate: r.joining_date, status: r.status, phone: r.phone || "",
-        imagePath: r.image_path || "", image: getCachedSignedUrl(r.image_path)
-      }));
-      replaceArrayContents(store.employees, mappedEmp);
-    } else if (employees && !canMigrate) {
-      replaceArrayContents(store.employees, []);
-    }
-
-    if (accounts?.length) {
-      const { data: entries, error } = await client.from("account_entries").select("*").order("entry_date", { ascending: true });
-      if (!error) {
-        const mappedAccounts = accounts.map((account) => ({
-          id: account.id, customer: account.party_name, phone: account.phone || "",
-          city: account.city || "", openingBalance: Number(account.opening_balance || 0),
-          entries: (entries || []).filter((entry) => entry.account_id === account.id)
-            .map((entry) => ({
-              id: entry.id, date: entry.entry_date, type: entry.entry_type, description: entry.description,
-              amount: Number(entry.amount || 0), imagePath: entry.image_path || "", image: getCachedSignedUrl(entry.image_path)
-            }))
-        }));
-        replaceArrayContents(store.customerKhatas, mappedAccounts.filter((_, index) => accounts[index].account_type === "receivable"));
-        replaceArrayContents(store.vendorKhatas, mappedAccounts.filter((_, index) => accounts[index].account_type === "payable"));
-      }
-    } else if (accounts && !canMigrate) {
-      replaceArrayContents(store.customerKhatas, []);
-      replaceArrayContents(store.vendorKhatas, []);
-    }
-
-    if (logs?.length) {
-      const mappedLogs = logs.map((r) => ({
-        id: `LOG-${r.id}`, timestamp: r.created_at, userName: r.user_name || "",
-        userEmail: r.metadata?.user_email || "", userRole: r.metadata?.user_role || "", module: r.module, action: r.action.toUpperCase(),
-        recordId: r.record_id || "-", details: r.description || ""
-      }));
-      replaceArrayContents(store.activityLogs, mappedLogs);
-    }
-
-    saveStore(store, { skipAudit: true, skipRemote: true });
-    if (canMigrate) {
-      const migrations = [];
-      if (trucks && !trucks.length && store.truckExpenses?.length && hasModuleAccessForSync("truck")) migrations.push(syncTruckJobs(store.truckExpenses));
-      if (equipment && !equipment.length && store.equipmentFleet?.length && hasModuleAccessForSync("equipment")) migrations.push(syncEquipment(store.equipmentFleet));
-      if (maintenance && !maintenance.length && store.maintenanceJobs?.length && hasModuleAccessForSync("maintenance")) migrations.push(syncMaintenance(store.maintenanceJobs));
-      if (employees && !employees.length && store.employees?.length && hasModuleAccessForSync("employee")) migrations.push(syncEmployees(store.employees));
-      if (accounts && !accounts.length) {
-        if (hasModuleAccessForSync("khata") && store.customerKhatas?.length) migrations.push(syncAccounts(store.customerKhatas, "receivable"));
-        if (hasModuleAccessForSync("accounts-payable") && store.vendorKhatas?.length) migrations.push(syncAccounts(store.vendorKhatas, "payable"));
-      }
-      await Promise.allSettled(migrations);
-      localStorage.setItem(migrationKey, "1");
-    }
-    await syncActivityLogs(store.activityLogs || []).catch(() => {});
-  }
-
   function getPageFile(page) {
     return `${page === "employee" ? "employees" : page}.html`;
-  }
-  const appPages = new Set([
-    "dashboard", "booking", "ledger", "truck", "truck-summary", 
-    "completed-truck-summary", "equipment", "maintenance", 
-    "employees", "employee", "khata", "accounts-payable", "admin", "activity-logs"
-  ]);
-
-  function isAppPage(page) {
-    return appPages.has(page);
-  }
-
-  function getSkeletonLoader(page) {
-    let contentHtml = "";
-
-    if (page === "dashboard") {
-      contentHtml = `
-        <div class="audit-summary" style="margin-bottom: 20px;">
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-        </div>
-        <div style="margin-bottom: 20px;">
-          <div class="skeleton-text skeleton-shimmer" style="width: 180px; height: 20px; margin-bottom: 12px; background: #e8d8c7;"></div>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-          </div>
-        </div>
-        <div style="margin-bottom: 20px;">
-          <div class="skeleton-text skeleton-shimmer" style="width: 180px; height: 20px; margin-bottom: 12px; background: #e8d8c7;"></div>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-            <div class="skeleton-card" style="padding: 12px;"><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 10px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 22px; margin: 0; background: #ebdccb;"></div></div>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="statement-table">
-            <thead>
-              <tr>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 85px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-              </tr>
-              <tr>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 85px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                <td><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      `;
-    } else if (page === "booking") {
-      contentHtml = `
-        <div class="form-grid" style="border: 1px solid var(--line); border-radius: 20px; background: var(--paper); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px;">
-          ${Array.from({ length: 24 }).map(() => `
-            <div class="field quarter">
-              <div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 12px; margin-bottom: 6px; background: #e8d8c7;"></div>
-              <div class="skeleton-shimmer" style="height: 44px; border-radius: 8px; border: 1px solid var(--line); background: #fffaf4;"></div>
-            </div>
-          `).join("")}
-          <div class="field full">
-            <div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 12px; margin-bottom: 6px; background: #e8d8c7;"></div>
-            <div class="skeleton-shimmer" style="height: 120px; border-radius: 12px; border: 1px solid var(--line); background: #fffdf9;"></div>
-          </div>
-          <div class="field full">
-            <div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 12px; margin-bottom: 6px; background: #e8d8c7;"></div>
-            <div class="skeleton-shimmer" style="height: 96px; border-radius: 8px; border: 1px solid var(--line); background: #fffaf4;"></div>
-          </div>
-        </div>
-      `;
-    } else if (["ledger", "khata", "accounts-payable", "completed-truck-summary", "truck-summary", "equipment", "activity-logs"].includes(page)) {
-      contentHtml = `
-        <div class="audit-summary" style="margin-bottom: 20px;">
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
-        </div>
-        <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px;">
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 12px; margin: 0; background: #e8d8c7;"></div>
-            <div class="skeleton-shimmer" style="width: 220px; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: #fff;"></div>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 12px; margin: 0; background: #e8d8c7;"></div>
-            <div class="skeleton-shimmer" style="width: 150px; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: #fff;"></div>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 12px; margin: 0; background: #e8d8c7;"></div>
-            <div class="skeleton-shimmer" style="width: 150px; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: #fff;"></div>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="statement-table">
-            <thead>
-              <tr>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 120px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Array.from({ length: 6 }).map(() => `
-                <tr>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 110px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      `;
-    } else {
-      contentHtml = `
-        <div class="form-grid" style="border: 1px solid var(--line); border-radius: 20px; background: var(--paper); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px;">
-          ${Array.from({ length: 4 }).map(() => `
-            <div class="field quarter">
-              <div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 12px; margin-bottom: 6px; background: #e8d8c7;"></div>
-              <div class="skeleton-shimmer" style="height: 44px; border-radius: 8px; border: 1px solid var(--line); background: #fffaf4;"></div>
-            </div>
-          `).join("")}
-        </div>
-        <div class="table-wrap">
-          <table class="statement-table">
-            <thead>
-              <tr>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 100px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-                <th><div class="skeleton-text skeleton-shimmer" style="width: 70px; height: 12px; margin: 0; background: #e8d8c7;"></div></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Array.from({ length: 4 }).map(() => `
-                <tr>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 90px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 75px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                  <td><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 14px; margin: 0; background: rgba(240, 230, 218, 0.5);"></div></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    return `
-      <section class="hero dashboard-hero skeleton-shimmer" style="margin-bottom: 16px; height: 60px; border-radius: 16px; opacity: 0.8;"></section>
-      <section class="screen" style="background: transparent; border: none; box-shadow: none; padding: 0;">
-        <div class="skeleton-text title skeleton-shimmer" style="margin-bottom: 20px; width: 220px; height: 28px; background: #ebdccb;"></div>
-        ${contentHtml}
-      </section>
-    `;
-  }
-
-  let activeNavigationController = null;
-
-  async function navigateDynamically(url, targetPage) {
-    if (activeNavigationController) {
-      activeNavigationController.abort();
-    }
-    activeNavigationController = new AbortController();
-    const { signal } = activeNavigationController;
-
-    const mainEl = document.querySelector(".main");
-    if (!mainEl) {
-      window.location.href = url;
-      return;
-    }
-
-    mainEl.style.transition = "opacity 0.15s ease-in-out, transform 0.15s ease-in-out";
-    mainEl.style.opacity = "0";
-    mainEl.style.transform = "translateY(-6px)";
-
-    let progressBar = document.querySelector(".nav-progress-bar");
-    if (!progressBar) {
-      progressBar = document.createElement("div");
-      progressBar.className = "nav-progress-bar";
-      document.body.appendChild(progressBar);
-    }
-    progressBar.style.width = "0%";
-    progressBar.style.opacity = "1";
-    
-    setTimeout(() => {
-      if (progressBar) progressBar.style.width = "40%";
-    }, 20);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    mainEl.innerHTML = getSkeletonLoader(targetPage);
-    mainEl.style.transform = "translateY(0)";
-    mainEl.style.opacity = "1";
-    
-    const panel = document.querySelector("[data-notification-panel]");
-    if (panel) panel.hidden = true;
-    
-    document.body.dataset.page = targetPage;
-    setActiveNav();
-
-    setTimeout(() => {
-      if (progressBar) progressBar.style.width = "70%";
-    }, 100);
-
-    try {
-      const response = await fetch(url, { signal });
-      if (!response.ok) throw new Error("Failed to load page content.");
-      const htmlText = await response.text();
-
-      if (progressBar) {
-        progressBar.style.width = "100%";
-        setTimeout(() => {
-          if (progressBar) progressBar.style.opacity = "0";
-        }, 150);
-      }
-
-      const parser = new DOMParser();
-      const newDoc = parser.parseFromString(htmlText, "text/html");
-
-      const newMainEl = newDoc.querySelector(".main");
-      if (!newMainEl) {
-        window.location.href = url;
-        return;
-      }
-
-      mainEl.style.opacity = "0";
-      mainEl.style.transform = "translateY(4px)";
-      await new Promise((resolve) => setTimeout(resolve, 120));
-
-      mainEl.innerHTML = newMainEl.innerHTML;
-      document.title = newDoc.title || "GTLS Transport";
-      history.pushState({ page: targetPage, url }, "", url);
-
-      const store = loadStore();
-      
-      if (!await enforceSoftwareAccess(targetPage)) {
-        return;
-      }
-
-      initializePage(store, targetPage);
-
-      mainEl.style.transition = "opacity 0.2s ease-in-out, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)";
-      mainEl.style.opacity = "1";
-      mainEl.style.transform = "translateY(0)";
-
-    } catch (error) {
-      if (error.name === "AbortError") {
-        console.log("Navigation request was aborted.");
-        return;
-      }
-      console.error("Dynamic navigation error:", error);
-      window.location.href = url;
-    } finally {
-      if (activeNavigationController && activeNavigationController.signal === signal) {
-        activeNavigationController = null;
-      }
-    }
   }
 
   function navigateWithTransition(url, options = {}) {
     if (!url) return;
-    
-    const cleanUrl = url.split("?")[0].split("#")[0];
-    let targetPage = cleanUrl.replace(".html", "").split("/").pop();
-    if (targetPage === "employees") targetPage = "employee";
-    if (targetPage === "index" || targetPage === "") targetPage = "signin";
-
-    const currentPage = document.body.dataset.page;
-
-    if (!options.immediate && isAppPage(currentPage) && isAppPage(targetPage)) {
-      navigateDynamically(url, targetPage);
-    } else {
-      document.body.classList.add("page-navigating");
-      setTimeout(() => {
-        window.location.href = url;
-      }, 200);
-    }
+    window.location.href = url;
   }
 
   function markPageReady() {
-    document.body.classList.remove("page-navigating");
-    document.body.classList.add("page-loaded");
+    return;
   }
 
   function bindPageTransitions() {
     document.querySelectorAll('a[href$=".html"]').forEach((link) => {
       const href = link.getAttribute("href");
-      if (!href) return;
-      if (!document.head.querySelector(`link[rel="prefetch"][href="${href}"]`)) {
-        const prefetch = document.createElement("link");
-        prefetch.rel = "prefetch";
-        prefetch.href = href;
-        document.head.appendChild(prefetch);
-      }
-      link.addEventListener("click", (event) => {
-        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        navigateWithTransition(href);
-      });
+      if (!href || document.head.querySelector(`link[rel="prefetch"][href="${href}"]`)) return;
+      const prefetch = document.createElement("link");
+      prefetch.rel = "prefetch";
+      prefetch.href = href;
+      document.head.appendChild(prefetch);
     });
-    window.addEventListener("pageshow", (event) => {
-      if (event.persisted) {
-        document.body.classList.remove("page-navigating");
-        document.body.classList.add("page-loaded");
-      }
-    });
-
-    if (!window._popstateBound) {
-      window._popstateBound = true;
-      window.addEventListener("popstate", async (event) => {
-        if (event.state && event.state.page) {
-          const page = event.state.page;
-          const url = event.state.url || getPageFile(page);
-          if (isAppPage(page)) {
-            await navigateDynamically(url, page);
-          } else {
-            window.location.href = url;
-          }
-        } else {
-          const url = window.location.pathname.split("/").pop() || "dashboard.html";
-          let targetPage = url.replace(".html", "").split("/").pop();
-          if (targetPage === "employees") targetPage = "employee";
-          if (targetPage === "index" || targetPage === "") targetPage = "signin";
-          if (isAppPage(targetPage)) {
-            await navigateDynamically(window.location.href, targetPage);
-          } else {
-            window.location.href = window.location.href;
-          }
-        }
-      });
-    }
   }
+
   function clearAdminSession() {
     sessionStorage.removeItem(ADMIN_AUTH_KEY);
   }
@@ -2041,8 +986,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (!page) return;
       const isAllowed = session.role === "Super Admin" || allowed.has(page);
       link.hidden = !isAllowed;
-      link.setAttribute("aria-hidden", String(!isAllowed));
-      link.tabIndex = isAllowed ? 0 : -1;
     });
   }
 
@@ -2994,15 +1937,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             </span>
           </a>
         `).join("")
-        : `
-          <div class="notification-empty">
-            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-            </svg>
-            <p>All clear! No payment terms have expired.</p>
-          </div>
-        `;
+        : '<div class="notification-empty">No payment term has expired.</div>';
     }
 
     function setPanel(open) {
@@ -3037,6 +1972,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
 
   function dashboardPage(store) {
+    const bookings = Array.isArray(store.bookings) ? store.bookings : [];
+    const truckJobs = (Array.isArray(store.truckExpenses) ? store.truckExpenses : []).filter((item) => item.jobNo);
+    const equipmentFleet = Array.isArray(store.equipmentFleet) ? store.equipmentFleet : [];
+    const customerAccounts = Array.isArray(store.customerKhatas) ? store.customerKhatas : [];
+    const supplierAccounts = Array.isArray(store.vendorKhatas) ? store.vendorKhatas : [];
+
     function hasAllTruckPaymentsCredited(item) {
       return [item.importPaymentStatus, item.exportPaymentStatus, item.mtyPaymentStatus]
         .every((status) => String(status || "Awaited").trim().toLowerCase() === "credit");
@@ -3109,7 +2050,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       return "valid";
     }
 
-    function getExpirySummary(equipmentFleet, field) {
+    function getExpirySummary(field) {
       return equipmentFleet.reduce((summary, item) => {
         const state = getDocumentExpiryState(item[field]);
         if (state === "expired") summary.expired += 1;
@@ -3119,96 +2060,83 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }, { alerts: 0, expired: 0, due: 0 });
     }
 
-    function renderDashboard() {
-      const bookings = Array.isArray(store.bookings) ? store.bookings : [];
-      const truckJobs = (Array.isArray(store.truckExpenses) ? store.truckExpenses : []).filter((item) => item.jobNo);
-      const equipmentFleet = Array.isArray(store.equipmentFleet) ? store.equipmentFleet : [];
-      const customerAccounts = Array.isArray(store.customerKhatas) ? store.customerKhatas : [];
-      const supplierAccounts = Array.isArray(store.vendorKhatas) ? store.vendorKhatas : [];
+    const activeTrips = bookings.filter((b) => b.status === "In Transit").length;
+    const awaitingBookings = bookings.filter((b) => String(b.accountFlow || "").trim().toLowerCase() === "awaited");
+    const pendingBills = awaitingBookings.length;
+    const delivered = bookings.filter((b) => b.status === "Delivered").length;
+    const bookingReceivable = awaitingBookings.reduce((sum, item) => sum + getBookingReceivableAmount(item), 0);
+    const completedTruckJobs = truckJobs.filter(hasAllTruckPaymentsCredited);
+    const pendingTruckJobRows = truckJobs.filter((item) => !hasAllTruckPaymentsCredited(item));
+    const pendingTruckJobs = pendingTruckJobRows.length;
+    const pendingTruckReceivable = pendingTruckJobRows.reduce((sum, item) => sum + getAwaitedTruckReceivable(item), 0);
+    const completedTruckWorkAmount = completedTruckJobs.reduce((sum, item) => sum + calculateTruckTripFinancials(item).grandTotal, 0);
+    const truckProfitLoss = completedTruckJobs.reduce((sum, item) => sum + calculateTruckTripFinancials(item).profitLoss, 0);
+    const customerAccountMetrics = getAccountMetrics(customerAccounts);
+    const supplierAccountMetrics = getAccountMetrics(supplierAccounts);
+    const equipmentExpirySummaries = {
+      fitnessAlerts: getExpirySummary("fitnessExpiry"),
+      balochistanPermitAlerts: getExpirySummary("balochistanPermitExpiry"),
+      sindhPermitAlerts: getExpirySummary("sindhPermitExpiry"),
+      kpkPermitAlerts: getExpirySummary("kpkPermitExpiry"),
+      punjabPermitAlerts: getExpirySummary("punjabPermitExpiry")
+    };
+    const documentAlerts = Object.values(equipmentExpirySummaries).reduce((total, summary) => ({
+      alerts: total.alerts + summary.alerts,
+      expired: total.expired + summary.expired,
+      due: total.due + summary.due
+    }), { alerts: 0, expired: 0, due: 0 });
 
-      const activeTrips = bookings.filter((b) => b.status === "In Transit").length;
-      const awaitingBookings = bookings.filter((b) => String(b.accountFlow || "").trim().toLowerCase() === "awaited");
-      const pendingBills = awaitingBookings.length;
-      const delivered = bookings.filter((b) => b.status === "Delivered").length;
-      const bookingReceivable = awaitingBookings.reduce((sum, item) => sum + getBookingReceivableAmount(item), 0);
-      const completedTruckJobs = truckJobs.filter(hasAllTruckPaymentsCredited);
-      const pendingTruckJobRows = truckJobs.filter((item) => !hasAllTruckPaymentsCredited(item));
-      const pendingTruckJobs = pendingTruckJobRows.length;
-      const pendingTruckReceivable = pendingTruckJobRows.reduce((sum, item) => sum + getAwaitedTruckReceivable(item), 0);
-      const completedTruckWorkAmount = completedTruckJobs.reduce((sum, item) => sum + calculateTruckTripFinancials(item).grandTotal, 0);
-      const truckProfitLoss = completedTruckJobs.reduce((sum, item) => sum + calculateTruckTripFinancials(item).profitLoss, 0);
-      const customerAccountMetrics = getAccountMetrics(customerAccounts);
-      const supplierAccountMetrics = getAccountMetrics(supplierAccounts);
-      const equipmentExpirySummaries = {
-        fitnessAlerts: getExpirySummary(equipmentFleet, "fitnessExpiry"),
-        balochistanPermitAlerts: getExpirySummary(equipmentFleet, "balochistanPermitExpiry"),
-        sindhPermitAlerts: getExpirySummary(equipmentFleet, "sindhPermitExpiry"),
-        kpkPermitAlerts: getExpirySummary(equipmentFleet, "kpkPermitExpiry"),
-        punjabPermitAlerts: getExpirySummary(equipmentFleet, "punjabPermitExpiry")
-      };
-      const documentAlerts = Object.values(equipmentExpirySummaries).reduce((total, summary) => ({
-        alerts: total.alerts + summary.alerts,
-        expired: total.expired + summary.expired,
-        due: total.due + summary.due
-      }), { alerts: 0, expired: 0, due: 0 });
+    setKpi("totalBookings", bookings.length);
+    setKpi("activeTrips", activeTrips);
+    setKpi("pendingBills", pendingBills);
+    setKpi("delivered", delivered);
+    setKpi("customerBillingTotal", money(customerAccountMetrics.totalDebit));
+    setKpi("receipts", money(customerAccountMetrics.totalCredit));
+    setKpi("bookingReceivable", money(bookingReceivable));
+    setFinancialAlertKpi("accountsReceivable", customerAccountMetrics.outstanding, true);
+    setFinancialAlertKpi("pendingCustomerCount", customerAccountMetrics.pendingAccounts);
+    setKpi("supplierPayableTotal", money(supplierAccountMetrics.totalDebit));
+    setKpi("supplierPaidTotal", money(supplierAccountMetrics.totalCredit));
+    setFinancialAlertKpi("accountsPayable", supplierAccountMetrics.outstanding, true);
+    setFinancialAlertKpi("pendingSupplierCount", supplierAccountMetrics.pendingAccounts);
+    setKpi("totalTruckJobs", truckJobs.length);
+    setKpi("pendingTruckJobs", pendingTruckJobs);
+    setKpi("completedTruckJobs", completedTruckJobs.length);
+    setKpi("pendingTruckReceivable", money(pendingTruckReceivable));
+    setKpi("completedTruckWorkAmount", money(completedTruckWorkAmount));
+    setKpi("truckProfitLoss", money(truckProfitLoss));
+    setKpi("fleetUnits", equipmentFleet.length);
+    setExpiryKpi("documentAlerts", documentAlerts);
+    Object.entries(equipmentExpirySummaries).forEach(([name, summary]) => setExpiryKpi(name, summary));
+    bindPaymentNotifications(bookings);
 
-      setKpi("totalBookings", bookings.length);
-      setKpi("activeTrips", activeTrips);
-      setKpi("pendingBills", pendingBills);
-      setKpi("delivered", delivered);
-      setKpi("customerBillingTotal", money(customerAccountMetrics.totalDebit));
-      setKpi("receipts", money(customerAccountMetrics.totalCredit));
-      setKpi("bookingReceivable", money(bookingReceivable));
-      setFinancialAlertKpi("accountsReceivable", customerAccountMetrics.outstanding, true);
-      setFinancialAlertKpi("pendingCustomerCount", customerAccountMetrics.pendingAccounts);
-      setKpi("supplierPayableTotal", money(supplierAccountMetrics.totalDebit));
-      setKpi("supplierPaidTotal", money(supplierAccountMetrics.totalCredit));
-      setFinancialAlertKpi("accountsPayable", supplierAccountMetrics.outstanding, true);
-      setFinancialAlertKpi("pendingSupplierCount", supplierAccountMetrics.pendingAccounts);
-      setKpi("totalTruckJobs", truckJobs.length);
-      setKpi("pendingTruckJobs", pendingTruckJobs);
-      setKpi("completedTruckJobs", completedTruckJobs.length);
-      setKpi("pendingTruckReceivable", money(pendingTruckReceivable));
-      setKpi("completedTruckWorkAmount", money(completedTruckWorkAmount));
-      setKpi("truckProfitLoss", money(truckProfitLoss));
-      setKpi("fleetUnits", equipmentFleet.length);
-      setExpiryKpi("documentAlerts", documentAlerts);
-      Object.entries(equipmentExpirySummaries).forEach(([name, summary]) => setExpiryKpi(name, summary));
-      if (typeof window.refreshPaymentNotifications === "function") window.refreshPaymentNotifications();
+    const bookingsBody = document.querySelector("[data-bookings-preview]");
+    bookingsBody.innerHTML = bookings.map((item) => `
+      <tr>
+        <td>${text(item.id)}</td>
+        <td>${formatShortDate(item.date)}</td>
+        <td>${text(item.customer)}</td>
+        <td>${text(item.route)}</td>
+        <td>${getBookingContainerLines(item).length} Container(s)</td>
+        <td>${getBookingContainerLines(item).map((line) => text(line.truckNo)).join(", ")}</td>
+        <td>${money(item.rate)}</td>
+        <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
+      </tr>
+    `).join("");
 
-      const bookingsBody = document.querySelector("[data-bookings-preview]");
-      if (bookingsBody) {
-        bookingsBody.innerHTML = bookings.map((item) => `
-          <tr>
-            <td>${text(item.id)}</td>
-            <td>${formatShortDate(item.date)}</td>
-            <td>${text(item.customer)}</td>
-            <td>${text(item.route)}</td>
-            <td>${getBookingContainerLines(item).length} Container(s)</td>
-            <td>${getBookingContainerLines(item).map((line) => text(line.truckNo)).join(", ")}</td>
-            <td>${money(item.rate)}</td>
-            <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
-          </tr>
-        `).join("");
-      }
-
-      const employeeBody = document.querySelector("[data-employee-preview]");
-      if (employeeBody) {
-        employeeBody.innerHTML = store.employees.map((item) => `
-          <tr>
-            <td>${text(item.id)}</td>
-            <td>${text(item.name)}</td>
-            <td>${text(item.designation)}</td>
-            <td>${text(item.department)}</td>
-            <td>${money(item.salary)}</td>
-            <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
-          </tr>
-        `).join("");
-      }
+    const employeeBody = document.querySelector("[data-employee-preview]");
+    if (employeeBody) {
+      employeeBody.innerHTML = store.employees.map((item) => `
+        <tr>
+          <td>${text(item.id)}</td>
+          <td>${text(item.name)}</td>
+          <td>${text(item.designation)}</td>
+          <td>${text(item.department)}</td>
+          <td>${money(item.salary)}</td>
+          <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
+        </tr>
+      `).join("");
     }
-
-    renderDashboard();
-    window.activePageRender = renderDashboard;
   }
 
   function bookingPage(store) {
@@ -3243,11 +2171,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const closeBiltyModalButton = document.querySelector("[data-close-bilty-modal]");
     let editingId = "";
     let biltyImageData = "";
-    let biltyStoragePath = "";
     let biltyImagePromise = Promise.resolve("");
-    const refreshPaymentNotifications = () => {
-      if (typeof window.refreshPaymentNotifications === "function") window.refreshPaymentNotifications();
-    };
+    const refreshPaymentNotifications = bindPaymentNotifications(() => store.bookings);
 
     function setBiltyPreview(imageData = "") {
       biltyImageData = String(imageData || "");
@@ -3375,7 +2300,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       form.reset();
       biltyInput.value = "";
       biltyImagePromise = Promise.resolve("");
-      biltyStoragePath = "";
       setBiltyPreview("");
       form.elements.bookingNo.value = "BKG-24061";
       form.elements.invoiceNo.value = "INV-24061";
@@ -3454,42 +2378,38 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <tr>
             <td>${text(item.id)}</td>
             <td>${text(item.bookingNo || item.id)}</td>
-            <td>${text(item.invoiceNo)}</td>
             <td>${formatShortDate(item.date)}</td>
-            <td>${text(item.blNo)}</td>
-            <td>${text(item.gatePass)}</td>
+            <td>${text(item.invoiceNo)}</td>
             <td>${text(item.customer)}</td>
             <td>${text(item.consignee)}</td>
             <td>${text(item.route)}</td>
             <td>${text(item.origin)}</td>
             <td>${text(item.destination)}</td>
             <td>${text(item.category)}</td>
+            <td>${text(item.blNo)}</td>
+            <td>${renderStackedCell(lines.map((line) => text(line.containerNo)))}</td>
+            <td>${renderStackedCell(lines.map((line) => text(line.size)))}</td>
+            <td>${renderStackedCell(lines.map((line) => text(line.truckNo)))}</td>
             <td>${text(item.goodsType)}</td>
             <td>${text(item.quantity)}</td>
             <td>${money(item.rate)}</td>
             <td>${text(item.salesTaxAuthority)}</td>
-            <td>${money(item.detention)}</td>
             <td>${money(item.salesTaxAmount)}</td>
             <td>${money(item.totalAmount)}</td>
             <td>${money(item.incomeTaxAmount)}</td>
             <td>${money(item.salesTaxWithheldAmount)}</td>
             <td>${money(item.salesTaxByUsAmount)}</td>
+            <td>${text(item.gatePass)}</td>
+            <td>${money(item.detention)}</td>
             <td>${money(item.receivableAmount)}</td>
             <td>${text(item.paymentTerm)}</td>
             <td>${text(item.paymentReceivedDate ? formatShortDate(item.paymentReceivedDate) : "-")}</td>
             <td>${text(item.chequeNumber || "-")}</td>
-            <td>${renderStackedCell(lines.map((line) => text(line.containerNo)))}</td>
-            <td>${renderStackedCell(lines.map((line) => text(line.size)))}</td>
-            <td>${renderStackedCell(lines.map((line) => text(line.truckNo)))}</td>
             <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
             <td><span class="badge ${item.accountFlow === "Credit" ? "good" : "bad"}">${text(item.accountFlow || "Awaited")}</span></td>
             <td>${item.biltyImage ? `
               <button class="bilty-thumbnail" type="button" data-view-bilty="${escapeHtml(item.id)}" aria-label="View Bilty image" title="View Bilty">
                 <img src="${escapeHtml(item.biltyImage)}" alt="Bilty thumbnail" />
-              </button>
-            ` : item.biltyPath ? `
-              <button class="bilty-thumbnail" type="button" data-view-bilty="${escapeHtml(item.id)}" aria-label="View Bilty image" title="View Bilty" data-lazy-bilty="${escapeHtml(item.biltyPath)}">
-                <span class="loading-placeholder">...</span>
               </button>
             ` : "-"}</td>
             <td>${text(item.remarks)}</td>
@@ -3503,19 +2423,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </tr>
         `;
       }).join("");
-
-      body.querySelectorAll("[data-lazy-bilty]").forEach((btn) => {
-        const path = btn.getAttribute("data-lazy-bilty");
-        const bookingId = btn.getAttribute("data-view-bilty");
-        const booking = bookings.find((b) => b.id === bookingId);
-        getPrivateDocumentUrl(path).then((url) => {
-          if (url) {
-            if (booking) booking.biltyImage = url;
-            btn.innerHTML = `<img src="${escapeHtml(url)}" alt="Bilty thumbnail" />`;
-            btn.removeAttribute("data-lazy-bilty");
-          }
-        });
-      });
     }
 
     function fillForm(item) {
@@ -3527,7 +2434,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       syncTotalAmount();
       renderContainerRows(getBookingContainerLines(item));
       biltyInput.value = "";
-      biltyStoragePath = String(item.biltyPath || "");
       setBiltyPreview(item.biltyImage);
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Booking";
@@ -3576,7 +2482,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     removeBiltyButton.addEventListener("click", () => {
       biltyInput.value = "";
       biltyImagePromise = Promise.resolve("");
-      biltyStoragePath = "";
       setBiltyPreview("");
     });
 
@@ -3629,39 +2534,28 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         receivableAmount: Number(data.receivableAmount || 0),
         paymentReceivedDate: String(data.paymentReceivedDate || "").trim(),
         chequeNumber: String(data.chequeNumber || "").trim(),
-        biltyPath: biltyStoragePath,
         biltyImage: biltyImageData
       };
       delete normalized.datePicker;
       delete normalized.biltyUpload;
 
-      let savedBooking;
       if (!editingId) {
         normalized.id = getNextBookingJobNo(store.bookings);
-        savedBooking = normalizeBookingContainers(normalized);
-        store.bookings.unshift(savedBooking);
+        store.bookings.unshift(normalizeBookingContainers(normalized));
+        notice.textContent = "New booking saved successfully in the current browser session.";
       } else {
         const index = store.bookings.findIndex((item) => item.id === editingId);
         normalized.id = editingId;
-        savedBooking = normalizeBookingContainers(normalized);
-        store.bookings[index] = savedBooking;
-      }
-
-      let syncMessage = `${editingId ? `Booking ${editingId} updated` : "New booking saved"} successfully.`;
-      try {
-        const remoteResult = await saveBookingToSupabase(savedBooking);
-        if (remoteResult) Object.assign(savedBooking, remoteResult);
-      } catch (error) {
-        syncMessage = `Booking saved in this browser, but Supabase sync failed: ${error.message}`;
+        store.bookings[index] = normalizeBookingContainers(normalized);
+        notice.textContent = `Booking ${editingId} updated successfully.`;
       }
       saveStore(store);
       render();
       refreshPaymentNotifications();
       resetForm();
-      notice.textContent = syncMessage;
     });
 
-    body.addEventListener("click", async (event) => {
+    body.addEventListener("click", (event) => {
       const biltyTrigger = event.target.closest("[data-view-bilty]");
       const invoiceId = event.target.getAttribute("data-download-invoice");
       const editId = event.target.getAttribute("data-edit-booking");
@@ -3688,13 +2582,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         }
       }
       if (deleteId) {
-        const booking = store.bookings.find((entry) => entry.id === deleteId);
-        try {
-          if (booking) await deleteBookingFromSupabase(booking);
-        } catch (error) {
-          notice.textContent = `Booking ${deleteId} could not be deleted from Supabase: ${error.message}`;
-          return;
-        }
         store.bookings = store.bookings.filter((entry) => entry.id !== deleteId);
         saveStore(store);
         render();
@@ -3718,7 +2605,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (endDateFilter) endDateFilter.addEventListener("change", render);
     if (dateSort) dateSort.addEventListener("change", render);
     resetForm();
-    window.activePageRender = render;
     render();
   }
 
@@ -3817,7 +2703,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       buildSummaryRecordPdf(customer, bookings).catch(() => {});
     });
     renderCustomerOptions();
-    window.activePageRender = render;
     render();
   }
 
@@ -4112,9 +2997,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const imageInput = form?.querySelector("[data-truck-image-input]");
     const imagePreview = form?.querySelector("[data-truck-image-preview]");
     const removeImageButton = form?.querySelector("[data-remove-truck-image]");
-    const truckImageModal = document.querySelector("[data-truck-image-modal]");
-    const truckImageModalImage = document.querySelector("[data-truck-image-modal-image]");
-    const closeTruckImageModalButton = document.querySelector("[data-close-truck-image-modal]");
     if (!body || !form) return;
     let editingId = "";
     let tripImageData = "";
@@ -4174,21 +3056,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
     }
 
-    function closeTruckImageModal() {
-      if (!truckImageModal || !truckImageModalImage) return;
-      truckImageModal.hidden = true;
-      truckImageModalImage.removeAttribute("src");
-      document.body.classList.remove("bilty-modal-open");
-    }
-
-    function openTruckImageModal(imageData) {
-      if (!imageData || !truckImageModal || !truckImageModalImage) return;
-      truckImageModalImage.src = imageData;
-      truckImageModal.hidden = false;
-      document.body.classList.add("bilty-modal-open");
-      closeTruckImageModalButton?.focus();
-    }
-
     function render() {
       const allRows = store.truckExpenses.filter((item) => item.jobNo);
       const truckNumbers = [...new Set(allRows.map((item) => String(item.truckNo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -4206,7 +3073,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="41">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="40">No truck trip records available yet.</td></tr>`;
         return;
       }
       body.innerHTML = rows.map((item, index) => {
@@ -4216,15 +3083,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${index + 1}</td><td>${text(item.jobNo)}</td><td>${formatShortDate(item.date)}</td><td>${text(item.truckNo)}</td>
           <td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.customer)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
           <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
-          <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.importRemarks || item.remarks || "-")}</td>
-          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
-          <td>${item.image ? `
-            <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image">
-              <img src="${escapeHtml(item.image)}" alt="Truck details attachment" />
-            </button>` : item.imagePath ? `
-            <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image" data-lazy-truck-img="${escapeHtml(item.imagePath)}">
-              <span class="loading-placeholder">...</span>
-            </button>` : "-"}</td>
+          <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td>${text(item.importRemarks || item.remarks || "-")}</td>
+          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-import-invoice="${item.id}">Import Invoice</button>
@@ -4236,19 +3096,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         </tr>
       `;
       }).join("");
-
-      body.querySelectorAll("[data-lazy-truck-img]").forEach((btn) => {
-        const path = btn.getAttribute("data-lazy-truck-img");
-        const tripId = btn.getAttribute("data-view-truck-image");
-        const trip = rows.find((t) => t.id === tripId);
-        getPrivateDocumentUrl(path).then((url) => {
-          if (url) {
-            if (trip) trip.image = url;
-            btn.innerHTML = `<img src="${escapeHtml(url)}" alt="Truck details attachment" />`;
-            btn.removeAttribute("data-lazy-truck-img");
-          }
-        });
-      });
     }
 
     function fillForm(item) {
@@ -4294,11 +3141,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const calculatedData = Object.fromEntries(new FormData(form).entries());
       const normalized = Object.fromEntries(Object.entries(calculatedData).filter(([key]) => key !== "tripImageFile"));
       numberFields.forEach((name) => { normalized[name] = Number(calculatedData[name] || 0); });
-      const existingItem = editingId
-        ? store.truckExpenses.find((item) => item.id === editingId)
-        : null;
       normalized.image = tripImageData;
-      normalized.imagePath = existingItem?.imagePath || "";
       if (!editingId) {
         normalized.jobNo = getNextTruckJobNo();
         normalized.id = getNextSequentialId(store.truckExpenses, "TRIP");
@@ -4322,16 +3165,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     });
 
     body.addEventListener("click", (event) => {
-      const imageButton = event.target.closest("[data-view-truck-image]");
       const importInvoiceId = event.target.getAttribute("data-import-invoice");
       const exportInvoiceId = event.target.getAttribute("data-export-invoice");
       const editId = event.target.getAttribute("data-edit-trip");
       const deleteId = event.target.getAttribute("data-delete-trip");
-      if (imageButton) {
-        const item = store.truckExpenses.find((entry) => entry.id === imageButton.dataset.viewTruckImage);
-        if (item?.image) openTruckImageModal(item.image);
-        return;
-      }
       if (importInvoiceId || exportInvoiceId) {
         const item = store.truckExpenses.find((entry) => entry.id === (importInvoiceId || exportInvoiceId));
         if (item) buildTruckDetailsInvoicePdf(item, importInvoiceId ? "import" : "export").catch(() => {
@@ -4352,15 +3189,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     if (customerFilter) customerFilter.addEventListener("change", render);
     if (jobSort) jobSort.addEventListener("change", render);
-    closeTruckImageModalButton?.addEventListener("click", closeTruckImageModal);
-    truckImageModal?.addEventListener("click", (event) => {
-      if (event.target === truckImageModal) closeTruckImageModal();
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && truckImageModal && !truckImageModal.hidden) closeTruckImageModal();
-    });
     resetForm();
-    window.activePageRender = render;
     render();
   }
 
@@ -4538,7 +3367,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         buildPendingTruckSummaryPdf(currentPendingSummaryTrips, currentPendingSummaryTruckNo).catch(() => {});
       });
     }
-    window.activePageRender = render;
     render();
   }
 
@@ -4552,9 +3380,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const documentInput = document.querySelector("[data-equipment-document-input]");
     const documentName = document.querySelector("[data-equipment-document-name]");
     const removeDocumentButton = document.querySelector("[data-remove-equipment-document]");
-    const documentModal = document.querySelector("[data-equipment-document-modal]");
-    const documentModalImage = document.querySelector("[data-equipment-document-modal-image]");
-    const closeDocumentModalButton = document.querySelector("[data-close-equipment-document-modal]");
     let editingId = "";
     let equipmentDocument = { name: "", type: "", data: "" };
     let equipmentDocumentPromise = Promise.resolve(equipmentDocument);
@@ -4584,20 +3409,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         documentName.hidden = !equipmentDocument.name;
       }
       if (removeDocumentButton) removeDocumentButton.hidden = !equipmentDocument.name;
-    }
-
-    function openDocumentModal(source) {
-      if (!source) return;
-      documentModalImage.src = source;
-      documentModal.hidden = false;
-      document.body.classList.add("bilty-modal-open");
-      closeDocumentModalButton?.focus();
-    }
-
-    function closeDocumentModal() {
-      documentModal.hidden = true;
-      documentModalImage.removeAttribute("src");
-      document.body.classList.remove("bilty-modal-open");
     }
 
     function getExpiryState(value) {
@@ -4671,13 +3482,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${expiryCell(item.punjabPermitExpiry)}</td>
           <td>${expiryCell(item.taxPaidUpTo)}</td>
           <td class="equipment-docs">${item.documentData
-            ? `<button class="equipment-thumbnail" type="button" data-view-equipment-document="${item.id}" aria-label="View document for ${escapeHtml(item.id)}">
-                <img src="${item.documentData}" alt="" />
-               </button>`
-            : item.documentPath ? `
-              <button class="equipment-thumbnail" type="button" data-view-equipment-document="${item.id}" data-lazy-equipment-doc="${escapeHtml(item.documentPath)}" aria-label="View document for ${escapeHtml(item.id)}">
-                <span class="loading-placeholder">...</span>
-              </button>`
+            ? `<button class="btn small" type="button" data-view-equipment-document="${item.id}">${escapeHtml(item.documentName || "View File")}</button>`
             : text(item.originalDocs || "-")}</td>
           <td>
             <div class="table-actions">
@@ -4690,19 +3495,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       `).join("");
       updateSummary(rows);
       if (count) count.textContent = `${rows.length} record(s)`;
-
-      body.querySelectorAll("[data-lazy-equipment-doc]").forEach((btn) => {
-        const path = btn.getAttribute("data-lazy-equipment-doc");
-        const equipId = btn.getAttribute("data-view-equipment-document");
-        const equip = rows.find((e) => e.id === equipId);
-        getPrivateDocumentUrl(path).then((url) => {
-          if (url) {
-            if (equip) equip.documentData = url;
-            btn.innerHTML = `<img src="${escapeHtml(url)}" alt="" />`;
-            btn.removeAttribute("data-lazy-equipment-doc");
-          }
-        });
-      });
     }
 
     function resetForm() {
@@ -4805,7 +3597,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       if (viewDocumentId) {
         const item = store.equipmentFleet.find((entry) => entry.id === viewDocumentId);
-        if (item?.documentData) openDocumentModal(item.documentData);
+        if (item?.documentData) window.open(item.documentData, "_blank", "noopener,noreferrer");
         return;
       }
       if (editId) fillForm(store.equipmentFleet.find((item) => item.id === editId));
@@ -4818,18 +3610,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
     });
 
-    closeDocumentModalButton?.addEventListener("click", closeDocumentModal);
-    documentModal?.addEventListener("click", (event) => {
-      if (event.target === documentModal) closeDocumentModal();
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && documentModal && !documentModal.hidden) closeDocumentModal();
-    });
-
     document.querySelector("[data-reset-equipment-form]").addEventListener("click", resetForm);
     if (search) search.addEventListener("input", render);
     resetForm();
-    window.activePageRender = render;
     render();
   }
 
@@ -5003,32 +3786,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>PKR ${money(item.partCost)}</td><td>${text(item.warrantyPeriod)}</td><td>${formatShortDate(item.warrantyExpiry)}</td>
           <td><span class="expiry-status ${warranty.className}">${warranty.label}</span></td>
           <td>${text(item.driverName)}</td>
-          <td>${item.image ? `
-            <button class="maintenance-thumbnail" type="button" data-view-maintenance-image="${item.id}" aria-label="View image for ${escapeHtml(item.id)}">
-              <img src="${item.image}" alt="" />
-            </button>` : item.imagePath ? `
-            <button class="maintenance-thumbnail" type="button" data-view-maintenance-image="${item.id}" aria-label="View image for ${escapeHtml(item.id)}" data-lazy-maintenance-img="${escapeHtml(item.imagePath)}">
-              <span class="loading-placeholder">...</span>
-            </button>` : "-"}</td>
+          <td>${item.image ? `<button class="maintenance-thumbnail" type="button" data-view-maintenance-image="${item.id}" aria-label="View image for ${escapeHtml(item.id)}"><img src="${item.image}" alt="" /></button>` : "-"}</td>
           <td>${text(item.approvedBy)}</td>
           <td><div class="table-actions"><button class="btn small" type="button" data-download-maintenance="${item.id}">Download PDF</button><button class="btn small" type="button" data-edit-maintenance="${item.id}">Edit</button><button class="btn small danger" type="button" data-delete-maintenance="${item.id}">Delete</button></div></td>
         </tr>`;
       }).join("");
       updateSummary(rows);
       if (count) count.textContent = `${rows.length} record(s)`;
-
-      body.querySelectorAll("[data-lazy-maintenance-img]").forEach((btn) => {
-        const path = btn.getAttribute("data-lazy-maintenance-img");
-        const jobId = btn.getAttribute("data-view-maintenance-image");
-        const job = rows.find((j) => j.id === jobId);
-        getPrivateDocumentUrl(path).then((url) => {
-          if (url) {
-            if (job) job.image = url;
-            btn.innerHTML = `<img src="${escapeHtml(url)}" alt="" />`;
-            btn.removeAttribute("data-lazy-maintenance-img");
-          }
-        });
-      });
     }
 
     function resetForm() {
@@ -5164,7 +3928,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !imageModal.hidden) closeImageModal(); });
     populateTruckControls();
     resetForm();
-    window.activePageRender = render;
     render();
   }
 
@@ -5339,7 +4102,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
-    window.activePageRender = render;
     render();
     resetForm();
   }
@@ -6143,10 +4905,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               <button class="bilty-thumbnail" type="button" data-view-khata-image="${escapeHtml(entry.id)}" aria-label="View entry image" title="View image">
                 <img src="${escapeHtml(entry.image)}" alt="Entry attachment thumbnail" />
               </button>
-            ` : entry.imagePath && !isAggregate ? `
-              <button class="bilty-thumbnail" type="button" data-view-khata-image="${escapeHtml(entry.id)}" aria-label="View entry image" title="View image" data-lazy-khata-img="${escapeHtml(entry.imagePath)}">
-                <span class="loading-placeholder">...</span>
-              </button>
             ` : entry.image ? '<span class="muted">Attached</span>' : "-"}</td>
             <td class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
@@ -6163,19 +4921,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </tr>
         `;
       }).join("");
-
-      body.querySelectorAll("[data-lazy-khata-img]").forEach((btn) => {
-        const path = btn.getAttribute("data-lazy-khata-img");
-        const entryId = btn.getAttribute("data-view-khata-image");
-        const entry = sortedEntries.find((e) => e.id === entryId);
-        getPrivateDocumentUrl(path).then((url) => {
-          if (url) {
-            if (entry) entry.image = url;
-            btn.innerHTML = `<img src="${escapeHtml(url)}" alt="Entry attachment thumbnail" />`;
-            btn.removeAttribute("data-lazy-khata-img");
-          }
-        });
-      });
 
       form.elements.accountId.value = isAggregate ? "" : account.id;
       Array.from(form.elements).forEach((control) => {
@@ -6386,10 +5131,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (event.key === "Escape" && !entryImageModal.hidden) closeEntryImageModal();
     });
     populateCustomers(allAccountsValue);
-    window.activePageRender = () => {
-      populateCustomers(select.value);
-      renderAccount(select.value);
-    };
     renderAccount(allAccountsValue);
     resetForm();
     resetCustomerForm();
@@ -6433,14 +5174,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
   });
 
-  function initializePage(store, page) {
-    document.body.dataset.page = page;
+  document.addEventListener("DOMContentLoaded", async () => {
+    const store = loadStore();
+    const page = document.body.dataset.page;
+    if (!await enforceSoftwareAccess(page)) return;
+    bindPageTransitions();
+    syncAdminNavigationRoute();
+    ensureEquipmentNavigation();
+    ensureMaintenanceNavigation();
+    ensureAccountsNavigationOrder();
+    ensureActivityLogsNavigation();
+    applySessionAccess();
     setActiveNav();
-
-    if (page !== "signin" && page !== "admin-login") {
-      window.refreshPaymentNotifications = bindPaymentNotifications(() => store.bookings);
-    }
-
+    bindMobileNav();
+    if (page !== "signin") bindSoftwareSignOut();
+    bindDesktopSidebar();
     if (page === "signin") softwareLoginPage(store);
     if (page === "dashboard") dashboardPage(store);
     if (page === "booking") bookingPage(store);
@@ -6456,60 +5204,5 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (page === "khata" || page === "accounts-payable") khataPage(store);
     enhanceFileInputs();
     markPageReady();
-
-    const hydrationPromises = [];
-    if (["dashboard", "booking", "ledger", "khata"].includes(page)) {
-      hydrationPromises.push(hydrateBookingsFromSupabase(store));
-    }
-    if (["dashboard", "truck", "truck-summary", "completed-truck-summary", "equipment", "maintenance", "employee", "khata", "accounts-payable", "activity-logs"].includes(page)) {
-      hydrationPromises.push(hydrateOperationalStore(store));
-    }
-
-    if (hydrationPromises.length) {
-      Promise.all(hydrationPromises)
-        .then(() => {
-          console.log("Background operational and bookings store hydration completed successfully.");
-          if (typeof window.refreshPaymentNotifications === "function") {
-            try {
-              window.refreshPaymentNotifications();
-            } catch (err) {
-              console.warn("Error refreshing global notifications after hydration:", err.message);
-            }
-          }
-          if (typeof window.activePageRender === "function") {
-            try {
-              window.activePageRender();
-            } catch (err) {
-              console.warn("Error re-rendering active page after background hydration:", err.message);
-            }
-          }
-        })
-        .catch((err) => {
-          console.error("Background store hydration failed:", err);
-        });
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", async () => {
-    const store = loadStore();
-    const page = document.body.dataset.page;
-    if (!await enforceSoftwareAccess(page)) return;
-
-    if (!history.state) {
-      history.replaceState({ page, url: window.location.href }, "", window.location.href);
-    }
-
-    bindPageTransitions();
-    syncAdminNavigationRoute();
-    ensureEquipmentNavigation();
-    ensureMaintenanceNavigation();
-    ensureAccountsNavigationOrder();
-    ensureActivityLogsNavigation();
-    applySessionAccess();
-    bindMobileNav();
-    if (page !== "signin") bindSoftwareSignOut();
-    bindDesktopSidebar();
-
-    initializePage(store, page);
   });
 })();
