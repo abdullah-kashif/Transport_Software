@@ -43,12 +43,31 @@
         </div>
       </section>
       <section class="screen">
-        <div class="screen-head">
-          <div></div>
-          <div class="ledger-filter"><div class="ledger-total" aria-live="polite"><span>Total Trucks</span><strong data-truck-summary-total-trucks>0</strong></div><div class="ledger-total" aria-live="polite"><span>Total Import Receivable</span><strong data-truck-summary-import-receivable>PKR 0</strong></div><div class="ledger-total" aria-live="polite"><span>Total Export Receivable</span><strong data-truck-summary-export-receivable>PKR 0</strong></div><div class="ledger-total" aria-live="polite"><span>Grand Total</span><strong data-truck-summary-grand-total>PKR 0</strong></div><div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div><div class="ledger-filter-control"><label for="truck-summary-job-sort">Job Order</label><select id="truck-summary-job-sort" data-truck-summary-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div><span class="ledger-count" data-truck-summary-count>0 job(s)</span></div>
+        <div class="screen-head truck-summary-screen-head">
+          <div class="truck-summary-stats">
+            <div class="ledger-total ledger-total-trucks" aria-live="polite"><span>Total Trucks</span><strong data-truck-summary-total-trucks>0</strong></div>
+            <div class="ledger-total" aria-live="polite"><span>Total Import Receivable</span><strong data-truck-summary-import-receivable>PKR 0</strong></div>
+            <div class="ledger-total" aria-live="polite"><span>Total Export Receivable</span><strong data-truck-summary-export-receivable>PKR 0</strong></div>
+            <div class="ledger-total" aria-live="polite"><span>Total MTY Receivable</span><strong data-truck-summary-mty-receivable>PKR 0</strong></div>
+            <div class="ledger-total" aria-live="polite"><span>Grand Total</span><strong data-truck-summary-grand-total>PKR 0</strong></div>
+          </div>
+          <div class="truck-summary-controls">
+            <div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div>
+            <div class="ledger-filter-control"><label for="truck-summary-import-broker-filter">Imp Broker</label><select id="truck-summary-import-broker-filter" data-truck-summary-import-broker-filter><option value="">All Imp</option></select></div>
+            <div class="ledger-filter-control"><label for="truck-summary-export-broker-filter">Exp Broker</label><select id="truck-summary-export-broker-filter" data-truck-summary-export-broker-filter><option value="">All Exp</option></select></div>
+            <div class="ledger-filter-control"><label for="truck-summary-mty-broker-filter">MTY Broker</label><select id="truck-summary-mty-broker-filter" data-truck-summary-mty-broker-filter><option value="">All MTY</option></select></div>
+            <div class="ledger-filter-control"><label for="truck-summary-job-sort">Job Order</label><select id="truck-summary-job-sort" data-truck-summary-job-sort><option value="desc">Descend</option><option value="asc">Ascend</option></select></div>
+          </div>
         </div>
         <div class="truck-summary-download">
-          <button class="btn primary" type="button" data-download-pending-truck-summary disabled>Download PDF</button>
+          <span class="ledger-count" data-truck-summary-count>0 job(s)</span>
+          <div class="truck-summary-download-actions">
+            <button type="button" class="clear-filter-btn" data-truck-summary-reset-filters title="Reset all filters">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              Clear Filters
+            </button>
+            <button class="btn primary" type="button" data-download-pending-truck-summary disabled>Download PDF</button>
+          </div>
         </div>
         <div class="truck-summary-groups" data-truck-summary-groups></div>
       </section>

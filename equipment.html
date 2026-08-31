@@ -68,23 +68,24 @@
           <div><h3>Create / Update Equipment</h3></div>
         </div>
         <form class="form-grid" data-equipment-form>
-          <div class="field"><label>Truck No</label><input name="truckNo" required /></div>
+          <div class="field"><label>Registration No</label><input name="truckNo" placeholder="Example: TMT-066" required /></div>
+          <div class="field"><label>Type of Body</label><input name="typeOfBody" placeholder="Example: Flatbed / Container" /></div>
           <div class="field"><label>Chassis No</label><input name="chassisNo" required /></div>
           <div class="field"><label>Engine No</label><input name="engineNo" required /></div>
-          <div class="field"><label>Make</label><input name="make" required /></div>
 
+          <div class="field"><label>Maker</label><input name="make" required /></div>
           <div class="field"><label>Model</label><input name="model" required /></div>
           <div class="field"><label>MRA</label><input name="mra" /></div>
           <div class="field"><label>Banker</label><input name="banker" /></div>
-          <div class="field"><label>Fitness Expiry</label><input name="fitnessExpiry" type="date" /></div>
 
+          <div class="field"><label>Fitness Expiry</label><input name="fitnessExpiry" type="date" /></div>
           <div class="field"><label>Balochistan Permit Expiry</label><input name="balochistanPermitExpiry" type="date" /></div>
           <div class="field"><label>Sindh Permit Expiry</label><input name="sindhPermitExpiry" type="date" /></div>
           <div class="field"><label>KPK Permit Expiry</label><input name="kpkPermitExpiry" type="date" /></div>
-          <div class="field"><label>Punjab Permit Expiry</label><input name="punjabPermitExpiry" type="date" /></div>
 
+          <div class="field"><label>Punjab Permit Expiry</label><input name="punjabPermitExpiry" type="date" /></div>
           <div class="field"><label>Tax Paid Up To</label><input name="taxPaidUpTo" type="date" /></div>
-          <div class="field wide">
+          <div class="field">
             <label>Original Documents Upload</label>
             <div class="maintenance-image-field">
               <input name="equipmentDocumentFile" type="file" accept="image/*,application/pdf,.pdf" data-equipment-document-input />
@@ -106,7 +107,7 @@
           <div class="equipment-toolbar">
             <label class="equipment-search">
               <span>Search</span>
-              <input type="search" data-equipment-search placeholder="Truck, chassis, make or banker" />
+              <input type="search" data-equipment-search placeholder="Registration, body type, chassis, maker..." />
             </label>
             <span class="ledger-count" data-equipment-count>0 record(s)</span>
           </div>
@@ -116,10 +117,11 @@
             <thead>
               <tr>
                 <th>S.No</th>
-                <th>Truck No</th>
+                <th>Registration No</th>
+                <th>Type of Body</th>
                 <th>Chassis No</th>
                 <th>Engine No</th>
-                <th>Make</th>
+                <th>Maker</th>
                 <th>Model</th>
                 <th>MRA</th>
                 <th>Banker</th>

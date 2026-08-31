@@ -76,13 +76,13 @@
           </div>
         </div>
         <form data-employee-form class="form-grid">
-          <div class="field"><label>Employee Name</label><input name="name" value="Ali Raza" required /></div>
-          <div class="field"><label>Designation</label><input name="designation" value="Dispatcher" required /></div>
+          <div class="field"><label>Employee Name</label><input name="name" placeholder="Full Name" required /></div>
+          <div class="field"><label>Designation</label><input name="designation" placeholder="Designation / Role" required /></div>
           <div class="field"><label>Department</label><select name="department"><option>Operations</option><option>Finance</option><option>Admin</option><option>Fleet</option><option>HR</option></select></div>
-          <div class="field"><label>Salary</label><input name="salary" type="number" value="65000" required /></div>
+          <div class="field"><label>Salary</label><input name="salary" type="number" placeholder="0" required /></div>
           <div class="field"><label>Joining Date</label><input name="joiningDate" type="date" required /></div>
           <div class="field"><label>Status</label><select name="status"><option>Active</option><option>Inactive</option></select></div>
-          <div class="field"><label>Phone</label><input name="phone" value="0301-5556677" /></div>
+          <div class="field"><label>Phone</label><input name="phone" placeholder="0300-1234567" /></div>
           <div class="field full"><label>Employee Image</label><div class="maintenance-image-field"><input name="employeeImageFile" type="file" accept="image/*" data-employee-image-input /><button class="maintenance-image-remove" type="button" data-remove-employee-image hidden aria-label="Remove selected image" title="Remove image">&times;</button></div><div class="maintenance-image-preview" data-employee-image-preview hidden></div></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Employee</button>
@@ -110,6 +110,7 @@
               <th>Joining Date</th>
               <th>Phone</th>
               <th>Status</th>
+              <th>Image</th>
               <th></th>
             </tr>
           </thead>
@@ -117,6 +118,12 @@
         </table>
         </div>
       </section>
+      <div class="bilty-modal" data-employee-image-modal hidden>
+        <div class="bilty-modal-content" role="dialog" aria-modal="true" aria-label="Employee image preview">
+          <button class="bilty-modal-close" type="button" data-close-employee-image-modal aria-label="Close image preview">&times;</button>
+          <img data-employee-image-modal-image alt="Full employee preview" />
+        </div>
+      </div>
     </main>
   </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

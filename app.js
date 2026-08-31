@@ -1,5 +1,5 @@
 (function () {
-  const KEY = "gtls-transport-demo-data-v1";
+  const KEY = "gtls-transport-live-data-v1";
   const ADMIN_AUTH_KEY = "gtls-admin-auth-v1";
   const SIDEBAR_COLLAPSED_KEY = "gtls-sidebar-collapsed-v1";
   const ACCESS_OPTIONS = [
@@ -22,312 +22,17 @@
 
   const seed = {
     activityLogs: [],
-    bookings: [
-      {
-        id: "BK-24061",
-        invoiceNo: "INV-24061",
-        date: "2026-06-10",
-        category: "Inter City Transport",
-        accountFlow: "Awaited",
-        paymentTerm: "30 Days",
-        salesTaxAuthority: "Sindh Revenue Board",
-        totalAmount: 166750,
-        customer: "Cherat Packaging Ltd",
-        consignee: "Cherat Packaging Gadoon",
-        route: "Karachi to Gadoon",
-        origin: "Karachi Port",
-        destination: "Gadoon",
-        blNo: "ONEYSINE22550700",
-        containerNo: "TRHU5588410",
-        size: "40 FT",
-        truckNo: "TMT-066",
-        goodsType: "Plastic Dana",
-        quantity: "990 Bags",
-        rate: 145000,
-        gatePass: 0,
-        detention: 0,
-        remarks: "PO submitted, dispatch ready.",
-        status: "Delivered"
-      },
-      {
-        id: "BK-24062",
-        invoiceNo: "INV-24062",
-        date: "2026-06-10",
-        category: "Inter City Transport",
-        accountFlow: "Awaited",
-        paymentTerm: "15 Days",
-        salesTaxAuthority: "Sindh Revenue Board",
-        totalAmount: 388700,
-        customer: "AICT",
-        consignee: "AICT Lahore Terminal",
-        route: "Port Qasim to Lahore",
-        origin: "Port Qasim",
-        destination: "Lahore",
-        blNo: "KMTCTAO8140361",
-        containerNo: "2 X 40FT",
-        size: "40 FT",
-        truckNo: "TMT-166",
-        goodsType: "Cranes",
-        quantity: "14 Units",
-        rate: 338000,
-        gatePass: 0,
-        detention: 0,
-        remarks: "In transit toward Lahore.",
-        status: "In Transit"
-      },
-      {
-        id: "BK-24063",
-        invoiceNo: "INV-24063",
-        date: "2026-06-09",
-        category: "Inter City Transport",
-        accountFlow: "Awaited",
-        paymentTerm: "Immediate",
-        salesTaxAuthority: "Punjab Revenue Authority",
-        totalAmount: 216200,
-        customer: "DAMCO Pakistan",
-        consignee: "Sadaqat Ltd",
-        route: "Karachi to Faisalabad",
-        origin: "Karachi",
-        destination: "Faisalabad",
-        blNo: "EMN-2502438",
-        containerNo: "LCL Cargo",
-        size: "40 FT",
-        truckNo: "JW-5477",
-        goodsType: "General Cargo",
-        quantity: "52 Mton",
-        rate: 188000,
-        gatePass: 0,
-        detention: 0,
-        remarks: "Delivered and ready for invoice.",
-        status: "Delivered"
-      }
-    ],
-    ledgerEntries: [
-      {
-        id: "LED-001",
-        billNo: "001/24",
-        date: "2024-05-22",
-        customer: "Cherat Packaging Ltd",
-        destination: "Gadoon",
-        blNo: "ONEYSINE22550700",
-        container: "TRHU5588410",
-        goods: "990 Bags",
-        receivedAmount: 348502,
-        receivedDate: "2024-06-11",
-        chequeNo: "1005782261",
-        remarks: "Full Payment Received"
-      },
-      {
-        id: "LED-006",
-        billNo: "006/24",
-        date: "2024-05-29",
-        customer: "Cherat Packaging Ltd",
-        destination: "Gadoon",
-        blNo: "720118757",
-        container: "5 X 40",
-        goods: "5100 Bags",
-        receivedAmount: 1499799.84,
-        receivedDate: "2024-06-11",
-        chequeNo: "1005782264",
-        remarks: "Settled"
-      },
-      {
-        id: "LED-018",
-        billNo: "018/24",
-        date: "2024-07-12",
-        customer: "Cherat Packaging Ltd",
-        destination: "Gadoon",
-        blNo: "ML/KHI/24023",
-        container: "1 X 20",
-        goods: "Plastic Dana",
-        receivedAmount: 193662,
-        receivedDate: "2024-08-01",
-        chequeNo: "51000400",
-        remarks: "Settled"
-      }
-    ],
-    trucks: [
-      {
-        id: "TRK-066",
-        registrationNo: "TMT-066",
-        chassisNo: "JALFVR34MS7000695",
-        engineNo: "6HK1-AA6552",
-        make: "ISUZU",
-        model: "2025",
-        purchaseCost: 17400000,
-        downPayment: 6870000,
-        installmentPaid: 8,
-        installmentTotal: 12,
-        documentAlert: "Fitness expires on 20 Jun 2026"
-      },
-      {
-        id: "TRK-166",
-        registrationNo: "TMT-166",
-        chassisNo: "JALFVR34MS7000801",
-        engineNo: "AA7939",
-        make: "FVR-240",
-        model: "2025",
-        purchaseCost: 17900000,
-        downPayment: 3209700,
-        installmentPaid: 6,
-        installmentTotal: 12,
-        documentAlert: "Route permit renewal needed"
-      }
-    ],
-    equipmentFleet: [
-      {
-        id: "EQP-001",
-        truckNo: "TMT-066",
-        chassisNo: "JALFVR34MS7000695",
-        engineNo: "6HK1AA6552",
-        make: "ISUZU",
-        model: "2025",
-        mra: "Lasbellah Balochistan",
-        banker: "United Bank Limited",
-        fitnessExpiry: "2026-06-17",
-        balochistanPermitExpiry: "2028-12-09",
-        sindhPermitExpiry: "2028-12-09",
-        kpkPermitExpiry: "",
-        punjabPermitExpiry: "2028-12-09",
-        taxPaidUpTo: "2026-12-31",
-        originalDocs: "Fitness, Route Permits"
-      },
-      {
-        id: "EQP-002",
-        truckNo: "TMT-166",
-        chassisNo: "JALFVR34MS7000801",
-        engineNo: "6HK1AA7939",
-        make: "ISUZU",
-        model: "2025",
-        mra: "Lasbellah Balochistan",
-        banker: "Bank of Punjab",
-        fitnessExpiry: "2026-12-28",
-        balochistanPermitExpiry: "2028-12-09",
-        sindhPermitExpiry: "2028-12-09",
-        kpkPermitExpiry: "2028-12-09",
-        punjabPermitExpiry: "2028-12-09",
-        taxPaidUpTo: "2026-12-31",
-        originalDocs: "Fitness, Route Permits, Original Card"
-      },
-      {
-        id: "EQP-003",
-        truckNo: "TMT-266",
-        chassisNo: "JALFVR34MS7001096",
-        engineNo: "6HK1AD1590",
-        make: "ISUZU",
-        model: "2026",
-        mra: "Lasbellah Balochistan",
-        banker: "Bank of Punjab",
-        fitnessExpiry: "2026-09-08",
-        balochistanPermitExpiry: "2029-02-23",
-        sindhPermitExpiry: "2029-02-23",
-        kpkPermitExpiry: "2029-02-23",
-        punjabPermitExpiry: "2029-02-23",
-        taxPaidUpTo: "2026-12-31",
-        originalDocs: "Fitness, Route Permits"
-      },
-      {
-        id: "EQP-004",
-        truckNo: "JW-5477",
-        chassisNo: "JALFVR34MS7000694",
-        engineNo: "6HK1AA6552",
-        make: "ISUZU",
-        model: "2025",
-        mra: "Karachi Sindh",
-        banker: "United Bank Limited",
-        fitnessExpiry: "2026-12-19",
-        balochistanPermitExpiry: "",
-        sindhPermitExpiry: "2029-01-16",
-        kpkPermitExpiry: "",
-        punjabPermitExpiry: "2029-01-16",
-        taxPaidUpTo: "2027-06-30",
-        originalDocs: "Fitness, Route Permits, Number Plate, Copy Key"
-      }
-    ],
-    truckExpenses: [
-      {
-        id: "EXP-001",
-        truckNo: "TMT-066",
-        date: "2025-11-20",
-        vendor: "Shabir Trailor",
-        description: "Trolly Maker",
-        paymentMode: "Cheque",
-        invoiceNo: "001",
-        amount: 1000000
-      },
-      {
-        id: "EXP-005",
-        truckNo: "TMT-066",
-        date: "2025-11-21",
-        vendor: "TPL Insurance",
-        description: "Insurance",
-        paymentMode: "IBFT",
-        invoiceNo: "005",
-        amount: 295800
-      },
-      {
-        id: "EXP-013",
-        truckNo: "TMT-066",
-        date: "2026-01-13",
-        vendor: "General Store",
-        description: "Rim",
-        paymentMode: "IBFT",
-        invoiceNo: "013",
-        amount: 416000
-      }
-    ],
-    invoices: [
-      {
-        id: "INV-102-26",
-        invoiceNo: "INV-102/26",
-        customer: "Cherat Packaging Ltd",
-        period: "01 Jun 2026 - 10 Jun 2026",
-        units: "12 Containers",
-        roadFreight: 1820000,
-        saleTax: 273000,
-        otherCharges: 18000,
-        receivedSoFar: 1100000,
-        lastPaymentRef: "Cheque No 1005782405"
-      },
-      {
-        id: "INV-103-26",
-        invoiceNo: "INV-103/26",
-        customer: "DAMCO Pakistan",
-        period: "11 Jun 2026 - 20 Jun 2026",
-        units: "8 Containers",
-        roadFreight: 1245000,
-        saleTax: 186750,
-        otherCharges: 0,
-        receivedSoFar: 0,
-        lastPaymentRef: "Awaiting payment"
-      }
-    ],
+    bookings: [],
+    ledgerEntries: [],
+    trucks: [],
+    equipmentFleet: [],
+    truckExpenses: [],
+    invoices: [],
     maintenanceJobs: [],
-    employees: [
-      {
-        id: "EMP-1001",
-        name: "Muhammad Usman",
-        designation: "Operations Coordinator",
-        salary: 85000,
-        joiningDate: "2025-02-15",
-        status: "Active",
-        phone: "0300-1234567",
-        department: "Operations"
-      },
-      {
-        id: "EMP-1002",
-        name: "Ayesha Khan",
-        designation: "Accounts Assistant",
-        salary: 72000,
-        joiningDate: "2024-11-01",
-        status: "Inactive",
-        phone: "0312-9876543",
-        department: "Finance"
-      }
-    ],
+    employees: [],
     adminUsers: [
       {
-        id: "ADM-1001",
+        id: "ADM-1",
         name: "Super Admin",
         email: "admin@gmail.com",
         password: "transport",
@@ -336,79 +41,8 @@
         access: ACCESS_OPTIONS.map((item) => item.value)
       }
     ],
-    customerKhatas: [
-      {
-        id: "CUS-1001",
-        customer: "Cherat Packaging Ltd",
-        phone: "021-34900112",
-        city: "Karachi",
-        openingBalance: 125000,
-        entries: [
-          {
-            id: "KHT-001",
-            date: "2026-06-05",
-            type: "Debit",
-            description: "Transport bill for Karachi to Gadoon",
-            amount: 145000
-          },
-          {
-            id: "KHT-002",
-            date: "2026-06-08",
-            type: "Credit",
-            description: "Part payment received",
-            amount: 75000
-          }
-        ]
-      },
-      {
-        id: "CUS-1002",
-        customer: "DAMCO Pakistan",
-        phone: "042-35788011",
-        city: "Lahore",
-        openingBalance: -45000,
-        entries: [
-          {
-            id: "KHT-003",
-            date: "2026-06-11",
-            type: "Debit",
-            description: "Faisalabad delivery billing",
-            amount: 188000
-          },
-          {
-            id: "KHT-004",
-            date: "2026-06-14",
-            type: "Credit",
-            description: "Advance adjustment",
-            amount: 50000
-          }
-        ]
-      }
-    ],
-    vendorKhatas: [
-      {
-        id: "PAY-1001",
-        customer: "Abdullah Transport",
-        phone: "0300-1234567",
-        city: "Karachi",
-        openingBalance: 0,
-        entries: [
-          {
-            id: "PAYE-001",
-            date: "2026-07-04",
-            type: "Debit",
-            description: "Transport service payable",
-            amount: 120000
-          },
-          {
-            id: "PAYE-002",
-            date: "2026-07-08",
-            type: "Credit",
-            description: "Part payment made",
-            amount: 40000
-          }
-        ]
-      }
-    ]
+    customerKhatas: [],
+    vendorKhatas: []
   };
 
   function assignSequentialIds(items = [], prefix, field = "id") {
@@ -1307,7 +941,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const rows = [];
     for (const item of records || []) {
       const path = await uploadPrivateDataUrl(item.documentData, item.documentPath, "equipment", item.truckNo || item.id);
-      rows.push({ truck_no: item.truckNo, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make, model: item.model,
+      rows.push({ truck_no: item.truckNo, type_of_body: item.typeOfBody || null, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make, model: item.model,
         mra: item.mra || null, banker: item.banker || null, fitness_expiry: formatIsoDate(item.fitnessExpiry) || null,
         balochistan_permit_expiry: formatIsoDate(item.balochistanPermitExpiry) || null, sindh_permit_expiry: formatIsoDate(item.sindhPermitExpiry) || null,
         kpk_permit_expiry: formatIsoDate(item.kpkPermitExpiry) || null, punjab_permit_expiry: formatIsoDate(item.punjabPermitExpiry) || null,
@@ -1468,7 +1102,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     if (equipment?.length) {
       const mappedEquip = equipment.map((r) => ({
-        id: r.truck_no, truckNo: r.truck_no, chassisNo: r.chassis_no,
+        id: r.truck_no, truckNo: r.truck_no, typeOfBody: r.type_of_body || "", chassisNo: r.chassis_no,
         engineNo: r.engine_no, make: r.make, model: r.model, mra: r.mra || "", banker: r.banker || "", fitnessExpiry: r.fitness_expiry || "",
         balochistanPermitExpiry: r.balochistan_permit_expiry || "", sindhPermitExpiry: r.sindh_permit_expiry || "", kpkPermitExpiry: r.kpk_permit_expiry || "",
         punjabPermitExpiry: r.punjab_permit_expiry || "", taxPaidUpTo: r.tax_paid_up_to || "", originalDocs: r.original_documents || "",
@@ -2167,7 +1801,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const status = statusValue === "Submitted" ? "Delivered" : (statusValue || "Delivered");
     const rate = Number(booking.rate || 0);
     const detention = Number(booking.detention || 0);
-    const taxBreakdown = calculateBookingTaxBreakdown(rate, detention, booking.salesTaxAuthority);
+    const taxBreakdown = calculateBookingTaxBreakdown(rate, detention, booking.salesTaxAuthority, booking.salesTaxWithholding);
     return {
       ...booking,
       invoiceNo: String(booking.invoiceNo || "").trim(),
@@ -2178,6 +1812,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       size: primaryLine.size,
       truckNo: primaryLine.truckNo,
       rate,
+      salesTaxWithholding: String(booking.salesTaxWithholding ?? taxBreakdown.salesTaxWithholding),
       salesTaxAmount: Number(booking.salesTaxAmount ?? taxBreakdown.salesTaxAmount),
       totalAmount: Number(booking.totalAmount ?? taxBreakdown.totalAmount),
       incomeTaxAmount: Number(booking.incomeTaxAmount ?? taxBreakdown.incomeTaxAmount),
@@ -2252,7 +1887,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     return taxableAuthorities.has(String(authority || "").trim());
   }
 
-  function calculateBookingTaxBreakdown(rate, detention, authority) {
+  function calculateBookingTaxBreakdown(rate, detention, authority, withholding = "20") {
     const roadHaulageCharges = Number(rate || 0);
     const detentionCharges = Number(detention || 0);
     const withoutIncomeTax = String(authority || "").trim() === "Without Income Tax";
@@ -2260,8 +1895,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const salesTaxAmount = shouldApplySalesTax(authority) ? roundAmount(taxableBase * 0.15) : 0;
     const totalAmount = roundAmount(taxableBase + salesTaxAmount);
     const incomeTaxAmount = withoutIncomeTax ? 0 : roundAmount(totalAmount * 0.07);
-    const salesTaxWithheldAmount = roundAmount(salesTaxAmount * 0.20);
-    const salesTaxByUsAmount = roundAmount(salesTaxAmount * 0.80);
+
+    let withholdingPercent = 20;
+    if (withholding !== undefined && withholding !== null && withholding !== "") {
+      const match = String(withholding).match(/\d+/);
+      if (match) withholdingPercent = Number(match[0]);
+    }
+    const withheldRatio = withholdingPercent / 100;
+    const byUsRatio = Math.max(0, 1 - withheldRatio);
+
+    const salesTaxWithheldAmount = roundAmount(salesTaxAmount * withheldRatio);
+    const salesTaxByUsAmount = roundAmount(salesTaxAmount * byUsRatio);
     const receivableAmount = withoutIncomeTax
       ? taxableBase
       : roundAmount(totalAmount - incomeTaxAmount - salesTaxWithheldAmount + detentionCharges);
@@ -2273,14 +1917,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       salesTaxAmount,
       totalAmount,
       incomeTaxAmount,
+      salesTaxWithholding: String(withholdingPercent),
+      salesTaxWithheldPercent: withholdingPercent,
+      salesTaxByUsPercent: Math.round(byUsRatio * 100),
       salesTaxWithheldAmount,
       salesTaxByUsAmount,
       receivableAmount
     };
   }
 
-  function calculateBookingTotalAmount(rate, detention, authority) {
-    return calculateBookingTaxBreakdown(rate, detention, authority).totalAmount;
+  function calculateBookingTotalAmount(rate, detention, authority, withholding) {
+    return calculateBookingTaxBreakdown(rate, detention, authority, withholding).totalAmount;
   }
 
   function calculateKhataSummary(account) {
@@ -3225,6 +2872,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const rateField = form.querySelector("[name='rate']");
     const detentionField = form.querySelector("[name='detention']");
     const salesTaxAuthorityField = form.querySelector("[name='salesTaxAuthority']");
+    const salesTaxWithholdingField = form.querySelector("[name='salesTaxWithholding']");
+    const salesTaxWithheldLabel = form.querySelector("[data-label-st-withheld]");
+    const salesTaxByUsLabel = form.querySelector("[data-label-st-by-us]");
     const salesTaxAmountField = form.querySelector("[name='salesTaxAmount']");
     const totalAmountField = form.querySelector("[name='totalAmount']");
     const incomeTaxAmountField = form.querySelector("[name='incomeTaxAmount']");
@@ -3362,13 +3012,25 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     function syncTotalAmount() {
-      const breakdown = calculateBookingTaxBreakdown(rateField.value, detentionField.value, salesTaxAuthorityField.value);
+      const breakdown = calculateBookingTaxBreakdown(
+        rateField.value,
+        detentionField.value,
+        salesTaxAuthorityField.value,
+        salesTaxWithholdingField?.value
+      );
       salesTaxAmountField.value = String(breakdown.salesTaxAmount);
       totalAmountField.value = String(breakdown.totalAmount);
       incomeTaxAmountField.value = String(breakdown.incomeTaxAmount);
       salesTaxWithheldAmountField.value = String(breakdown.salesTaxWithheldAmount);
       salesTaxByUsAmountField.value = String(breakdown.salesTaxByUsAmount);
       receivableAmountField.value = String(breakdown.receivableAmount);
+
+      if (salesTaxWithheldLabel) {
+        salesTaxWithheldLabel.textContent = `Sale Tax With Held ${breakdown.salesTaxWithheldPercent}%`;
+      }
+      if (salesTaxByUsLabel) {
+        salesTaxByUsLabel.textContent = `Sale Tax ${breakdown.salesTaxByUsPercent}% by us`;
+      }
     }
 
     function resetForm() {
@@ -3377,23 +3039,25 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       biltyImagePromise = Promise.resolve("");
       biltyStoragePath = "";
       setBiltyPreview("");
-      form.elements.bookingNo.value = "BKG-24061";
-      form.elements.invoiceNo.value = "INV-24061";
-      syncBookingDate("2026-06-10");
+      if (form.elements.bookingNo) form.elements.bookingNo.value = "";
+      if (form.elements.invoiceNo) form.elements.invoiceNo.value = "";
+      syncBookingDate(getTodayIsoDate());
       form.elements.category.value = "Inter City Transport";
       form.elements.accountFlow.value = "Awaited";
       form.elements.paymentTerm.value = "30 Days";
-      form.elements.rate.value = "145000";
-      form.elements.gatePass.value = "GP-001";
+      form.elements.rate.value = "";
+      form.elements.gatePass.value = "";
       form.elements.detention.value = "0";
       form.elements.salesTaxAuthority.value = "Sindh Revenue Board";
+      if (salesTaxWithholdingField) salesTaxWithholdingField.value = "20";
+      if (form.elements.remarks) form.elements.remarks.value = "";
       syncTotalAmount();
       statusField.value = "Delivered";
       renderContainerRows([
         {
-          containerNo: "TRHU5588410",
+          containerNo: "",
           size: "40 FT",
-          truckNo: "TMT-066"
+          truckNo: ""
         }
       ]);
       editingId = "";
@@ -3497,7 +3161,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               <div class="table-actions">
                 <button class="btn small" data-download-invoice="${item.id}">Invoice</button>
                 <button class="btn small" data-edit-booking="${item.id}">Edit</button>
-                <button class="btn small danger" data-delete-booking="${item.id}">Delete</button>
               </div>
             </td>
           </tr>
@@ -3534,8 +3197,23 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     datePickerButton.addEventListener("click", () => {
+      if (!datePickerField.value || !dateTextField.value) {
+        syncBookingDate(getTodayIsoDate());
+      }
       if (typeof datePickerField.showPicker === "function") datePickerField.showPicker();
       else datePickerField.click();
+    });
+
+    dateTextField.addEventListener("focus", () => {
+      if (!dateTextField.value) {
+        syncBookingDate(getTodayIsoDate());
+      }
+    });
+
+    dateTextField.addEventListener("click", () => {
+      if (!dateTextField.value) {
+        syncBookingDate(getTodayIsoDate());
+      }
     });
 
     datePickerField.addEventListener("change", () => {
@@ -3551,6 +3229,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     rateField.addEventListener("input", syncTotalAmount);
     detentionField.addEventListener("input", syncTotalAmount);
     salesTaxAuthorityField.addEventListener("change", syncTotalAmount);
+    salesTaxWithholdingField?.addEventListener("change", syncTotalAmount);
 
     biltyInput.addEventListener("change", () => {
       const file = biltyInput.files && biltyInput.files[0];
@@ -3638,11 +3317,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       let savedBooking;
       if (!editingId) {
         normalized.id = getNextBookingJobNo(store.bookings);
+        normalized.bookingNo = normalized.bookingNo || getNextSequentialId(store.bookings, "BN", "bookingNo");
         savedBooking = normalizeBookingContainers(normalized);
         store.bookings.unshift(savedBooking);
       } else {
         const index = store.bookings.findIndex((item) => item.id === editingId);
+        const existing = store.bookings[index] || {};
         normalized.id = editingId;
+        normalized.bookingNo = existing.bookingNo || normalized.bookingNo || getNextSequentialId(store.bookings, "BN", "bookingNo");
         savedBooking = normalizeBookingContainers(normalized);
         store.bookings[index] = savedBooking;
       }
@@ -3665,7 +3347,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const biltyTrigger = event.target.closest("[data-view-bilty]");
       const invoiceId = event.target.getAttribute("data-download-invoice");
       const editId = event.target.getAttribute("data-edit-booking");
-      const deleteId = event.target.getAttribute("data-delete-booking");
       if (biltyTrigger) {
         const item = store.bookings.find((entry) => entry.id === biltyTrigger.getAttribute("data-view-bilty"));
         if (item && item.biltyImage) openBiltyModal(item.biltyImage);
@@ -3686,21 +3367,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           const formSection = form.closest(".screen");
           (formSection || form).scrollIntoView({ behavior: "smooth", block: "start" });
         }
-      }
-      if (deleteId) {
-        const booking = store.bookings.find((entry) => entry.id === deleteId);
-        try {
-          if (booking) await deleteBookingFromSupabase(booking);
-        } catch (error) {
-          notice.textContent = `Booking ${deleteId} could not be deleted from Supabase: ${error.message}`;
-          return;
-        }
-        store.bookings = store.bookings.filter((entry) => entry.id !== deleteId);
-        saveStore(store);
-        render();
-        refreshPaymentNotifications();
-        notice.textContent = `Booking ${deleteId} deleted successfully.`;
-        if (editingId === deleteId) resetForm();
       }
     });
 
@@ -3821,7 +3487,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     render();
   }
 
-  async function buildPendingTruckSummaryPdf(trips, summaryTruckNo) {
+  async function buildPendingTruckSummaryPdf(trips, summaryTruckNo, brokerFilter = {}) {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
     const records = (Array.isArray(trips) ? trips : [trips])
       .filter(Boolean)
@@ -3842,7 +3508,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12);
     pdf.text("PENDING TRUCK SUMMARY", 28, 150);
-    pdf.text(`Truck No: ${text(summaryTruckNo)}`, 28, 168);
+
+    let subHeader = `Truck No: ${text(summaryTruckNo)}`;
+    const brokerDetails = [];
+    if (brokerFilter.impBroker) brokerDetails.push(`Imp Broker: ${brokerFilter.impBroker}`);
+    if (brokerFilter.expBroker) brokerDetails.push(`Exp Broker: ${brokerFilter.expBroker}`);
+    if (brokerFilter.mtyBroker) brokerDetails.push(`MTY Broker: ${brokerFilter.mtyBroker}`);
+    if (brokerDetails.length) subHeader += ` | ${brokerDetails.join(" | ")}`;
+    pdf.text(subHeader, 28, 168);
 
     function shortPdfDate(value) {
       const movementDate = parseDateValue(value);
@@ -3851,16 +3524,40 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         : "-";
     }
 
+    const hasSpecificBroker = Boolean(brokerFilter.impBroker || brokerFilter.expBroker || brokerFilter.mtyBroker);
+    function shouldIncludeLeg(type, broker) {
+      if (!hasSpecificBroker) return true;
+      const b = String(broker || "").trim();
+      if (type === "Import") return brokerFilter.impBroker ? b === brokerFilter.impBroker : false;
+      if (type === "Export") return brokerFilter.expBroker ? b === brokerFilter.expBroker : false;
+      if (type === "MTY") return brokerFilter.mtyBroker ? b === brokerFilter.mtyBroker : false;
+      return false;
+    }
+
     const rows = records.flatMap((trip) => {
-      const importReceivable = trip.importReceivedAmount === undefined || trip.importReceivedAmount === ""
-        ? Number(trip.importFreight || 0) - Number(trip.importBrokerCommission || 0)
-        : Number(trip.importReceivedAmount || 0);
-      const exportReceivable = trip.exportReceivedAmount === undefined || trip.exportReceivedAmount === ""
-        ? Number(trip.exportFreight || 0) - Number(trip.exportBrokerCommission || 0)
-        : Number(trip.exportReceivedAmount || 0);
-      return [
+      const storedImport = Number(trip.importReceivedAmount);
+      const rawImport = Number.isFinite(storedImport)
+        ? storedImport
+        : Number(trip.importFreight || 0) - Number(trip.importBrokerCommission || 0);
+      const storedExport = Number(trip.exportReceivedAmount);
+      const rawExport = Number.isFinite(storedExport)
+        ? storedExport
+        : Number(trip.exportFreight || 0) - Number(trip.exportBrokerCommission || 0);
+      const rawMty = Number(trip.mtyBoxFreight || 0);
+
+      const isImportCredit = String(trip.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+      const isExportCredit = String(trip.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+      const isMtyCredit = String(trip.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+
+      const importReceivable = isImportCredit ? 0 : rawImport;
+      const exportReceivable = isExportCredit ? 0 : rawExport;
+      const mtyReceivable = isMtyCredit ? 0 : rawMty;
+
+      const legs = [
         {
           amount: importReceivable,
+          type: "Import",
+          broker: trip.importBroker,
           values: {
             jobNo: trip.jobNo,
             type: "Import",
@@ -3878,6 +3575,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         },
         {
           amount: exportReceivable,
+          type: "Export",
+          broker: trip.exportBroker,
           values: {
             jobNo: trip.jobNo,
             type: "Export",
@@ -3894,7 +3593,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           }
         },
         {
-          amount: Number(trip.mtyBoxFreight || 0),
+          amount: mtyReceivable,
+          type: "MTY",
+          broker: trip.mtyBroker,
           values: {
             jobNo: trip.jobNo,
             type: "MTY",
@@ -3905,12 +3606,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             size: "-",
             weight: "-",
             cargo: "-",
-            receivable: Number(trip.mtyBoxFreight || 0),
+            receivable: mtyReceivable,
             broker: trip.mtyBroker,
             remarks: "-"
           }
         }
       ];
+
+      return legs.filter((leg) => shouldIncludeLeg(leg.type, leg.broker));
     }).map((row, index) => ({
       amount: row.amount,
       cells: [
@@ -4149,12 +3852,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function resetForm() {
       form.reset();
-      form.elements.date.value = "2026-07-04";
-      form.elements.truckNo.value = "JW-5477";
-      form.elements.exportTruckNo.value = "JW-5477";
-      form.elements.importPaymentStatus.value = "Awaited";
-      form.elements.mtyPaymentStatus.value = "Awaited";
-      form.elements.exportPaymentStatus.value = "Awaited";
+      form.elements.date.value = getTodayIsoDate();
+      if (form.elements.truckNo) form.elements.truckNo.value = "";
+      if (form.elements.exportTruckNo) form.elements.exportTruckNo.value = "";
+      if (form.elements.customer) form.elements.customer.value = "";
+      if (form.elements.importRemarks) form.elements.importRemarks.value = "";
+      if (form.elements.exportRemarks) form.elements.exportRemarks.value = "";
+      if (form.elements.importPaymentStatus) form.elements.importPaymentStatus.value = "Awaited";
+      if (form.elements.mtyPaymentStatus) form.elements.mtyPaymentStatus.value = "Awaited";
+      if (form.elements.exportPaymentStatus) form.elements.exportPaymentStatus.value = "Awaited";
       calculateTrip();
       if (imageInput) imageInput.value = "";
       setTripImage("");
@@ -4230,7 +3936,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               <button class="btn small" data-import-invoice="${item.id}">Import Invoice</button>
               <button class="btn small" data-export-invoice="${item.id}">Export Invoice</button>
               <button class="btn small" data-edit-trip="${item.id}">Edit</button>
-              <button class="btn small danger" data-delete-trip="${item.id}">Delete</button>
             </div>
           </td>
         </tr>
@@ -4326,7 +4031,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const importInvoiceId = event.target.getAttribute("data-import-invoice");
       const exportInvoiceId = event.target.getAttribute("data-export-invoice");
       const editId = event.target.getAttribute("data-edit-trip");
-      const deleteId = event.target.getAttribute("data-delete-trip");
       if (imageButton) {
         const item = store.truckExpenses.find((entry) => entry.id === imageButton.dataset.viewTruckImage);
         if (item?.image) openTruckImageModal(item.image);
@@ -4340,13 +4044,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return;
       }
       if (editId) fillForm(store.truckExpenses.find((item) => item.id === editId));
-      if (deleteId) {
-        store.truckExpenses = store.truckExpenses.filter((item) => item.id !== deleteId);
-        saveStore(store);
-        render();
-        notice.textContent = `Truck trip ${deleteId} deleted successfully.`;
-        if (editingId === deleteId) resetForm();
-      }
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
@@ -4369,11 +4066,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const groupsContainer = document.querySelector("[data-truck-summary-groups]");
     const count = document.querySelector("[data-truck-summary-count]");
     const customerFilter = document.querySelector("[data-truck-summary-customer-filter]");
+    const importBrokerFilter = document.querySelector("[data-truck-summary-import-broker-filter]");
+    const exportBrokerFilter = document.querySelector("[data-truck-summary-export-broker-filter]");
+    const mtyBrokerFilter = document.querySelector("[data-truck-summary-mty-broker-filter]");
     const jobSort = document.querySelector("[data-truck-summary-job-sort]");
     const startDateFilter = document.querySelector("[data-truck-summary-start-date]");
     const endDateFilter = document.querySelector("[data-truck-summary-end-date]");
     const importReceivableTotal = document.querySelector("[data-truck-summary-import-receivable]");
     const exportReceivableTotal = document.querySelector("[data-truck-summary-export-receivable]");
+    const mtyReceivableTotal = document.querySelector("[data-truck-summary-mty-receivable]");
     const grandTotalElement = document.querySelector("[data-truck-summary-grand-total]");
     const totalTrucksElement = document.querySelector("[data-truck-summary-total-trucks]");
     const totalWorkElement = document.querySelector("[data-completed-total-work]");
@@ -4403,10 +4104,47 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         customerFilter.innerHTML = `<option value="">All Trucks</option>${truckNumbers.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${text(truckNo)}</option>`).join("")}`;
         customerFilter.value = truckNumbers.includes(selectedTruckNo) ? selectedTruckNo : "";
       }
+
+      const candidateTripsForBrokers = trips.filter((item) => !selectedTruckNo || String(item.truckNo || "").trim() === selectedTruckNo);
+
+      const impBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.importBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const expBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.exportBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const mtyBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.mtyBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+      const prevImp = String(importBrokerFilter?.value || "").trim();
+      const prevExp = String(exportBrokerFilter?.value || "").trim();
+      const prevMty = String(mtyBrokerFilter?.value || "").trim();
+
+      if (importBrokerFilter) {
+        importBrokerFilter.innerHTML = `<option value="">All Imp</option>${impBrokers.map((b) => `<option value="${escapeHtml(b)}">${text(b)}</option>`).join("")}`;
+        importBrokerFilter.value = impBrokers.includes(prevImp) ? prevImp : "";
+      }
+      if (exportBrokerFilter) {
+        exportBrokerFilter.innerHTML = `<option value="">All Exp</option>${expBrokers.map((b) => `<option value="${escapeHtml(b)}">${text(b)}</option>`).join("")}`;
+        exportBrokerFilter.value = expBrokers.includes(prevExp) ? prevExp : "";
+      }
+      if (mtyBrokerFilter) {
+        mtyBrokerFilter.innerHTML = `<option value="">All MTY</option>${mtyBrokers.map((b) => `<option value="${escapeHtml(b)}">${text(b)}</option>`).join("")}`;
+        mtyBrokerFilter.value = mtyBrokers.includes(prevMty) ? prevMty : "";
+      }
+
+      const activeImpBroker = String(importBrokerFilter?.value || "").trim();
+      const activeExpBroker = String(exportBrokerFilter?.value || "").trim();
+      const activeMtyBroker = String(mtyBrokerFilter?.value || "").trim();
+      const hasSpecificBroker = Boolean(activeImpBroker || activeExpBroker || activeMtyBroker);
+
+      function shouldIncludeLeg(type, broker) {
+        if (!hasSpecificBroker) return true;
+        const b = String(broker || "").trim();
+        if (type === "Import") return activeImpBroker ? b === activeImpBroker : false;
+        if (type === "Export") return activeExpBroker ? b === activeExpBroker : false;
+        if (type === "MTY") return activeMtyBroker ? b === activeMtyBroker : false;
+        return false;
+      }
+
       const startDate = parseDateValue(startDateFilter?.value);
       const endDate = parseDateValue(endDateFilter?.value);
-      const filteredTrips = trips
-        .filter((item) => !selectedTruckNo || String(item.truckNo || "").trim() === selectedTruckNo)
+      const filteredTrips = candidateTripsForBrokers
         .filter((item) => {
           if (!startDate && !endDate) return true;
           const completedDate = parseDateValue(item.exportLoadDate || item.date);
@@ -4414,6 +4152,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           if (startDate && completedDate < startDate) return false;
           if (endDate && completedDate > endDate) return false;
           return true;
+        })
+        .filter((item) => {
+          if (!hasSpecificBroker) return true;
+          const matchesImp = activeImpBroker && String(item.importBroker || "").trim() === activeImpBroker;
+          const matchesExp = activeExpBroker && String(item.exportBroker || "").trim() === activeExpBroker;
+          const matchesMty = activeMtyBroker && String(item.mtyBroker || "").trim() === activeMtyBroker;
+          return Boolean(matchesImp || matchesExp || matchesMty);
         })
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
 
@@ -4428,23 +4173,40 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const totals = filteredTrips.reduce((summary, item) => {
         const storedImportReceivable = Number(item.importReceivedAmount);
         const storedExportReceivable = Number(item.exportReceivedAmount);
-        const importReceivable = Number.isFinite(storedImportReceivable)
+        const rawImportReceivable = Number.isFinite(storedImportReceivable)
           ? storedImportReceivable
           : Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0);
-        const exportReceivable = Number.isFinite(storedExportReceivable)
+        const rawExportReceivable = Number.isFinite(storedExportReceivable)
           ? storedExportReceivable
           : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
+        const rawMtyReceivable = Number(item.mtyBoxFreight || 0);
+
+        const isImportCredit = String(item.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+        const isExportCredit = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+        const isMtyCredit = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+
+        const incImport = shouldIncludeLeg("Import", item.importBroker);
+        const incExport = shouldIncludeLeg("Export", item.exportBroker);
+        const incMty = shouldIncludeLeg("MTY", item.mtyBroker);
+
+        const importReceivable = incImport ? (isCompletedSummary ? rawImportReceivable : (isImportCredit ? 0 : rawImportReceivable)) : 0;
+        const exportReceivable = incExport ? (isCompletedSummary ? rawExportReceivable : (isExportCredit ? 0 : rawExportReceivable)) : 0;
+        const mtyReceivable = incMty ? (isCompletedSummary ? rawMtyReceivable : (isMtyCredit ? 0 : rawMtyReceivable)) : 0;
+
         const financials = calculateTruckTripFinancials(item);
-        const grandTotal = financials.grandTotal;
+        const grandTotal = isCompletedSummary ? financials.grandTotal : (importReceivable + exportReceivable + mtyReceivable);
+
         summary.importReceivable += importReceivable;
         summary.exportReceivable += exportReceivable;
+        summary.mtyReceivable += mtyReceivable;
         summary.grandTotal += grandTotal;
         summary.profitLoss += financials.profitLoss;
         return summary;
-      }, { importReceivable: 0, exportReceivable: 0, grandTotal: 0, profitLoss: 0 });
+      }, { importReceivable: 0, exportReceivable: 0, mtyReceivable: 0, grandTotal: 0, profitLoss: 0 });
 
       if (importReceivableTotal) importReceivableTotal.textContent = `PKR ${money(totals.importReceivable)}`;
       if (exportReceivableTotal) exportReceivableTotal.textContent = `PKR ${money(totals.exportReceivable)}`;
+      if (mtyReceivableTotal) mtyReceivableTotal.textContent = `PKR ${money(totals.mtyReceivable)}`;
       if (grandTotalElement) grandTotalElement.textContent = `PKR ${money(totals.grandTotal)}`;
       if (totalTrucksElement) {
         const totalTrucks = new Set(filteredTrips.map((item) => String(item.truckNo || "").trim()).filter(Boolean)).size;
@@ -4475,11 +4237,35 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
       let serialNumber = 0;
       groupsContainer.innerHTML = jobGroups.map((group) => {
-        const legs = group.trips.flatMap((item) => ([
-          { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, receivable: item.importReceivedAmount === undefined || item.importReceivedAmount === "" ? Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0) : Number(item.importReceivedAmount || 0), broker: item.importBroker, remarks: item.importRemarks || item.remarks },
-          { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, receivable: item.exportReceivedAmount === undefined || item.exportReceivedAmount === "" ? Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0) : Number(item.exportReceivedAmount || 0), broker: item.exportBroker, remarks: item.exportRemarks || item.remarks },
-          { tripId: item.id, type: "MTY", date: "", truckNo: "", origin: "", destination: "", size: "", weight: "", cargo: "", freight: item.mtyBoxFreight, receivable: Number(item.mtyBoxFreight || 0), broker: item.mtyBroker, remarks: "" }
-        ]));
+        const legs = group.trips.flatMap((item) => {
+          const storedImport = Number(item.importReceivedAmount);
+          const rawImport = Number.isFinite(storedImport)
+            ? storedImport
+            : Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0);
+          const storedExport = Number(item.exportReceivedAmount);
+          const rawExport = Number.isFinite(storedExport)
+            ? storedExport
+            : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
+          const rawMty = Number(item.mtyBoxFreight || 0);
+
+          const isImportCredit = String(item.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+          const isExportCredit = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+          const isMtyCredit = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+
+          const importRec = isCompletedSummary ? rawImport : (isImportCredit ? 0 : rawImport);
+          const exportRec = isCompletedSummary ? rawExport : (isExportCredit ? 0 : rawExport);
+          const mtyRec = isCompletedSummary ? rawMty : (isMtyCredit ? 0 : rawMty);
+
+          const allLegs = [
+            { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, receivable: importRec, broker: item.importBroker, remarks: item.importRemarks || item.remarks },
+            { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, receivable: exportRec, broker: item.exportBroker, remarks: item.exportRemarks || item.remarks },
+            { tripId: item.id, type: "MTY", date: "", truckNo: "", origin: "", destination: "", size: "", weight: "", cargo: "", freight: item.mtyBoxFreight, receivable: mtyRec, broker: item.mtyBroker, remarks: "" }
+          ];
+
+          return allLegs.filter((leg) => shouldIncludeLeg(leg.type, leg.broker));
+        });
+
+        if (!legs.length) return "";
         const brokerSummary = [...new Set(legs.map((leg) => String(leg.broker || "").trim()).filter(Boolean))].join(" | ") || "-";
 
         return `
@@ -4525,17 +4311,38 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             </div>
           </section>
         `;
-      }).join("");
+      }).filter(Boolean).join("");
     }
 
+    const resetFiltersButton = document.querySelector("[data-truck-summary-reset-filters]");
     if (customerFilter) customerFilter.addEventListener("change", render);
+    if (importBrokerFilter) importBrokerFilter.addEventListener("change", render);
+    if (exportBrokerFilter) exportBrokerFilter.addEventListener("change", render);
+    if (mtyBrokerFilter) mtyBrokerFilter.addEventListener("change", render);
     if (jobSort) jobSort.addEventListener("change", render);
     if (startDateFilter) startDateFilter.addEventListener("change", render);
     if (endDateFilter) endDateFilter.addEventListener("change", render);
+    if (resetFiltersButton) {
+      resetFiltersButton.addEventListener("click", () => {
+        if (customerFilter) customerFilter.value = "";
+        if (importBrokerFilter) importBrokerFilter.value = "";
+        if (exportBrokerFilter) exportBrokerFilter.value = "";
+        if (mtyBrokerFilter) mtyBrokerFilter.value = "";
+        if (jobSort) jobSort.value = "desc";
+        if (startDateFilter) startDateFilter.value = "";
+        if (endDateFilter) endDateFilter.value = "";
+        render();
+      });
+    }
     if (pendingSummaryDownloadButton) {
       pendingSummaryDownloadButton.addEventListener("click", () => {
         if (!currentPendingSummaryTruckNo || !currentPendingSummaryTrips.length) return;
-        buildPendingTruckSummaryPdf(currentPendingSummaryTrips, currentPendingSummaryTruckNo).catch(() => {});
+        const brokerFilter = {
+          impBroker: String(importBrokerFilter?.value || "").trim(),
+          expBroker: String(exportBrokerFilter?.value || "").trim(),
+          mtyBroker: String(mtyBrokerFilter?.value || "").trim()
+        };
+        buildPendingTruckSummaryPdf(currentPendingSummaryTrips, currentPendingSummaryTruckNo, brokerFilter).catch(() => {});
       });
     }
     window.activePageRender = render;
@@ -4640,6 +4447,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       return [...store.equipmentFleet]
         .filter((item) => !query || [
           item.truckNo,
+          item.typeOfBody,
           item.chassisNo,
           item.engineNo,
           item.make,
@@ -4658,6 +4466,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         <tr>
           <td>${index + 1}</td>
           <td><strong>${text(item.truckNo)}</strong></td>
+          <td>${text(item.typeOfBody || "-")}</td>
           <td>${text(item.chassisNo)}</td>
           <td>${text(item.engineNo)}</td>
           <td>${text(item.make)}</td>
@@ -4683,7 +4492,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <div class="table-actions">
               <button class="btn small" type="button" data-download-equipment="${item.id}">Download PDF</button>
               <button class="btn small" type="button" data-edit-equipment="${item.id}">Edit</button>
-              <button class="btn small danger" type="button" data-delete-equipment="${item.id}">Delete</button>
             </div>
           </td>
         </tr>
@@ -4786,15 +4594,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const downloadId = event.target.closest("[data-download-equipment]")?.dataset.downloadEquipment;
       const viewDocumentId = event.target.closest("[data-view-equipment-document]")?.dataset.viewEquipmentDocument;
       const editId = event.target.getAttribute("data-edit-equipment");
-      const deleteId = event.target.getAttribute("data-delete-equipment");
       if (downloadId) {
         const item = store.equipmentFleet.find((entry) => entry.id === downloadId);
         if (item) {
           try {
             await createRegisterPdf(
               "Equipment & Handling Fleet",
-              ["S.No", "Truck No", "Chassis No", "Engine No", "Make", "Model", "MRA"],
-              ["1", item.truckNo, item.chassisNo, item.engineNo, item.make, item.model, item.mra],
+              ["S.No", "Registration No", "Type of Body", "Chassis No", "Engine No", "Maker", "Model", "MRA"],
+              ["1", item.truckNo, item.typeOfBody || "-", item.chassisNo, item.engineNo, item.make, item.model, item.mra],
               `${safePdfFileName(item.truckNo || item.id)}_equipment_fleet`
             );
           } catch (error) {
@@ -4809,13 +4616,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return;
       }
       if (editId) fillForm(store.equipmentFleet.find((item) => item.id === editId));
-      if (deleteId) {
-        store.equipmentFleet = store.equipmentFleet.filter((item) => item.id !== deleteId);
-        saveStore(store);
-        if (editingId === deleteId) resetForm();
-        render();
-        setNotice("Equipment record deleted.");
-      }
     });
 
     closeDocumentModalButton?.addEventListener("click", closeDocumentModal);
@@ -5011,7 +4811,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               <span class="loading-placeholder">...</span>
             </button>` : "-"}</td>
           <td>${text(item.approvedBy)}</td>
-          <td><div class="table-actions"><button class="btn small" type="button" data-download-maintenance="${item.id}">Download PDF</button><button class="btn small" type="button" data-edit-maintenance="${item.id}">Edit</button><button class="btn small danger" type="button" data-delete-maintenance="${item.id}">Delete</button></div></td>
+          <td><div class="table-actions"><button class="btn small" type="button" data-download-maintenance="${item.id}">Download PDF</button><button class="btn small" type="button" data-edit-maintenance="${item.id}">Edit</button></div></td>
         </tr>`;
       }).join("");
       updateSummary(rows);
@@ -5126,7 +4926,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     body.addEventListener("click", async (event) => {
       const downloadId = event.target.closest("[data-download-maintenance]")?.dataset.downloadMaintenance;
       const editId = event.target.closest("[data-edit-maintenance]")?.dataset.editMaintenance;
-      const deleteId = event.target.closest("[data-delete-maintenance]")?.dataset.deleteMaintenance;
       const imageId = event.target.closest("[data-view-maintenance-image]")?.dataset.viewMaintenanceImage;
       if (downloadId) {
         const item = store.maintenanceJobs.find((record) => record.id === downloadId);
@@ -5137,7 +4936,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               ["Job No", "Truck No", "Complaint Date", "Repair Date", "Part Name", "Old Serial No", "New Serial No", "Part Cost", "Warranty Period", "Warranty Expiry", "Warranty Status", "Driver Name", "Image", "Approved By"],
               [item.id, item.truckNo, formatShortDate(item.complaintDate), formatShortDate(item.repairDate), item.partName, item.oldSerialNumber, item.newSerialNumber, `PKR ${money(item.partCost)}`, item.warrantyPeriod, formatShortDate(item.warrantyExpiry), getWarrantyState(item.warrantyExpiry).label, item.driverName, item.image ? "Attached" : "-", item.approvedBy],
               `${safePdfFileName(item.truckNo || item.id)}_${safePdfFileName(item.id)}_maintenance`,
-              item.image || ""
+              ""
             );
           } catch (error) {
             setNotice(error.message, true);
@@ -5147,13 +4946,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       if (editId) fillForm(store.maintenanceJobs.find((item) => item.id === editId));
       if (imageId) openImageModal(store.maintenanceJobs.find((item) => item.id === imageId)?.image);
-      if (deleteId) {
-        store.maintenanceJobs = store.maintenanceJobs.filter((item) => item.id !== deleteId);
-        saveStore(store);
-        if (editingId === deleteId) resetForm();
-        render();
-        setNotice(`${deleteId} deleted.`);
-      }
     });
 
     truckFilter?.addEventListener("change", render);
@@ -5176,6 +4968,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const imageInput = document.querySelector("[data-employee-image-input]");
     const imagePreview = document.querySelector("[data-employee-image-preview]");
     const removeImageButton = document.querySelector("[data-remove-employee-image]");
+    const imageModal = document.querySelector("[data-employee-image-modal]");
+    const imageModalImage = document.querySelector("[data-employee-image-modal-image]");
+    const closeImageModalButton = document.querySelector("[data-close-employee-image-modal]");
     let editingId = "";
     let employeeImageData = "";
     let employeeImagePromise = Promise.resolve("");
@@ -5189,6 +4984,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           ? `<img src="${employeeImageData}" alt="Selected employee" />`
           : "";
       }
+    }
+
+    function openImageModal(source) {
+      if (!source || !imageModal || !imageModalImage) return;
+      imageModalImage.src = source;
+      imageModal.hidden = false;
+      document.body.classList.add("bilty-modal-open");
+      closeImageModalButton?.focus();
+    }
+
+    function closeImageModal() {
+      if (!imageModal || !imageModalImage) return;
+      imageModal.hidden = true;
+      imageModalImage.removeAttribute("src");
+      document.body.classList.remove("bilty-modal-open");
     }
 
     function updateSummary() {
@@ -5207,7 +5017,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function resetForm() {
       form.reset();
-      form.elements.joiningDate.value = "2026-06-18";
+      form.elements.joiningDate.value = getTodayIsoDate();
       form.elements.status.value = "Active";
       form.elements.department.value = "Operations";
       editingId = "";
@@ -5225,18 +5035,37 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${text(item.designation)}</td>
           <td>${text(item.department)}</td>
           <td>${money(item.salary)}</td>
-          <td>${text(item.joiningDate)}</td>
+          <td>${formatShortDate(item.joiningDate)}</td>
           <td>${text(item.phone)}</td>
           <td><div class="employee-status-actions"><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span><button class="btn small" type="button" data-download-employee="${item.id}">Download PDF</button></div></td>
+          <td>${item.image ? `
+            <button class="maintenance-thumbnail" type="button" data-view-employee-image="${item.id}" aria-label="View image for ${escapeHtml(item.name || item.id)}">
+              <img src="${item.image}" alt="" />
+            </button>` : item.imagePath ? `
+            <button class="maintenance-thumbnail" type="button" data-view-employee-image="${item.id}" aria-label="View image for ${escapeHtml(item.name || item.id)}" data-lazy-employee-img="${escapeHtml(item.imagePath)}">
+              <span class="loading-placeholder">...</span>
+            </button>` : "-"}</td>
           <td>
             <div class="table-actions">
               <button class="btn small" data-edit-employee="${item.id}">Edit</button>
-              <button class="btn small danger" data-delete-employee="${item.id}">Delete</button>
             </div>
           </td>
         </tr>
       `).join("");
       updateSummary();
+
+      body.querySelectorAll("[data-lazy-employee-img]").forEach((btn) => {
+        const path = btn.getAttribute("data-lazy-employee-img");
+        const empId = btn.getAttribute("data-view-employee-image");
+        const emp = store.employees.find((e) => e.id === empId);
+        getPrivateDocumentUrl(path).then((url) => {
+          if (url) {
+            if (emp) emp.image = url;
+            btn.innerHTML = `<img src="${escapeHtml(url)}" alt="" />`;
+            btn.removeAttribute("data-lazy-employee-img");
+          }
+        });
+      });
     }
 
     function fillForm(item) {
@@ -5245,7 +5074,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         if (form.elements[key]) form.elements[key].value = item[key];
       });
       editingId = item.id;
-      setEmployeeImage(item.image || "");
+      if (item.image) {
+        setEmployeeImage(item.image);
+      } else if (item.imagePath) {
+        getPrivateDocumentUrl(item.imagePath).then((url) => {
+          if (url) {
+            item.image = url;
+            setEmployeeImage(url);
+          }
+        });
+      } else {
+        setEmployeeImage("");
+      }
       employeeImagePromise = Promise.resolve(employeeImageData);
       form.querySelector("[data-submit-label]").textContent = "Update Employee";
       form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -5276,10 +5116,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       event.preventDefault();
       await employeeImagePromise;
       const data = Object.fromEntries([...new FormData(form).entries()].filter(([key]) => key !== "employeeImageFile"));
+      const existingItem = editingId ? store.employees.find((item) => item.id === editingId) : null;
       const normalized = {
         ...data,
         salary: Number(data.salary || 0),
-        image: employeeImageData
+        image: employeeImageData,
+        imagePath: existingItem?.imagePath || ""
       };
 
       if (!editingId) {
@@ -5310,7 +5152,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     body.addEventListener("click", async (event) => {
       const downloadId = event.target.closest("[data-download-employee]")?.dataset.downloadEmployee;
       const editId = event.target.closest("[data-edit-employee]")?.dataset.editEmployee;
-      const deleteId = event.target.closest("[data-delete-employee]")?.dataset.deleteEmployee;
+      const imageId = event.target.closest("[data-view-employee-image]")?.dataset.viewEmployeeImage;
       if (downloadId) {
         const item = store.employees.find((record) => record.id === downloadId);
         if (item) {
@@ -5320,7 +5162,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               ["Employee ID", "Name", "Designation", "Department", "Salary", "Joining Date", "Phone", "Status"],
               [item.id, item.name, item.designation, item.department, `PKR ${money(item.salary)}`, formatShortDate(item.joiningDate), item.phone, item.status],
               `${safePdfFileName(item.name || item.id)}_employee_record`,
-              item.image || ""
+              ""
             );
           } catch (error) {
             notice.textContent = error.message;
@@ -5329,15 +5171,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return;
       }
       if (editId) fillForm(store.employees.find((item) => item.id === editId));
-      if (deleteId) {
-        store.employees = store.employees.filter((item) => item.id !== deleteId);
-        saveStore(store);
-        render();
-        notice.textContent = `Employee ${deleteId} deleted successfully.`;
-        if (editingId === deleteId) resetForm();
+      if (imageId) {
+        const emp = store.employees.find((item) => item.id === imageId);
+        if (emp?.image) openImageModal(emp.image);
       }
     });
 
+    closeImageModalButton?.addEventListener("click", closeImageModal);
+    imageModal?.addEventListener("click", (event) => { if (event.target === imageModal) closeImageModal(); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && imageModal && !imageModal.hidden) closeImageModal(); });
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     window.activePageRender = render;
     render();
@@ -6490,6 +6332,44 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
   }
 
+  function bindGlobalDateAutoSelect() {
+    document.addEventListener("focusin", (event) => {
+      const target = event.target;
+      if (target && target.tagName === "INPUT" && target.type === "date" && !target.value) {
+        target.value = getTodayIsoDate();
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+        target.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target && target.tagName === "INPUT" && target.type === "date" && !target.value) {
+        target.value = getTodayIsoDate();
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+        target.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      const datePickerBtn = target.closest("[data-open-date-picker], .date-picker-btn");
+      if (datePickerBtn) {
+        const group = datePickerBtn.closest(".date-input-group");
+        if (group) {
+          const textInput = group.querySelector("input[type='text']");
+          const dateInput = group.querySelector("input[type='date']");
+          if (dateInput && !dateInput.value) {
+            dateInput.value = getTodayIsoDate();
+            dateInput.dispatchEvent(new Event("input", { bubbles: true }));
+            dateInput.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          if (textInput && !textInput.value) {
+            textInput.value = formatShortDate(getTodayIsoDate());
+            textInput.dispatchEvent(new Event("input", { bubbles: true }));
+            textInput.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }
+      }
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", async () => {
     const store = loadStore();
     const page = document.body.dataset.page;
@@ -6499,6 +6379,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       history.replaceState({ page, url: window.location.href }, "", window.location.href);
     }
 
+    bindGlobalDateAutoSelect();
     bindPageTransitions();
     syncAdminNavigationRoute();
     ensureEquipmentNavigation();

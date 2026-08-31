@@ -44,41 +44,41 @@
         <div class="screen-head"><div><h3>Create / Update Truck Trip</h3></div></div>
         <form data-truck-trip-form class="form-grid">
           <div class="field full"><h3>Import Details</h3></div>
-          <div class="field quarter"><label>Import Truck Registration No</label><input name="truckNo" value="JW-5477" required /></div>
-          <div class="field quarter"><label>Date</label><input name="date" type="date" value="2026-07-04" required /></div>
-          <div class="field quarter"><label>Customer / Payer</label><input name="customer" value="Cherat" required /></div>
-          <div class="field quarter"><label>Origin</label><input name="origin" value="Karachi" /></div>
-          <div class="field quarter"><label>Destination</label><input name="destination" value="Lahore" /></div>
-          <div class="field quarter"><label>Size</label><input name="size" value="1x40" /></div>
-          <div class="field quarter"><label>Weight</label><input name="weight" value="40 Mton" /></div>
-          <div class="field quarter"><label>Cargo Description</label><input name="cargoDescription" value="Bags" /></div>
-          <div class="field quarter"><label>MTY Box Freight</label><input name="mtyBoxFreight" type="number" value="10000" /></div>
-          <div class="field quarter"><label>MTY Broker</label><input name="mtyBroker" value="Ajmal Mty-0300-8383762" /></div>
-          <div class="field quarter"><label>Import Freight</label><input name="importFreight" type="number" value="370000" /></div>
-          <div class="field quarter"><label>Broker Commission</label><input name="importBrokerCommission" type="number" value="5000" /></div>
-          <div class="field quarter"><label>Import - Broker</label><input name="importBroker" value="Shareef/Faisal-0304-2609790" /></div>
+          <div class="field quarter"><label>Import Truck Registration No</label><input name="truckNo" placeholder="Example: JW-5477" required /></div>
+          <div class="field quarter"><label>Date</label><input name="date" type="date" required /></div>
+          <div class="field quarter"><label>Customer / Payer</label><input name="customer" placeholder="Customer Name" required /></div>
+          <div class="field quarter"><label>Origin</label><input name="origin" placeholder="Origin" /></div>
+          <div class="field quarter"><label>Destination</label><input name="destination" placeholder="Destination" /></div>
+          <div class="field quarter"><label>Size</label><input name="size" placeholder="1x40 / 1x20" /></div>
+          <div class="field quarter"><label>Weight</label><input name="weight" placeholder="Weight" /></div>
+          <div class="field quarter"><label>Cargo Description</label><input name="cargoDescription" placeholder="Description" /></div>
+          <div class="field quarter"><label>MTY Box Freight</label><input name="mtyBoxFreight" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>MTY Broker</label><input name="mtyBroker" placeholder="Broker / Contact" /></div>
+          <div class="field quarter"><label>Import Freight</label><input name="importFreight" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>Broker Commission</label><input name="importBrokerCommission" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>Import - Broker</label><input name="importBroker" placeholder="Broker / Contact" /></div>
           <div class="field quarter"><label>Import Receivable Amount</label><input name="importReceivedAmount" type="text" readonly /></div>
-          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="importChequeDetails" value="IBFT" /></div>
-          <div class="field quarter"><label>Payment Received Date</label><input name="importPaymentDate" type="date" value="2026-07-07" /></div>
+          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="importChequeDetails" placeholder="IBFT / Cheque No" /></div>
+          <div class="field quarter"><label>Payment Received Date</label><input name="importPaymentDate" type="date" /></div>
           <div class="field quarter"><label>Payment Status</label><select name="importPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
           <div class="field quarter"><label>MTY Payment Received Date</label><input name="mtyPaymentDate" type="date" /></div>
           <div class="field quarter"><label>MTY Payment Status</label><select name="mtyPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
-          <div class="field full"><label>Import Remarks</label><textarea name="importRemarks">Import Payment Awaited</textarea></div>
+          <div class="field full"><label>Import Remarks</label><textarea name="importRemarks" placeholder="Import remarks..."></textarea></div>
           <div class="field full"><h3>Export Details</h3></div>
-          <div class="field quarter"><label>Export Load Date</label><input name="exportLoadDate" type="date" value="2026-07-08" /></div>
-          <div class="field quarter"><label>Export Truck Registration No</label><input name="exportTruckNo" value="JW-5477" required /></div>
-          <div class="field quarter"><label>Export - Broker</label><input name="exportBroker" value="Tanveer/M Waseem-0300-0990201" /></div>
-          <div class="field quarter"><label>Export Freight</label><input name="exportFreight" type="number" value="100000" /></div>
-          <div class="field quarter"><label>Broker Commission</label><input name="exportBrokerCommission" type="number" value="2000" /></div>
-          <div class="field quarter"><label>Origin</label><input name="exportOrigin" value="Lahore" /></div>
-          <div class="field quarter"><label>Destination</label><input name="exportDestination" value="Karachi" /></div>
-          <div class="field quarter"><label>Size</label><input name="exportSize" value="1x40" /></div>
-          <div class="field quarter"><label>Weight</label><input name="exportWeight" value="20 Mton" /></div>
+          <div class="field quarter"><label>Export Load Date</label><input name="exportLoadDate" type="date" /></div>
+          <div class="field quarter"><label>Export Truck Registration No</label><input name="exportTruckNo" placeholder="Example: JW-5477" /></div>
+          <div class="field quarter"><label>Export - Broker</label><input name="exportBroker" placeholder="Broker / Contact" /></div>
+          <div class="field quarter"><label>Export Freight</label><input name="exportFreight" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>Broker Commission</label><input name="exportBrokerCommission" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>Origin</label><input name="exportOrigin" placeholder="Origin" /></div>
+          <div class="field quarter"><label>Destination</label><input name="exportDestination" placeholder="Destination" /></div>
+          <div class="field quarter"><label>Size</label><input name="exportSize" placeholder="1x40 / 1x20" /></div>
+          <div class="field quarter"><label>Weight</label><input name="exportWeight" placeholder="Weight" /></div>
           <div class="field quarter"><label>Export Receivable Amount</label><input name="exportReceivedAmount" type="text" readonly /></div>
-          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="exportChequeDetails" value="MCB-10986541" /></div>
-          <div class="field quarter"><label>Payment Received Date</label><input name="exportPaymentDate" type="date" value="2026-07-11" /></div>
+          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="exportChequeDetails" placeholder="Instrument Details" /></div>
+          <div class="field quarter"><label>Payment Received Date</label><input name="exportPaymentDate" type="date" /></div>
           <div class="field quarter"><label>Payment Status</label><select name="exportPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
-          <div class="field full"><label>Export Remarks</label><textarea name="exportRemarks">Export Payment Awaited</textarea></div>
+          <div class="field full"><label>Export Remarks</label><textarea name="exportRemarks" placeholder="Export remarks..."></textarea></div>
           <div class="field quarter"><label>Truck Details Image</label><div class="maintenance-image-field"><input name="tripImageFile" type="file" accept="image/*" data-truck-image-input /><button class="maintenance-image-remove" type="button" data-remove-truck-image hidden aria-label="Remove selected image" title="Remove image">&times;</button></div><div class="maintenance-image-preview" data-truck-image-preview hidden></div></div>
           <div class="field quarter"><label>Grand Total</label><input name="grandTotal" type="text" readonly /></div>
           <div class="field quarter"><label>Round Trip Expense</label><input name="roundTripExpense" type="number" value="0" min="0" /></div>

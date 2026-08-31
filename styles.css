@@ -1978,29 +1978,165 @@ th {
 .ledger-filter {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .ledger-filter-control {
-  min-width: 220px;
+  min-width: 130px;
+  max-width: 175px;
+  flex: 1 1 auto;
+}
+
+.ledger-filter-control-job-order {
+  min-width: 175px;
+  max-width: 215px;
 }
 
 .ledger-filter-control label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
+.ledger-filter-control select,
+.ledger-filter-control input {
+  min-height: 38px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+
+.truck-summary-screen-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.truck-summary-stats {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 1.15;
+  min-width: 0;
+}
+
+.truck-summary-stats .ledger-total {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  padding: 6px 10px;
+  border: 1px solid #dfbea2;
+  border-radius: 8px;
+  background: #f8eadc;
+  color: var(--nav);
+  flex-direction: column;
+  justify-content: center;
+}
+
+.truck-summary-stats .ledger-total.ledger-total-trucks {
+  flex: 0.75;
+}
+
+.truck-summary-stats .ledger-total span {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.truck-summary-stats .ledger-total strong {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.truck-summary-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.truck-summary-controls .ledger-filter-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.truck-summary-controls .ledger-filter-control label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.truck-summary-controls .ledger-filter-control select {
+  width: 100%;
+  min-height: 38px;
+  height: 38px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background-color: #ffffff;
+}
+
+.clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #dfbea2;
+  border-radius: 8px;
+  background: #fbf1e7;
+  color: #734526;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.clear-filter-btn svg {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.clear-filter-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+  transform: translateY(-1px);
+}
+
+.clear-filter-btn:hover svg {
+  transform: rotate(-90deg);
+}
+
 .ledger-total {
   display: flex;
-  min-width: 180px;
-  min-height: 48px;
-  padding: 7px 13px;
+  min-width: 130px;
+  min-height: 44px;
+  padding: 6px 12px;
   border: 1px solid #dfbea2;
   border-radius: 8px;
   background: #f8eadc;
@@ -2014,24 +2150,26 @@ th {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  line-height: 1.2;
 }
 
 .ledger-total strong {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.25;
   white-space: nowrap;
+  margin: 2px 0 0;
 }
 
 .ledger-count {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
+  min-height: 38px;
+  padding: 0 12px;
   border-radius: 999px;
   background: #fff7ef;
   border: 1px solid var(--line);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2742,8 +2880,18 @@ body[data-page="truck-summary"] .truck-summary-table td {
 
 .truck-summary-download {
   display: flex;
-  justify-content: flex-end;
-  margin: 0 0 16px;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.truck-summary-download-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 
 .truck-summary-download .btn:disabled {

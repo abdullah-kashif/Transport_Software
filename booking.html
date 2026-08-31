@@ -68,9 +68,7 @@
           </div>
         </div>
         <form data-booking-form class="form-grid">
-          <div class="field quarter"><label>Booking No</label><input name="bookingNo" value="BKG-24061"
-              placeholder="Example: BKG-24061" required /></div>
-          <div class="field quarter"><label>Invoice</label><input name="invoiceNo" value="INV-24061"
+          <div class="field quarter"><label>Invoice</label><input name="invoiceNo"
               placeholder="Example: INV-24061" /></div>
           <div class="field quarter">
             <label>Booking Date</label>
@@ -88,16 +86,16 @@
               </button>
             </div>
           </div>
-          <div class="field quarter"><label>BL No</label><input name="blNo" value="ONEYSINE22550700" /></div>
-          <div class="field quarter"><label>NTN</label><input name="gatePass" type="text" value="GP-001"
+          <div class="field quarter"><label>BL No</label><input name="blNo" placeholder="Example: ONEYSINE22550700" /></div>
+          <div class="field quarter"><label>NTN</label><input name="gatePass" type="text"
               placeholder="Example: 1234567-8" /></div>
-          <div class="field quarter"><label>Customer / Payer</label><input name="customer" value="Cherat Packaging Ltd"
+          <div class="field quarter"><label>Customer / Payer</label><input name="customer" placeholder="Customer Name"
               required /></div>
           <div class="field quarter"><label>Consignee Address</label><input name="consignee"
-              value="Cherat Packaging Gadoon" required /></div>
-          <div class="field quarter"><label>Route</label><input name="route" value="Karachi to Gadoon" required /></div>
-          <div class="field quarter"><label>Origin</label><input name="origin" value="Karachi Port" required /></div>
-          <div class="field quarter"><label>Destination</label><input name="destination" value="Gadoon" required />
+              placeholder="Consignee Address" required /></div>
+          <div class="field quarter"><label>Route</label><input name="route" placeholder="Example: Karachi to Lahore" required /></div>
+          <div class="field quarter"><label>Origin</label><input name="origin" placeholder="Origin Location" required /></div>
+          <div class="field quarter"><label>Destination</label><input name="destination" placeholder="Destination Location" required />
           </div>
           <div class="field quarter">
             <label>Category</label>
@@ -110,10 +108,10 @@
               <option>Crane Lifter Services</option>
             </select>
           </div>
-          <div class="field quarter"><label>Goods Type</label><input name="goodsType" value="Plastic Dana" /></div>
-          <div class="field quarter"><label>Quantity</label><input name="quantity" value="990 Bags" /></div>
+          <div class="field quarter"><label>Goods Type</label><input name="goodsType" placeholder="Goods Description" /></div>
+          <div class="field quarter"><label>Quantity</label><input name="quantity" placeholder="Quantity / Weight" /></div>
           <div class="field quarter"><label>Road Haulage Charges</label><input name="rate" type="number"
-              value="145000" /></div>
+              placeholder="0" /></div>
           <div class="field quarter">
             <label>Sales Tax Authority</label>
             <select name="salesTaxAuthority">
@@ -125,20 +123,28 @@
               <option>Other</option>
             </select>
           </div>
+          <div class="field quarter">
+            <label>Sales Tax Withholding</label>
+            <select name="salesTaxWithholding">
+              <option value="20" selected>20% Withheld (80% by us)</option>
+              <option value="100">100% Withheld (0% by us)</option>
+              <option value="0">0% Withheld (100% by us)</option>
+            </select>
+          </div>
           <div class="field quarter"><label>Detention</label><input name="detention" type="number" inputmode="numeric"
               class="manual-number-input" value="0" /></div>
-          <div class="field quarter"><label>15% Sales Tax</label><input name="salesTaxAmount" type="text" value="21750"
+          <div class="field quarter"><label>15% Sales Tax</label><input name="salesTaxAmount" type="text" value="0"
               readonly /></div>
-          <div class="field quarter"><label>Total Amount</label><input name="totalAmount" type="text" value="166750"
+          <div class="field quarter"><label>Total Amount</label><input name="totalAmount" type="text" value="0"
               readonly /></div>
           <div class="field quarter"><label>Income Tax 7%</label><input name="incomeTaxAmount" type="text"
-              value="11672.5" readonly /></div>
-          <div class="field quarter"><label>Sale Tax With Held 20%</label><input name="salesTaxWithheldAmount"
-              type="text" value="4350" readonly /></div>
-          <div class="field quarter"><label>Sale Tax 80% by us</label><input name="salesTaxByUsAmount" type="text"
-              value="17400" readonly /></div>
+              value="0" readonly /></div>
+          <div class="field quarter"><label data-label-st-withheld>Sale Tax With Held 20%</label><input name="salesTaxWithheldAmount"
+              type="text" value="0" readonly /></div>
+          <div class="field quarter"><label data-label-st-by-us>Sale Tax 80% by us</label><input name="salesTaxByUsAmount" type="text"
+              value="0" readonly /></div>
           <div class="field quarter"><label>Receivable Amount</label><input name="receivableAmount" type="text"
-              value="150727.5" readonly /></div>
+              value="0" readonly /></div>
           <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days"
               placeholder="Example: 30 Days" /></div>
           <div class="field quarter"><label>Payment Received Date</label><input name="paymentReceivedDate"
@@ -177,7 +183,7 @@
             </div>
           </div>
           <div class="field full"><label>Remarks</label><textarea
-              name="remarks">PO submitted, dispatch ready.</textarea></div>
+              name="remarks" placeholder="Optional booking remarks..."></textarea></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Booking</button>
             <button class="btn" type="button" data-reset-form>Clear Form</button>
