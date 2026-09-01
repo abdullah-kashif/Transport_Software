@@ -723,28 +723,16 @@ async function uploadBookingBilty(booking) {
       console.warn("Supabase booking load failed; browser data remains available.", error.message);
       return;
     }
-    const session = getAdminSession();
-    const canWriteBookings = session?.role === "Super Admin" || normalizeAdminAccess(session?.access || [], session?.role).includes("booking");
-    if (!data.length && canWriteBookings) {
-      for (const booking of store.bookings || []) {
-        try {
-          const remote = await saveBookingToSupabase(booking);
-          Object.assign(booking, remote || {});
-        } catch (migrationError) {
-          console.warn("Initial booking sync skipped.", migrationError.message);
-          break;
-        }
-      }
-      saveStore(store, { skipAudit: true });
-      return;
-    }
-    const mapped = data.map((row) => {
+    const mapped = (data || []).map((row) => {
       const booking = mapBookingRowFromSupabase(row);
       booking.biltyImage = getCachedSignedUrl(booking.biltyPath);
       return booking;
     });
     replaceArrayContents(store.bookings, mapped);
-    saveStore(store, { skipAudit: true });
+    saveStore(store, { skipAudit: true, skipRemote: true });
+    if (typeof window.activePageRender === "function") {
+      window.activePageRender();
+    }
   }
 
   let operationalSyncTimer = null;
@@ -1076,10 +1064,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
       load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at")
     ]);
-    const migrationKey = "gtls-supabase-operational-migrated";
-    const canMigrate = getAdminSession()?.role === "Super Admin" && localStorage.getItem(migrationKey) !== "1";
-    
-    if (trucks?.length) {
+    if (Array.isArray(trucks)) {
       const mappedTrucks = trucks.map((r) => ({
         id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
         date: r.import_date, customer: r.customer || "", origin: r.import_origin || "", destination: r.import_destination || "", size: r.import_size || "",
@@ -1096,11 +1081,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         image: getCachedSignedUrl(r.image_path)
       }));
       replaceArrayContents(store.truckExpenses, mappedTrucks);
-    } else if (trucks && !canMigrate) {
-      replaceArrayContents(store.truckExpenses, []);
     }
 
-    if (equipment?.length) {
+    if (Array.isArray(equipment)) {
       const mappedEquip = equipment.map((r) => ({
         id: r.truck_no, truckNo: r.truck_no, typeOfBody: r.type_of_body || "", chassisNo: r.chassis_no,
         engineNo: r.engine_no, make: r.make, model: r.model, mra: r.mra || "", banker: r.banker || "", fitnessExpiry: r.fitness_expiry || "",
@@ -1110,11 +1093,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         documentData: getCachedSignedUrl(r.original_documents_path)
       }));
       replaceArrayContents(store.equipmentFleet, mappedEquip);
-    } else if (equipment && !canMigrate) {
-      replaceArrayContents(store.equipmentFleet, []);
     }
 
-    if (maintenance?.length) {
+    if (Array.isArray(maintenance)) {
       const mappedMaint = maintenance.map((r) => ({
         id: r.maintenance_job_no, truckNo: r.truck_no,
         complaintDate: r.complaint_date, repairDate: r.repair_date, partName: r.part_name, oldSerialNumber: r.old_serial_number || "", newSerialNumber: r.new_serial_number,
@@ -1122,22 +1103,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         approvedBy: r.approved_by, imagePath: r.image_path || "", image: getCachedSignedUrl(r.image_path)
       }));
       replaceArrayContents(store.maintenanceJobs, mappedMaint);
-    } else if (maintenance && !canMigrate) {
-      replaceArrayContents(store.maintenanceJobs, []);
     }
 
-    if (employees?.length) {
+    if (Array.isArray(employees)) {
       const mappedEmp = employees.map((r) => ({
         id: r.employee_no, name: r.name, designation: r.designation,
         department: r.department || "", salary: Number(r.salary || 0), joiningDate: r.joining_date, status: r.status, phone: r.phone || "",
         imagePath: r.image_path || "", image: getCachedSignedUrl(r.image_path)
       }));
       replaceArrayContents(store.employees, mappedEmp);
-    } else if (employees && !canMigrate) {
-      replaceArrayContents(store.employees, []);
     }
 
-    if (accounts?.length) {
+    if (Array.isArray(accounts)) {
       const { data: entries, error } = await client.from("account_entries").select("*").order("entry_date", { ascending: true });
       if (!error) {
         const mappedAccounts = accounts.map((account) => ({
@@ -1151,13 +1128,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         }));
         replaceArrayContents(store.customerKhatas, mappedAccounts.filter((_, index) => accounts[index].account_type === "receivable"));
         replaceArrayContents(store.vendorKhatas, mappedAccounts.filter((_, index) => accounts[index].account_type === "payable"));
+      } else {
+        replaceArrayContents(store.customerKhatas, []);
+        replaceArrayContents(store.vendorKhatas, []);
       }
-    } else if (accounts && !canMigrate) {
-      replaceArrayContents(store.customerKhatas, []);
-      replaceArrayContents(store.vendorKhatas, []);
     }
 
-    if (logs?.length) {
+    if (Array.isArray(logs)) {
       const mappedLogs = logs.map((r) => ({
         id: `LOG-${r.id}`, timestamp: r.created_at, userName: r.user_name || "",
         userEmail: r.metadata?.user_email || "", userRole: r.metadata?.user_role || "", module: r.module, action: r.action.toUpperCase(),
@@ -1167,20 +1144,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     saveStore(store, { skipAudit: true, skipRemote: true });
-    if (canMigrate) {
-      const migrations = [];
-      if (trucks && !trucks.length && store.truckExpenses?.length && hasModuleAccessForSync("truck")) migrations.push(syncTruckJobs(store.truckExpenses));
-      if (equipment && !equipment.length && store.equipmentFleet?.length && hasModuleAccessForSync("equipment")) migrations.push(syncEquipment(store.equipmentFleet));
-      if (maintenance && !maintenance.length && store.maintenanceJobs?.length && hasModuleAccessForSync("maintenance")) migrations.push(syncMaintenance(store.maintenanceJobs));
-      if (employees && !employees.length && store.employees?.length && hasModuleAccessForSync("employee")) migrations.push(syncEmployees(store.employees));
-      if (accounts && !accounts.length) {
-        if (hasModuleAccessForSync("khata") && store.customerKhatas?.length) migrations.push(syncAccounts(store.customerKhatas, "receivable"));
-        if (hasModuleAccessForSync("accounts-payable") && store.vendorKhatas?.length) migrations.push(syncAccounts(store.vendorKhatas, "payable"));
-      }
-      await Promise.allSettled(migrations);
-      localStorage.setItem(migrationKey, "1");
+    if (typeof window.activePageRender === "function") {
+      window.activePageRender();
     }
-    await syncActivityLogs(store.activityLogs || []).catch(() => {});
   }
 
   function getPageFile(page) {
