@@ -362,6 +362,7 @@
       collectAuditChanges(previousStore, store);
     }
     store.activityLogs = pruneActivityLogs(store.activityLogs || []);
+    if (!options.skipAudit) operationalMutationVersion += 1;
     sessionStorage.setItem(KEY, JSON.stringify(store));
     if (!options.skipRemote) scheduleOperationalSync(previousStore, store);
   }
@@ -749,6 +750,7 @@ async function uploadBookingBilty(booking) {
 
   let operationalSyncTimer = null;
   let operationalSyncQueue = Promise.resolve();
+  let operationalMutationVersion = 0;
 
   async function flushOperationalSyncBeforeMutation() {
     clearTimeout(operationalSyncTimer);
@@ -1142,6 +1144,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function hydrateOperationalStore(store) {
     const client = getSupabaseClient();
     if (!client) return;
+    const hydrationVersion = operationalMutationVersion;
     const load = async (table, allowed, orderField) => {
       if (!allowed) return null;
       let query = client.from(table).select("*");
@@ -1161,6 +1164,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
       load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at")
     ]);
+    if (hydrationVersion !== operationalMutationVersion) return;
     if (Array.isArray(trucks)) {
       const mappedTrucks = trucks.map((r) => ({
         id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
@@ -6315,10 +6319,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return;
       }
 
+      let successMessage = "";
       if (!editingCustomerId) {
         normalized.id = getNextSequentialId(accounts, isPayable ? "PAY" : "CUS");
         accounts.unshift(normalized);
-        showNotice(customerNotice, `${partyLabel} ${normalized.customer} was added successfully.`);
+        successMessage = `${partyLabel} ${normalized.customer} was added successfully.`;
       } else {
         const index = accounts.findIndex((item) => String(item.id) === String(editingCustomerId));
         if (index === -1) {
@@ -6328,7 +6333,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         normalized.id = editingCustomerId;
         normalized.entries = accounts[index].entries || [];
         accounts[index] = normalized;
-        showNotice(customerNotice, `${partyLabel} ${normalized.customer} updated successfully.`);
+        successMessage = `${partyLabel} ${normalized.customer} updated successfully.`;
       }
 
       saveStore(store, { skipRemote: true });
@@ -6342,6 +6347,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         showNotice(customerNotice, `Supabase sync failed: ${error.message || "Unable to save this account."}`);
         return;
       }
+      showNotice(customerNotice, successMessage);
       populateCustomers(normalized.id);
       renderAccount(normalized.id);
       resetCustomerForm();
@@ -6396,11 +6402,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
       if (!account.entries) account.entries = [];
 
+      let successMessage = "";
       if (!editingId) {
         const allEntries = accounts.flatMap((item) => Array.isArray(item.entries) ? item.entries : []);
         normalized.id = getNextSequentialId(allEntries, entryPrefix);
         account.entries.unshift(normalized);
-        showNotice(notice, `Statement entry ${normalized.id} saved successfully.`);
+        successMessage = `Statement entry ${normalized.id} saved successfully.`;
       } else {
         const index = account.entries.findIndex((entry) => String(entry.id) === String(editingId));
         if (index === -1) {
@@ -6409,7 +6416,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         }
         normalized.imagePath = account.entries[index].imagePath || "";
         account.entries[index] = normalized;
-        showNotice(notice, `Statement entry ${editingId} updated successfully.`);
+        successMessage = `Statement entry ${editingId} updated successfully.`;
       }
 
       saveStore(store, { skipRemote: true });
@@ -6423,6 +6430,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         showNotice(notice, `Supabase sync failed: ${error.message || "Unable to save this entry."}`);
         return;
       }
+      showNotice(notice, successMessage);
       populateCustomers(account.id);
       renderAccount(account.id);
       resetForm();

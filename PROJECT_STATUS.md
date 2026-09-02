@@ -59,5 +59,10 @@ The local workspace cannot log into the user's live Supabase session or click th
   the master SQL includes the complete account-entry RLS/access repair.
 - Khata account and entry saves now wait for direct Supabase synchronization so
   entries cannot appear saved locally and disappear after refresh.
+- Protected in-flight Supabase hydration from overwriting a newer local Khata
+  account or entry mutation.
+- Success notices for Khata accounts and entries now appear only after direct
+  Supabase synchronization succeeds; failed remote saves remain visible as
+  errors instead of showing a false success message.
 - Re-checked JavaScript syntax, loaded all 15 HTML pages through a local server,
   and confirmed the unauthenticated redirect/sign-in path has no console errors.
