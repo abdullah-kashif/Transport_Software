@@ -5574,22 +5574,35 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     render();
   }
 
-  async function deleteRemoteKhataEntry(account, entry) {
+  async function resolveRemoteKhataAccount(account, accountType) {
+    const client = getSupabaseClient();
+    if (!client || !account?.customer) return null;
+    const query = /^[0-9a-f-]{36}$/i.test(String(account.id || ""))
+      ? client.from("accounts").select("id").eq("id", account.id).eq("account_type", accountType).maybeSingle()
+      : client.from("accounts").select("id").eq("party_name", account.customer).eq("account_type", accountType).maybeSingle();
+    const { data, error } = await query;
+    if (error) throw error;
+    return data?.id || null;
+  }
+
+  async function deleteRemoteKhataEntry(account, entry, accountType) {
     const client = getSupabaseClient();
     if (!client || !account?.id || !entry) return;
+    const remoteAccountId = await resolveRemoteKhataAccount(account, accountType);
+    if (!remoteAccountId) return;
     let remoteEntries = [];
     if (entry.imagePath) {
-      const result = await client.from("account_entries").select("id,image_path").eq("account_id", account.id).eq("image_path", entry.imagePath);
+      const result = await client.from("account_entries").select("id,image_path").eq("account_id", remoteAccountId).eq("image_path", entry.imagePath);
       if (result.error) throw result.error;
       remoteEntries = result.data || [];
     }
     if (!remoteEntries.length && /^[0-9a-f-]{36}$/i.test(String(entry.id || ""))) {
-      const result = await client.from("account_entries").select("id,image_path").eq("account_id", account.id).eq("id", entry.id);
+      const result = await client.from("account_entries").select("id,image_path").eq("account_id", remoteAccountId).eq("id", entry.id);
       if (result.error) throw result.error;
       remoteEntries = result.data || [];
     }
     if (!remoteEntries.length) {
-      const result = await client.from("account_entries").select("id,image_path").eq("account_id", account.id)
+      const result = await client.from("account_entries").select("id,image_path").eq("account_id", remoteAccountId)
         .eq("entry_date", formatIsoDate(entry.date))
         .eq("entry_type", entry.type === "Credit" ? "Credit" : "Debit")
         .eq("amount", Number(entry.amount || 0))
@@ -5606,18 +5619,20 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (error) throw error;
   }
 
-  async function deleteRemoteKhataAccount(account) {
+  async function deleteRemoteKhataAccount(account, accountType) {
     const client = getSupabaseClient();
     if (!client || !account?.id) return;
-    const { data: entries, error: readError } = await client.from("account_entries").select("id,image_path").eq("account_id", account.id);
+    const remoteAccountId = await resolveRemoteKhataAccount(account, accountType);
+    if (!remoteAccountId) return;
+    const { data: entries, error: readError } = await client.from("account_entries").select("id,image_path").eq("account_id", remoteAccountId);
     if (readError) throw readError;
     const paths = (entries || []).map((entry) => entry.image_path).filter(Boolean);
     if (paths.length) {
       await Promise.all(paths.map((path) => removeStoredPathAndFolder(path).catch((err) => console.warn("Failed to delete khata account image:", err.message))));
     }
-    const { error: entryError } = await client.from("account_entries").delete().eq("account_id", account.id);
+    const { error: entryError } = await client.from("account_entries").delete().eq("account_id", remoteAccountId);
     if (entryError) throw entryError;
-    const { error: accountError } = await client.from("accounts").delete().eq("id", account.id);
+    const { error: accountError } = await client.from("accounts").delete().eq("id", remoteAccountId);
     if (accountError) throw accountError;
   }
 
@@ -6312,9 +6327,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
         try {
           if (acc.entries.length === 0) {
-            await deleteRemoteKhataAccount(acc);
+            await deleteRemoteKhataAccount(acc, isPayable ? "payable" : "receivable");
           } else {
-            await deleteRemoteKhataEntry(acc, entryToDelete);
+            await deleteRemoteKhataEntry(acc, entryToDelete, isPayable ? "payable" : "receivable");
           }
         } catch (error) {
           if (entryToDelete) acc.entries.splice(entryIndex === -1 ? acc.entries.length : entryIndex, 0, entryToDelete);
