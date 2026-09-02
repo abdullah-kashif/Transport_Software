@@ -1775,6 +1775,68 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     modal.querySelector("[data-cancel-signout]").focus();
   }
 
+  function requestDeleteConfirmation({ title = "Delete record?", message = "This action cannot be undone." } = {}) {
+    let modal = document.querySelector("[data-delete-modal]");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.className = "confirm-modal";
+      modal.dataset.deleteModal = "";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-description">
+          <div class="confirm-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path>
+            </svg>
+          </div>
+          <h2 id="delete-title">Delete record?</h2>
+          <p id="delete-description">This action cannot be undone.</p>
+          <div class="confirm-actions">
+            <button class="btn" type="button" data-cancel-delete>Cancel</button>
+            <button class="btn danger" type="button" data-confirm-delete>Delete</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    const previousFocus = document.activeElement;
+    const titleElement = modal.querySelector("#delete-title");
+    const descriptionElement = modal.querySelector("#delete-description");
+    const cancelButton = modal.querySelector("[data-cancel-delete]");
+    const confirmButton = modal.querySelector("[data-confirm-delete]");
+    titleElement.textContent = title;
+    descriptionElement.textContent = message;
+    modal.hidden = false;
+    document.body.classList.add("confirm-modal-open");
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (confirmed) => {
+        if (settled) return;
+        settled = true;
+        modal.hidden = true;
+        document.body.classList.remove("confirm-modal-open");
+        cancelButton.onclick = null;
+        confirmButton.onclick = null;
+        modal.onclick = null;
+        document.removeEventListener("keydown", onKeyDown);
+        if (previousFocus && typeof previousFocus.focus === "function") previousFocus.focus();
+        resolve(confirmed);
+      };
+      const onKeyDown = (event) => {
+        if (event.key === "Escape") finish(false);
+      };
+      cancelButton.onclick = () => finish(false);
+      confirmButton.onclick = () => finish(true);
+      modal.onclick = (event) => {
+        if (event.target === modal) finish(false);
+      };
+      document.addEventListener("keydown", onKeyDown);
+      cancelButton.focus();
+    });
+  }
+
   function normalizeContainerLine(line = {}) {
     return {
       containerNo: String(line.containerNo || "").trim(),
@@ -5468,16 +5530,23 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const deleteId = event.target.getAttribute("data-delete-admin");
       if (editId) fillForm(adminUsers.find((item) => item.id === editId));
       if (deleteId) {
-        (async () => {
-          try {
-            await invokeUserManager({ action: "delete", user_id: deleteId });
-            setNotice("User deleted successfully.");
-            await loadAdminUsers();
-            if (editingId === deleteId) resetForm();
-          } catch (error) {
-            setNotice(error.message || "Unable to delete the Supabase user.");
-          }
-        })();
+        const user = adminUsers.find((item) => item.id === deleteId);
+        requestDeleteConfirmation({
+          title: "Delete user?",
+          message: `This will permanently delete ${user?.name || "this user"} and their sign-in access.`
+        }).then((confirmed) => {
+          if (!confirmed) return;
+          (async () => {
+            try {
+              await invokeUserManager({ action: "delete", user_id: deleteId });
+              setNotice("User deleted successfully.");
+              await loadAdminUsers();
+              if (editingId === deleteId) resetForm();
+            } catch (error) {
+              setNotice(error.message || "Unable to delete the Supabase user.");
+            }
+          })();
+        });
       }
     });
 
@@ -6316,6 +6385,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (deleteId) {
         const acc = accounts.find((a) => (a.entries || []).some((e) => String(e.id) === String(deleteId))) || selectedAccount;
         if (!acc) return;
+        const confirmed = await requestDeleteConfirmation({
+          title: acc.entries.length === 1 ? "Delete account?" : "Delete entry?",
+          message: acc.entries.length === 1
+            ? `This will delete the final entry and remove ${acc.customer} from this register.`
+            : `This will permanently delete the selected entry from ${acc.customer}.`
+        });
+        if (!confirmed) return;
         await flushOperationalSyncBeforeMutation();
         const entryIndex = (acc.entries || []).findIndex((entry) => String(entry.id) === String(deleteId));
         const entryToDelete = entryIndex !== -1 ? acc.entries[entryIndex] : null;

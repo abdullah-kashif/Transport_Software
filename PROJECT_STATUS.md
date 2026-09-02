@@ -45,4 +45,5 @@ The local workspace cannot log into the user's live Supabase session or click th
 - Reduced dynamic navigation latency by removing hard-coded transition sleeps.
 - Repaired Khata deletion and account cleanup so deleted statements do not return after refresh.
 - Added remote account UUID resolution for local IDs such as `CUS-1` and `PAY-1`, preventing PostgreSQL UUID errors during entry/account deletion.
+- Added an accessible confirmation dialog before Admin user deletion and Khata entry/account deletion, with record-specific wording and Escape/overlay cancellation.
 - Added this project status document and a paste-ready Supabase setup reference.
