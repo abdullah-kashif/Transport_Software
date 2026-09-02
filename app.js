@@ -1010,8 +1010,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
       if (existingEntries?.length) await client.from("account_entries").delete().eq("account_id", saved.id);
       if (entryRows.length) {
-        const { error: entryError } = await client.from("account_entries").insert(entryRows);
+        const { data: insertedEntries, error: entryError } = await client.from("account_entries").insert(entryRows).select("id");
         if (entryError) throw entryError;
+        if (insertedEntries && insertedEntries.length === account.entries.length) {
+          insertedEntries.forEach((row, i) => {
+            if (account.entries[i]) account.entries[i].id = String(row.id);
+          });
+        }
       }
     }
     const { data: existing, error } = await client.from("accounts").select("id,party_name").eq("account_type", accountType);
@@ -6217,8 +6222,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       if (editId) fillForm(account, (account.entries || []).find((entry) => String(entry.id) === String(editId)));
       if (deleteId) {
-        const entryToDelete = (account.entries || []).find((entry) => String(entry.id) === String(deleteId));
-        account.entries = (account.entries || []).filter((entry) => String(entry.id) !== String(deleteId));
+        const entryIndex = (account.entries || []).findIndex((entry) => String(entry.id) === String(deleteId));
+        const entryToDelete = entryIndex !== -1 ? account.entries[entryIndex] : null;
+        if (entryIndex !== -1) {
+          account.entries.splice(entryIndex, 1);
+        } else {
+          account.entries = (account.entries || []).filter((entry) => String(entry.id) !== String(deleteId));
+        }
         saveStore(store);
         populateCustomers(account.id);
         renderAccount(account.id);
@@ -6226,11 +6236,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         if (editingId === deleteId) resetForm();
 
         const client = getSupabaseClient();
-        if (client && entryToDelete) {
-          if (entryToDelete.imagePath) {
+        if (client) {
+          if (entryToDelete?.imagePath) {
             client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([entryToDelete.imagePath]).catch(() => {});
           }
-          if (Number(deleteId) || deleteId.length > 20) {
+          if (account.entries.length === 0 && account.id) {
+            client.from("account_entries").delete().eq("account_id", account.id).catch((err) => {
+              console.warn("Direct account_entries wipe failed:", err.message);
+            });
+          } else if (deleteId) {
             client.from("account_entries").delete().eq("id", deleteId).catch((err) => {
               console.warn("Direct Supabase entry delete failed:", err.message);
             });
