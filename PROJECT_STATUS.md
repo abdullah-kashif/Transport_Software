@@ -66,5 +66,7 @@ The local workspace cannot log into the user's live Supabase session or click th
   errors instead of showing a false success message.
 - Recovered the queued sync pipeline after a failed request so one failed save
   cannot block all later Khata edits and updates.
+- Optimized normal Khata account and entry saves to sync only the affected
+  account instead of serially reconciling the complete account register.
 - Re-checked JavaScript syntax, loaded all 15 HTML pages through a local server,
   and confirmed the unauthenticated redirect/sign-in path has no console errors.

@@ -1019,9 +1019,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     await syncRows("employees", "employee_no", rows);
   }
 
-  async function syncAccounts(records, accountType) {
+  async function syncAccounts(records, accountType, options = {}) {
     const client = getSupabaseClient();
     if (!client) return;
+    const pruneMissing = options.pruneMissing !== false;
     const parties = [];
     for (const account of records || []) {
       if (!account.customer) continue;
@@ -1082,21 +1083,23 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         if (deleteEntryError) throw deleteEntryError;
       }
     }
-    const { data: existing, error } = await client.from("accounts").select("id,party_name").eq("account_type", accountType);
-    if (error) throw error;
-    const removed = (existing || []).filter((row) => !parties.includes(row.party_name)).map((row) => row.id);
-    if (removed.length) {
-      const { data: deletedAccountEntries } = await client.from("account_entries").select("image_path").in("account_id", removed);
-      const pathsToDelete = (deletedAccountEntries || []).map((e) => e.image_path).filter(Boolean);
-      if (pathsToDelete.length) {
-        try {
-          await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(pathsToDelete);
-        } catch (err) {
-          console.warn("Failed to delete khata images for deleted accounts:", err.message);
+    if (pruneMissing) {
+      const { data: existing, error } = await client.from("accounts").select("id,party_name").eq("account_type", accountType);
+      if (error) throw error;
+      const removed = (existing || []).filter((row) => !parties.includes(row.party_name)).map((row) => row.id);
+      if (removed.length) {
+        const { data: deletedAccountEntries } = await client.from("account_entries").select("image_path").in("account_id", removed);
+        const pathsToDelete = (deletedAccountEntries || []).map((e) => e.image_path).filter(Boolean);
+        if (pathsToDelete.length) {
+          try {
+            await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(pathsToDelete);
+          } catch (err) {
+            console.warn("Failed to delete khata images for deleted accounts:", err.message);
+          }
         }
+        const { error: accountDeleteError } = await client.from("accounts").delete().in("id", removed);
+        if (accountDeleteError) throw accountDeleteError;
       }
-      const { error: accountDeleteError } = await client.from("accounts").delete().in("id", removed);
-      if (accountDeleteError) throw accountDeleteError;
     }
   }
 
@@ -1135,8 +1138,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (changed.equipmentFleet && hasModuleAccessForSync("equipment")) jobs.push(syncEquipment(store.equipmentFleet));
     if (changed.maintenanceJobs && hasModuleAccessForSync("maintenance")) jobs.push(syncMaintenance(store.maintenanceJobs));
     if (changed.employees && hasModuleAccessForSync("employee")) jobs.push(syncEmployees(store.employees));
-    if (changed.customerKhatas && hasModuleAccessForSync("khata")) jobs.push(syncAccounts(store.customerKhatas, "receivable"));
-    if (changed.vendorKhatas && hasModuleAccessForSync("accounts-payable")) jobs.push(syncAccounts(store.vendorKhatas, "payable"));
+    if (changed.customerKhatas && hasModuleAccessForSync("khata")) {
+      const records = Array.isArray(changed.customerKhataRecords) ? changed.customerKhataRecords : store.customerKhatas;
+      jobs.push(syncAccounts(records, "receivable", { pruneMissing: !Array.isArray(changed.customerKhataRecords) }));
+    }
+    if (changed.vendorKhatas && hasModuleAccessForSync("accounts-payable")) {
+      const records = Array.isArray(changed.vendorKhataRecords) ? changed.vendorKhataRecords : store.vendorKhatas;
+      jobs.push(syncAccounts(records, "payable", { pruneMissing: !Array.isArray(changed.vendorKhataRecords) }));
+    }
     if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs || []));
     const results = await Promise.allSettled(jobs);
     const failed = results.find((result) => result.status === "rejected");
@@ -6343,6 +6352,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         await syncStoreImmediately(store, {
           customerKhatas: !isPayable,
           vendorKhatas: isPayable,
+          customerKhataRecords: !isPayable ? [normalized] : undefined,
+          vendorKhataRecords: isPayable ? [normalized] : undefined,
           activityLogs: true
         });
       } catch (error) {
@@ -6426,6 +6437,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         await syncStoreImmediately(store, {
           customerKhatas: !isPayable,
           vendorKhatas: isPayable,
+          customerKhataRecords: !isPayable ? [account] : undefined,
+          vendorKhataRecords: isPayable ? [account] : undefined,
           activityLogs: true
         });
       } catch (error) {
