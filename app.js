@@ -661,9 +661,9 @@ async function uploadBookingBilty(booking) {
   // Case 3: New Bilty image uploaded
   if (imageData.startsWith("data:")) {
     const safeJobNo = String(booking.id || "booking").replace(/[^a-z0-9_-]/gi, "-");
-    const path = `bookings/${safeJobNo}/${Date.now()}.jpg`;
+    const path = `bookings/${safeJobNo}/latest.jpg`;
     const { error } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET)
-      .upload(path, dataUrlToBlob(imageData), { contentType: "image/jpeg", upsert: false });
+      .upload(path, dataUrlToBlob(imageData), { contentType: "image/jpeg", upsert: true });
     if (error) throw error;
     return path;
   }
@@ -738,6 +738,12 @@ async function uploadBookingBilty(booking) {
   let operationalSyncTimer = null;
   let operationalSyncQueue = Promise.resolve();
 
+  async function flushOperationalSyncBeforeMutation() {
+    clearTimeout(operationalSyncTimer);
+    operationalSyncTimer = null;
+    await operationalSyncQueue;
+  }
+
   function hasModuleAccessForSync(module) {
     const session = getAdminSession();
     if (!session) return false;
@@ -774,6 +780,28 @@ async function uploadBookingBilty(booking) {
     return String(value || "record").replace(/[^a-z0-9_-]/gi, "-");
   }
 
+  function getStorageRecordFolder(currentPath, folder, recordId) {
+    const path = String(currentPath || "").replace(/^\/+|\/+$/g, "");
+    if (path.includes("/")) return path.split("/").slice(0, -1).join("/");
+    return `${folder}/${safeStorageName(recordId)}`;
+  }
+
+  async function removeStoredPathAndFolder(path) {
+    const client = getSupabaseClient();
+    const normalized = String(path || "").replace(/^\/+|\/+$/g, "");
+    if (!client || !normalized) return;
+    const folder = normalized.includes("/") ? normalized.split("/").slice(0, -1).join("/") : "";
+    const bucket = client.storage.from(SUPABASE_DOCUMENT_BUCKET);
+    const paths = new Set([normalized]);
+    if (folder) {
+      const { data: files } = await bucket.list(folder, { limit: 100 });
+      (files || []).forEach((file) => {
+        if (file?.name && file.name !== ".emptyFolderPlaceholder") paths.add(`${folder}/${file.name}`);
+      });
+    }
+    await bucket.remove([...paths]);
+  }
+
 async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, options = {}) {
   const client = getSupabaseClient();
   if (!client) return currentPath || "";
@@ -784,7 +812,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       try {
         await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([currentPath]);
         if (options.replaceFolder) {
-          const recordFolder = `${folder}/${safeStorageName(recordId)}`;
+          const recordFolder = getStorageRecordFolder(currentPath, folder, recordId);
           const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(recordFolder, { limit: 100 });
           const obsoletePaths = (files || [])
             .map((file) => `${recordFolder}/${file.name}`)
@@ -809,7 +837,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   if (String(dataUrl).startsWith("data:")) {
     const mimeType = String(dataUrl).match(/data:([^;]+)/)?.[1] || "image/jpeg";
     const extension = mimeType === "application/pdf" ? "pdf" : (mimeType.split("/")[1] || "jpg").replace("jpeg", "jpg");
-    const recordFolder = `${folder}/${safeStorageName(recordId)}`;
+    const recordFolder = getStorageRecordFolder(options.replaceFolder ? currentPath : "", folder, recordId);
     const path = Boolean(options.replaceFolder)
       ? `${recordFolder}/latest.${extension}`
       : `${recordFolder}/${Date.now()}.${extension}`;
@@ -928,7 +956,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function syncEquipment(records) {
     const rows = [];
     for (const item of records || []) {
-      const path = await uploadPrivateDataUrl(item.documentData, item.documentPath, "equipment", item.truckNo || item.id);
+      const path = await uploadPrivateDataUrl(item.documentData, item.documentPath, "equipment", item.truckNo || item.id, { replaceFolder: true });
       rows.push({ truck_no: item.truckNo, type_of_body: item.typeOfBody || null, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make, model: item.model,
         mra: item.mra || null, banker: item.banker || null, fitness_expiry: formatIsoDate(item.fitnessExpiry) || null,
         balochistan_permit_expiry: formatIsoDate(item.balochistanPermitExpiry) || null, sindh_permit_expiry: formatIsoDate(item.sindhPermitExpiry) || null,
@@ -942,7 +970,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function syncMaintenance(records) {
     const rows = [];
     for (const item of records || []) {
-      const path = await uploadPrivateDataUrl(item.image, item.imagePath, "maintenance", item.id);
+      const path = await uploadPrivateDataUrl(item.image, item.imagePath, "maintenance", item.id, { replaceFolder: true });
       rows.push({ maintenance_job_no: item.id, truck_no: item.truckNo, complaint_date: formatIsoDate(item.complaintDate),
         repair_date: formatIsoDate(item.repairDate), part_name: item.partName, old_serial_number: item.oldSerialNumber || null,
         new_serial_number: item.newSerialNumber, part_cost: Number(item.partCost || 0), warranty_period: item.warrantyPeriod || null,
@@ -955,7 +983,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function syncEmployees(records) {
     const rows = [];
     for (const item of records || []) {
-      const path = await uploadPrivateDataUrl(item.image, item.imagePath, "employees", item.id);
+      const path = await uploadPrivateDataUrl(item.image, item.imagePath, "employees", item.id, { replaceFolder: true });
       rows.push({ employee_no: item.id, name: item.name, designation: item.designation, department: item.department || null,
         salary: Number(item.salary || 0), joining_date: formatIsoDate(item.joiningDate), status: item.status === "Inactive" ? "Inactive" : "Active",
         phone: item.phone || null, image_path: path || null, updated_at: new Date().toISOString() });
@@ -981,10 +1009,26 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (saved?.id) account.id = saved.id;
       parties.push(account.customer);
 
-      const entryRows = [];
+      const { data: existingEntries, error: entryReadError } = await client
+        .from("account_entries")
+        .select("id,image_path,entry_date,entry_type,description,amount")
+        .eq("account_id", saved.id);
+      if (entryReadError) throw entryReadError;
+
+      const unusedEntries = [...(existingEntries || [])];
       for (const entry of account.entries || []) {
-        const path = await uploadPrivateDataUrl(entry.image, entry.imagePath, accountType, `${account.id || saved.id}-${entry.id}`);
-        entryRows.push({
+        const matchingIndex = unusedEntries.findIndex((remote) =>
+          (entry.imagePath && remote.image_path === entry.imagePath) ||
+          (String(entry.id).match(/^[0-9a-f-]{36}$/i) && String(remote.id) === String(entry.id)) ||
+          (!entry.imagePath && !remote.image_path &&
+            String(remote.entry_date || "") === String(formatIsoDate(entry.date) || "") &&
+            String(remote.entry_type || "") === String(entry.type === "Credit" ? "Credit" : "Debit") &&
+            Number(remote.amount || 0) === Number(entry.amount || 0) &&
+            String(remote.description || "") === String(entry.description || ""))
+        );
+        const matchingRemote = matchingIndex === -1 ? null : unusedEntries.splice(matchingIndex, 1)[0];
+        const path = await uploadPrivateDataUrl(entry.image, entry.imagePath, accountType, `${account.id || saved.id}-${entry.id}`, { replaceFolder: true });
+        const row = {
           account_id: saved.id,
           entry_date: formatIsoDate(entry.date) || formatIsoDate(getTodayIsoDate()),
           entry_type: entry.type === "Credit" ? "Credit" : "Debit",
@@ -992,31 +1036,22 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           amount: Number(entry.amount || 0),
           image_path: path || null,
           updated_at: new Date().toISOString()
-        });
-      }
-      const { data: existingEntries, error: entryReadError } = await client.from("account_entries").select("id,image_path").eq("account_id", saved.id);
-      if (entryReadError) throw entryReadError;
-      
-      const activeEntryIds = new Set((account.entries || []).map((e) => String(e.id)));
-      const deletedEntries = (existingEntries || []).filter((e) => !activeEntryIds.has(String(e.id)));
-      const pathsToDelete = deletedEntries.map((e) => e.image_path).filter(Boolean);
-      if (pathsToDelete.length) {
-        try {
-          await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(pathsToDelete);
-        } catch (err) {
-          console.warn("Failed to delete removed khata entry images:", err.message);
+        };
+        const result = matchingRemote
+          ? await client.from("account_entries").update(row).eq("id", matchingRemote.id).select("id").single()
+          : await client.from("account_entries").insert(row).select("id").single();
+        if (result.error) throw result.error;
+        if (result.data?.id) {
+          entry.id = String(result.data.id);
         }
       }
 
-      if (existingEntries?.length) await client.from("account_entries").delete().eq("account_id", saved.id);
-      if (entryRows.length) {
-        const { data: insertedEntries, error: entryError } = await client.from("account_entries").insert(entryRows).select("id");
-        if (entryError) throw entryError;
-        if (insertedEntries && insertedEntries.length === account.entries.length) {
-          insertedEntries.forEach((row, i) => {
-            if (account.entries[i]) account.entries[i].id = String(row.id);
-          });
+      for (const removedEntry of unusedEntries) {
+        if (removedEntry.image_path) {
+          await removeStoredPathAndFolder(removedEntry.image_path).catch((err) => console.warn("Failed to delete removed khata entry image:", err.message));
         }
+        const { error: deleteEntryError } = await client.from("account_entries").delete().eq("id", removedEntry.id);
+        if (deleteEntryError) throw deleteEntryError;
       }
     }
     const { data: existing, error } = await client.from("accounts").select("id,party_name").eq("account_type", accountType);
@@ -1407,12 +1442,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     progressBar.style.width = "0%";
     progressBar.style.opacity = "1";
     
-    setTimeout(() => {
-      if (progressBar) progressBar.style.width = "40%";
-    }, 20);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
     mainEl.innerHTML = getSkeletonLoader(targetPage);
     mainEl.style.transform = "translateY(0)";
     mainEl.style.opacity = "1";
@@ -1423,9 +1452,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     document.body.dataset.page = targetPage;
     setActiveNav();
 
-    setTimeout(() => {
-      if (progressBar) progressBar.style.width = "70%";
-    }, 100);
+    if (progressBar) progressBar.style.width = "70%";
 
     try {
       const response = await fetch(url, { signal });
@@ -1447,10 +1474,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         window.location.href = url;
         return;
       }
-
-      mainEl.style.opacity = "0";
-      mainEl.style.transform = "translateY(4px)";
-      await new Promise((resolve) => setTimeout(resolve, 120));
 
       mainEl.innerHTML = newMainEl.innerHTML;
       document.title = newDoc.title || "GTLS Transport";
@@ -3487,7 +3510,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       customerFilter.addEventListener("change", render);
     }
     if (dateSort) dateSort.addEventListener("change", render);
-    body.addEventListener("click", (event) => {
+    body.addEventListener("click", async (event) => {
       const customer = event.target.getAttribute("data-download-summary");
       if (!customer) return;
       const bookings = getPendingBookings().filter((item) => (String(item.customer || "").trim() || "Unknown Customer") === customer);
@@ -4037,7 +4060,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       resetForm();
     });
 
-    body.addEventListener("click", (event) => {
+    body.addEventListener("click", async (event) => {
       const imageButton = event.target.closest("[data-view-truck-image]");
       const importInvoiceId = event.target.getAttribute("data-import-invoice");
       const exportInvoiceId = event.target.getAttribute("data-export-invoice");
@@ -5551,6 +5574,53 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     render();
   }
 
+  async function deleteRemoteKhataEntry(account, entry) {
+    const client = getSupabaseClient();
+    if (!client || !account?.id || !entry) return;
+    let remoteEntries = [];
+    if (entry.imagePath) {
+      const result = await client.from("account_entries").select("id,image_path").eq("account_id", account.id).eq("image_path", entry.imagePath);
+      if (result.error) throw result.error;
+      remoteEntries = result.data || [];
+    }
+    if (!remoteEntries.length && /^[0-9a-f-]{36}$/i.test(String(entry.id || ""))) {
+      const result = await client.from("account_entries").select("id,image_path").eq("account_id", account.id).eq("id", entry.id);
+      if (result.error) throw result.error;
+      remoteEntries = result.data || [];
+    }
+    if (!remoteEntries.length) {
+      const result = await client.from("account_entries").select("id,image_path").eq("account_id", account.id)
+        .eq("entry_date", formatIsoDate(entry.date))
+        .eq("entry_type", entry.type === "Credit" ? "Credit" : "Debit")
+        .eq("amount", Number(entry.amount || 0))
+        .eq("description", entry.description || "");
+      if (result.error) throw result.error;
+      remoteEntries = result.data || [];
+    }
+    if (!remoteEntries.length) return;
+    const paths = remoteEntries.map((item) => item.image_path).filter(Boolean);
+    if (paths.length) {
+      await Promise.all(paths.map((path) => removeStoredPathAndFolder(path).catch((err) => console.warn("Failed to delete khata entry image:", err.message))));
+    }
+    const { error } = await client.from("account_entries").delete().in("id", remoteEntries.map((item) => item.id));
+    if (error) throw error;
+  }
+
+  async function deleteRemoteKhataAccount(account) {
+    const client = getSupabaseClient();
+    if (!client || !account?.id) return;
+    const { data: entries, error: readError } = await client.from("account_entries").select("id,image_path").eq("account_id", account.id);
+    if (readError) throw readError;
+    const paths = (entries || []).map((entry) => entry.image_path).filter(Boolean);
+    if (paths.length) {
+      await Promise.all(paths.map((path) => removeStoredPathAndFolder(path).catch((err) => console.warn("Failed to delete khata account image:", err.message))));
+    }
+    const { error: entryError } = await client.from("account_entries").delete().eq("account_id", account.id);
+    if (entryError) throw entryError;
+    const { error: accountError } = await client.from("accounts").delete().eq("id", account.id);
+    if (accountError) throw accountError;
+  }
+
   function khataPage(store) {
     const isPayable = document.body.dataset.page === "accounts-payable";
     const accounts = isPayable ? store.vendorKhatas : store.customerKhatas;
@@ -6208,7 +6278,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       resetForm();
     });
 
-    body.addEventListener("click", (event) => {
+    body.addEventListener("click", async (event) => {
       const imageTrigger = event.target.closest("[data-view-khata-image]");
       const editId = event.target.getAttribute("data-edit-khata");
       const deleteId = event.target.getAttribute("data-delete-khata");
@@ -6231,6 +6301,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (deleteId) {
         const acc = accounts.find((a) => (a.entries || []).some((e) => String(e.id) === String(deleteId))) || selectedAccount;
         if (!acc) return;
+        await flushOperationalSyncBeforeMutation();
         const entryIndex = (acc.entries || []).findIndex((entry) => String(entry.id) === String(deleteId));
         const entryToDelete = entryIndex !== -1 ? acc.entries[entryIndex] : null;
         if (entryIndex !== -1) {
@@ -6239,33 +6310,29 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           acc.entries = (acc.entries || []).filter((entry) => String(entry.id) !== String(deleteId));
         }
 
-        const client = getSupabaseClient();
-        if (client) {
-          if (entryToDelete?.imagePath) {
-            client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([entryToDelete.imagePath]).catch(() => {});
+        try {
+          if (acc.entries.length === 0) {
+            await deleteRemoteKhataAccount(acc);
+          } else {
+            await deleteRemoteKhataEntry(acc, entryToDelete);
           }
-          if (deleteId) {
-            client.from("account_entries").delete().eq("id", deleteId).catch((err) => {
-              console.warn("Direct Supabase entry delete failed:", err.message);
-            });
-          }
+        } catch (error) {
+          if (entryToDelete) acc.entries.splice(entryIndex === -1 ? acc.entries.length : entryIndex, 0, entryToDelete);
+          showNotice(notice, `Delete failed: ${error.message || "Unable to delete this entry."}`);
+          return;
         }
 
         if (acc.entries.length === 0) {
           const accIndex = accounts.findIndex((a) => a.id === acc.id || a.customer.toLowerCase() === acc.customer.toLowerCase());
           if (accIndex !== -1) accounts.splice(accIndex, 1);
-          if (client && acc.id) {
-            client.from("account_entries").delete().eq("account_id", acc.id).catch(() => {});
-            client.from("accounts").delete().eq("id", acc.id).catch(() => {});
-          }
-          saveStore(store);
+          saveStore(store, { skipRemote: true });
           populateCustomers(allAccountsValue);
           renderAccount(allAccountsValue);
           renderCustomerList();
           resetForm();
           showNotice(notice, `All entries deleted. ${acc.customer} record removed from khata.`);
         } else {
-          saveStore(store);
+          saveStore(store, { skipRemote: true });
           populateCustomers(acc.id);
           renderAccount(acc.id);
           renderCustomerList();
