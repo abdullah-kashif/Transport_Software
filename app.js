@@ -6212,43 +6212,65 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const imageTrigger = event.target.closest("[data-view-khata-image]");
       const editId = event.target.getAttribute("data-edit-khata");
       const deleteId = event.target.getAttribute("data-delete-khata");
-      const account = findAccountByIdOrName(select.value);
-      if (!account) return;
+      const selectedAccount = findAccountByIdOrName(select.value);
 
       if (imageTrigger) {
-        const entry = (account.entries || []).find((item) => String(item.id) === String(imageTrigger.getAttribute("data-view-khata-image")));
+        const imageEntryId = imageTrigger.getAttribute("data-view-khata-image");
+        const acc = accounts.find((a) => (a.entries || []).some((e) => String(e.id) === String(imageEntryId))) || selectedAccount;
+        const entry = acc ? (acc.entries || []).find((item) => String(item.id) === String(imageEntryId)) : null;
         if (entry?.image) openEntryImageModal(entry.image);
         return;
       }
-      if (editId) fillForm(account, (account.entries || []).find((entry) => String(entry.id) === String(editId)));
+
+      if (editId) {
+        const acc = accounts.find((a) => (a.entries || []).some((e) => String(e.id) === String(editId))) || selectedAccount;
+        if (acc) fillForm(acc, (acc.entries || []).find((entry) => String(entry.id) === String(editId)));
+        return;
+      }
+
       if (deleteId) {
-        const entryIndex = (account.entries || []).findIndex((entry) => String(entry.id) === String(deleteId));
-        const entryToDelete = entryIndex !== -1 ? account.entries[entryIndex] : null;
+        const acc = accounts.find((a) => (a.entries || []).some((e) => String(e.id) === String(deleteId))) || selectedAccount;
+        if (!acc) return;
+        const entryIndex = (acc.entries || []).findIndex((entry) => String(entry.id) === String(deleteId));
+        const entryToDelete = entryIndex !== -1 ? acc.entries[entryIndex] : null;
         if (entryIndex !== -1) {
-          account.entries.splice(entryIndex, 1);
+          acc.entries.splice(entryIndex, 1);
         } else {
-          account.entries = (account.entries || []).filter((entry) => String(entry.id) !== String(deleteId));
+          acc.entries = (acc.entries || []).filter((entry) => String(entry.id) !== String(deleteId));
         }
-        saveStore(store);
-        populateCustomers(account.id);
-        renderAccount(account.id);
-        showNotice(notice, "Statement entry deleted successfully.");
-        if (editingId === deleteId) resetForm();
 
         const client = getSupabaseClient();
         if (client) {
           if (entryToDelete?.imagePath) {
             client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([entryToDelete.imagePath]).catch(() => {});
           }
-          if (account.entries.length === 0 && account.id) {
-            client.from("account_entries").delete().eq("account_id", account.id).catch((err) => {
-              console.warn("Direct account_entries wipe failed:", err.message);
-            });
-          } else if (deleteId) {
+          if (deleteId) {
             client.from("account_entries").delete().eq("id", deleteId).catch((err) => {
               console.warn("Direct Supabase entry delete failed:", err.message);
             });
           }
+        }
+
+        if (acc.entries.length === 0) {
+          const accIndex = accounts.findIndex((a) => a.id === acc.id || a.customer.toLowerCase() === acc.customer.toLowerCase());
+          if (accIndex !== -1) accounts.splice(accIndex, 1);
+          if (client && acc.id) {
+            client.from("account_entries").delete().eq("account_id", acc.id).catch(() => {});
+            client.from("accounts").delete().eq("id", acc.id).catch(() => {});
+          }
+          saveStore(store);
+          populateCustomers(allAccountsValue);
+          renderAccount(allAccountsValue);
+          renderCustomerList();
+          resetForm();
+          showNotice(notice, `All entries deleted. ${acc.customer} record removed from khata.`);
+        } else {
+          saveStore(store);
+          populateCustomers(acc.id);
+          renderAccount(acc.id);
+          renderCustomerList();
+          showNotice(notice, "Statement entry deleted successfully.");
+          if (editingId === deleteId) resetForm();
         }
       }
     });
