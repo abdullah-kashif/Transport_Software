@@ -755,15 +755,17 @@ async function uploadBookingBilty(booking) {
   async function flushOperationalSyncBeforeMutation() {
     clearTimeout(operationalSyncTimer);
     operationalSyncTimer = null;
-    await operationalSyncQueue;
+    await operationalSyncQueue.catch(() => {});
   }
 
   async function syncStoreImmediately(store, changed) {
     clearTimeout(operationalSyncTimer);
     operationalSyncTimer = null;
-    await operationalSyncQueue;
+    await operationalSyncQueue.catch(() => {});
     const snapshot = structuredClone(store);
-    operationalSyncQueue = operationalSyncQueue.then(() => syncOperationalStore(snapshot, changed));
+    operationalSyncQueue = operationalSyncQueue
+      .catch(() => {})
+      .then(() => syncOperationalStore(snapshot, changed));
     return operationalSyncQueue;
   }
 

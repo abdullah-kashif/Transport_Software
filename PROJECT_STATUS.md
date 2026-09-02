@@ -64,5 +64,7 @@ The local workspace cannot log into the user's live Supabase session or click th
 - Success notices for Khata accounts and entries now appear only after direct
   Supabase synchronization succeeds; failed remote saves remain visible as
   errors instead of showing a false success message.
+- Recovered the queued sync pipeline after a failed request so one failed save
+  cannot block all later Khata edits and updates.
 - Re-checked JavaScript syntax, loaded all 15 HTML pages through a local server,
   and confirmed the unauthenticated redirect/sign-in path has no console errors.
