@@ -20,6 +20,18 @@
   const DEFAULT_USER_ACCESS = ACCESS_OPTIONS.map((item) => item.value)
     .filter((item) => !["admin", "activity-logs"].includes(item));
 
+  // Dynamic page navigation re-initializes page modules, so clean up their
+  // document-level listeners before binding the next page.
+  let pageDocumentListeners = [];
+  function addPageDocumentListener(type, handler) {
+    document.addEventListener(type, handler);
+    pageDocumentListeners.push({ type, handler });
+  }
+  function clearPageDocumentListeners() {
+    pageDocumentListeners.forEach(({ type, handler }) => document.removeEventListener(type, handler));
+    pageDocumentListeners = [];
+  }
+
   const seed = {
     activityLogs: [],
     bookings: [],
@@ -744,6 +756,15 @@ async function uploadBookingBilty(booking) {
     await operationalSyncQueue;
   }
 
+  async function syncStoreImmediately(store, changed) {
+    clearTimeout(operationalSyncTimer);
+    operationalSyncTimer = null;
+    await operationalSyncQueue;
+    const snapshot = structuredClone(store);
+    operationalSyncQueue = operationalSyncQueue.then(() => syncOperationalStore(snapshot, changed));
+    return operationalSyncQueue;
+  }
+
   function hasModuleAccessForSync(module) {
     const session = getAdminSession();
     if (!session) return false;
@@ -772,7 +793,10 @@ async function uploadBookingBilty(booking) {
     operationalSyncTimer = setTimeout(() => {
       operationalSyncQueue = operationalSyncQueue
         .then(() => syncOperationalStore(snapshot, changed))
-        .catch((error) => console.warn("Supabase background sync failed.", error.message));
+        .catch((error) => {
+          console.warn("Supabase background sync failed.", error.message);
+          document.dispatchEvent(new CustomEvent("gtls-sync-error", { detail: { message: error.message } }));
+        });
     }, 250);
   }
 
@@ -1067,7 +1091,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           console.warn("Failed to delete khata images for deleted accounts:", err.message);
         }
       }
-      await client.from("accounts").delete().in("id", removed);
+      const { error: accountDeleteError } = await client.from("accounts").delete().in("id", removed);
+      if (accountDeleteError) throw accountDeleteError;
     }
   }
 
@@ -1109,7 +1134,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (changed.customerKhatas && hasModuleAccessForSync("khata")) jobs.push(syncAccounts(store.customerKhatas, "receivable"));
     if (changed.vendorKhatas && hasModuleAccessForSync("accounts-payable")) jobs.push(syncAccounts(store.vendorKhatas, "payable"));
     if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs || []));
-    await Promise.allSettled(jobs);
+    const results = await Promise.allSettled(jobs);
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
   }
 
   async function hydrateOperationalStore(store) {
@@ -2765,10 +2792,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       setPanel(opening);
     });
     closeButton.addEventListener("click", () => setPanel(false));
-    document.addEventListener("click", (event) => {
+    addPageDocumentListener("click", (event) => {
       if (!panel.hidden && !center.contains(event.target)) setPanel(false);
     });
-    document.addEventListener("keydown", (event) => {
+    addPageDocumentListener("keydown", (event) => {
       if (event.key === "Escape" && !panel.hidden) {
         setPanel(false);
         trigger.focus();
@@ -3470,7 +3497,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     biltyModal.addEventListener("click", (event) => {
       if (event.target === biltyModal) closeBiltyModal();
     });
-    document.addEventListener("keydown", (event) => {
+    addPageDocumentListener("keydown", (event) => {
       if (event.key === "Escape" && !biltyModal.hidden) closeBiltyModal();
     });
 
@@ -4149,7 +4176,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     truckImageModal?.addEventListener("click", (event) => {
       if (event.target === truckImageModal) closeTruckImageModal();
     });
-    document.addEventListener("keydown", (event) => {
+    addPageDocumentListener("keydown", (event) => {
       if (event.key === "Escape" && truckImageModal && !truckImageModal.hidden) closeTruckImageModal();
     });
     resetForm();
@@ -4718,7 +4745,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     documentModal?.addEventListener("click", (event) => {
       if (event.target === documentModal) closeDocumentModal();
     });
-    document.addEventListener("keydown", (event) => {
+    addPageDocumentListener("keydown", (event) => {
       if (event.key === "Escape" && documentModal && !documentModal.hidden) closeDocumentModal();
     });
 
@@ -5049,7 +5076,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     document.querySelector("[data-reset-maintenance-form]").addEventListener("click", resetForm);
     closeImageModalButton.addEventListener("click", closeImageModal);
     imageModal.addEventListener("click", (event) => { if (event.target === imageModal) closeImageModal(); });
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !imageModal.hidden) closeImageModal(); });
+    addPageDocumentListener("keydown", (event) => { if (event.key === "Escape" && !imageModal.hidden) closeImageModal(); });
     populateTruckControls();
     resetForm();
     window.activePageRender = render;
@@ -5275,7 +5302,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     closeImageModalButton?.addEventListener("click", closeImageModal);
     imageModal?.addEventListener("click", (event) => { if (event.target === imageModal) closeImageModal(); });
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && imageModal && !imageModal.hidden) closeImageModal(); });
+    addPageDocumentListener("keydown", (event) => { if (event.key === "Escape" && imageModal && !imageModal.hidden) closeImageModal(); });
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
     window.activePageRender = render;
     render();
@@ -5703,6 +5730,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (entryError) throw entryError;
     const { error: accountError } = await client.from("accounts").delete().eq("id", remoteAccountId);
     if (accountError) throw accountError;
+    const { data: remainingAccount, error: verifyError } = await client
+      .from("accounts")
+      .select("id")
+      .eq("id", remoteAccountId)
+      .maybeSingle();
+    if (verifyError) throw verifyError;
+    if (remainingAccount) throw new Error("The account could not be removed from Supabase. Please check your account permissions.");
   }
 
   function khataPage(store) {
@@ -5752,6 +5786,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function getVisibleAccounts() {
       return accounts;
+    }
+
+    function removeLocalAccount(account) {
+      const accountId = String(account?.id || "");
+      const accountName = String(account?.customer || "").trim().toLowerCase();
+      for (let index = accounts.length - 1; index >= 0; index -= 1) {
+        const candidate = accounts[index];
+        if (String(candidate?.id || "") === accountId ||
+            (accountName && String(candidate?.customer || "").trim().toLowerCase() === accountName)) {
+          accounts.splice(index, 1);
+        }
+      }
     }
 
     function getAggregateAccount() {
@@ -6252,7 +6298,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       resetForm();
     });
 
-    customerForm.addEventListener("submit", (event) => {
+    customerForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(customerForm).entries());
       const normalized = {
@@ -6285,7 +6331,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         showNotice(customerNotice, `${partyLabel} ${normalized.customer} updated successfully.`);
       }
 
-      saveStore(store);
+      saveStore(store, { skipRemote: true });
+      try {
+        await syncStoreImmediately(store, {
+          customerKhatas: !isPayable,
+          vendorKhatas: isPayable,
+          activityLogs: true
+        });
+      } catch (error) {
+        showNotice(customerNotice, `Supabase sync failed: ${error.message || "Unable to save this account."}`);
+        return;
+      }
       populateCustomers(normalized.id);
       renderAccount(normalized.id);
       resetCustomerForm();
@@ -6356,7 +6412,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         showNotice(notice, `Statement entry ${editingId} updated successfully.`);
       }
 
-      saveStore(store);
+      saveStore(store, { skipRemote: true });
+      try {
+        await syncStoreImmediately(store, {
+          customerKhatas: !isPayable,
+          vendorKhatas: isPayable,
+          activityLogs: true
+        });
+      } catch (error) {
+        showNotice(notice, `Supabase sync failed: ${error.message || "Unable to save this entry."}`);
+        return;
+      }
       populateCustomers(account.id);
       renderAccount(account.id);
       resetForm();
@@ -6414,8 +6480,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         }
 
         if (acc.entries.length === 0) {
-          const accIndex = accounts.findIndex((a) => a.id === acc.id || a.customer.toLowerCase() === acc.customer.toLowerCase());
-          if (accIndex !== -1) accounts.splice(accIndex, 1);
+          removeLocalAccount(acc);
           saveStore(store, { skipRemote: true });
           populateCustomers(allAccountsValue);
           renderAccount(allAccountsValue);
@@ -6465,8 +6530,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     entryImageModal.addEventListener("click", (event) => {
       if (event.target === entryImageModal) closeEntryImageModal();
     });
-    document.addEventListener("keydown", (event) => {
+    addPageDocumentListener("keydown", (event) => {
       if (event.key === "Escape" && !entryImageModal.hidden) closeEntryImageModal();
+    });
+    addPageDocumentListener("gtls-sync-error", (event) => {
+      showNotice(notice, `Supabase sync failed: ${event.detail?.message || "Please try again."}`);
     });
     populateCustomers(allAccountsValue);
     window.activePageRender = () => {
@@ -6517,6 +6585,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   });
 
   function initializePage(store, page) {
+    clearPageDocumentListeners();
     document.body.dataset.page = page;
     setActiveNav();
 

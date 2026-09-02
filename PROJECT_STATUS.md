@@ -47,3 +47,17 @@ The local workspace cannot log into the user's live Supabase session or click th
 - Added remote account UUID resolution for local IDs such as `CUS-1` and `PAY-1`, preventing PostgreSQL UUID errors during entry/account deletion.
 - Added an accessible confirmation dialog before Admin user deletion and Khata entry/account deletion, with record-specific wording and Escape/overlay cancellation.
 - Added this project status document and a paste-ready Supabase setup reference.
+- Fixed repeated document-level event listeners during dynamic navigation to reduce
+  lag and duplicate Escape/notification handling.
+- Added explicit error handling for background account deletion.
+- Updated schema defaults so new Job and Maintenance IDs start as `1`, `2`, `3`
+  without leading zeroes.
+- Removed stray literal newline markers from all HTML entry pages.
+- Final Khata deletion now verifies that the Supabase account is truly gone and
+  removes any stale local duplicate before resetting the dropdown.
+- Background Supabase sync failures are now surfaced in the active module, and
+  the master SQL includes the complete account-entry RLS/access repair.
+- Khata account and entry saves now wait for direct Supabase synchronization so
+  entries cannot appear saved locally and disappear after refresh.
+- Re-checked JavaScript syntax, loaded all 15 HTML pages through a local server,
+  and confirmed the unauthenticated redirect/sign-in path has no console errors.
