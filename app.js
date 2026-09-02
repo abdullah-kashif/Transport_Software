@@ -6217,12 +6217,25 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       if (editId) fillForm(account, (account.entries || []).find((entry) => String(entry.id) === String(editId)));
       if (deleteId) {
+        const entryToDelete = (account.entries || []).find((entry) => String(entry.id) === String(deleteId));
         account.entries = (account.entries || []).filter((entry) => String(entry.id) !== String(deleteId));
         saveStore(store);
         populateCustomers(account.id);
         renderAccount(account.id);
-        showNotice(notice, `Statement entry ${deleteId} deleted successfully.`);
+        showNotice(notice, "Statement entry deleted successfully.");
         if (editingId === deleteId) resetForm();
+
+        const client = getSupabaseClient();
+        if (client && entryToDelete) {
+          if (entryToDelete.imagePath) {
+            client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([entryToDelete.imagePath]).catch(() => {});
+          }
+          if (Number(deleteId) || deleteId.length > 20) {
+            client.from("account_entries").delete().eq("id", deleteId).catch((err) => {
+              console.warn("Direct Supabase entry delete failed:", err.message);
+            });
+          }
+        }
       }
     });
 
