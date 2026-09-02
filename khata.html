@@ -109,7 +109,7 @@
           <input type="hidden" name="accountId" />
           <div class="field"><label>Date</label><input name="date" type="date" required /></div>
           <div class="field"><label>Type</label><select name="type"><option>Debit</option><option>Credit</option></select></div>
-          <div class="field wide"><label>Description</label><input name="description" value="Transport billing entry" required /></div>
+          <div class="field wide"><label>Description</label><input name="description" placeholder="Example: Transport billing entry" required /></div>
           <div class="field bilty-upload-field">
             <label for="receivable-entry-image">Image</label>
             <div class="bilty-input-group">
@@ -117,7 +117,7 @@
               <button class="bilty-clear" type="button" data-remove-entry-image aria-label="Remove selected image" title="Remove selected image" hidden>&times;</button>
             </div>
           </div>
-          <div class="field"><label>Amount</label><input name="amount" type="number" value="50000" required /></div>
+          <div class="field"><label>Amount</label><input name="amount" type="number" placeholder="0" required /></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Entry</button>
             <button class="btn" type="button" data-reset-form>Clear Form</button>

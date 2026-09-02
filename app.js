@@ -965,24 +965,40 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
   async function syncAccounts(records, accountType) {
     const client = getSupabaseClient();
+    if (!client) return;
     const parties = [];
     for (const account of records || []) {
-      const { data: saved, error } = await client.from("accounts").upsert({ account_type: accountType, party_name: account.customer,
-        phone: account.phone || null, city: account.city || null, opening_balance: Number(account.openingBalance || 0), updated_at: new Date().toISOString()
+      if (!account.customer) continue;
+      const { data: saved, error } = await client.from("accounts").upsert({
+        account_type: accountType,
+        party_name: account.customer,
+        phone: account.phone || null,
+        city: account.city || null,
+        opening_balance: Number(account.openingBalance || 0),
+        updated_at: new Date().toISOString()
       }, { onConflict: "account_type,party_name" }).select("id").single();
       if (error) throw error;
+      if (saved?.id) account.id = saved.id;
       parties.push(account.customer);
+
       const entryRows = [];
       for (const entry of account.entries || []) {
-        const path = await uploadPrivateDataUrl(entry.image, entry.imagePath, accountType, `${account.id}-${entry.id}`);
-        entryRows.push({ account_id: saved.id, entry_date: formatIsoDate(entry.date), entry_type: entry.type === "Credit" ? "Credit" : "Debit",
-          description: entry.description || "Entry", amount: Number(entry.amount || 0), image_path: path || null, updated_at: new Date().toISOString() });
+        const path = await uploadPrivateDataUrl(entry.image, entry.imagePath, accountType, `${account.id || saved.id}-${entry.id}`);
+        entryRows.push({
+          account_id: saved.id,
+          entry_date: formatIsoDate(entry.date) || formatIsoDate(getTodayIsoDate()),
+          entry_type: entry.type === "Credit" ? "Credit" : "Debit",
+          description: entry.description || "Entry",
+          amount: Number(entry.amount || 0),
+          image_path: path || null,
+          updated_at: new Date().toISOString()
+        });
       }
       const { data: existingEntries, error: entryReadError } = await client.from("account_entries").select("id,image_path").eq("account_id", saved.id);
       if (entryReadError) throw entryReadError;
       
-      const activeEntryIds = new Set((account.entries || []).map((e) => e.id));
-      const deletedEntries = (existingEntries || []).filter((e) => !activeEntryIds.has(e.id));
+      const activeEntryIds = new Set((account.entries || []).map((e) => String(e.id)));
+      const deletedEntries = (existingEntries || []).filter((e) => !activeEntryIds.has(String(e.id)));
       const pathsToDelete = deletedEntries.map((e) => e.image_path).filter(Boolean);
       if (pathsToDelete.length) {
         try {
@@ -1018,20 +1034,33 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function syncActivityLogs(logs) {
     const client = getSupabaseClient();
     const syncedKey = "gtls-supabase-synced-log-ids";
-    const synced = new Set(JSON.parse(localStorage.getItem(syncedKey) || "[]"));
-    const pending = (logs || []).filter((log) => !synced.has(log.id));
-    if (!pending.length) return;
-    const actionMap = { CREATE: "create", UPDATE: "update", DELETE: "delete", SIGN_IN: "login", SIGN_OUT: "logout", DOWNLOAD: "download", VIEW: "view" };
-    const rows = pending.map((log) => ({ user_name: log.userName || null, module: log.module || "System",
-      action: actionMap[log.action] || "view", record_id: log.recordId || null, description: log.details || null,
-      metadata: { local_id: log.id, user_email: log.userEmail || "", user_role: log.userRole || "" }, created_at: log.timestamp || new Date().toISOString() }));
-    const { error } = await client.from("activity_logs").insert(rows);
-    if (error) throw error;
-    pending.forEach((log) => synced.add(log.id));
-    localStorage.setItem(syncedKey, JSON.stringify([...synced].slice(-2000)));
+    let syncedIds = new Set();
+    try {
+      syncedIds = new Set(JSON.parse(localStorage.getItem(syncedKey) || "[]"));
+    } catch (_) {}
+    const newLogs = (logs || []).filter((log) => !syncedIds.has(log.id));
+    if (!newLogs.length) return;
+    const sessionUser = getAdminSession();
+    const rows = newLogs.map((log) => ({
+      user_name: log.userName || sessionUser?.name || "System",
+      module: log.module,
+      action: (log.action || "UPDATE").toLowerCase(),
+      record_id: log.recordId || null,
+      description: log.details || "",
+      metadata: {
+        user_email: log.userEmail || sessionUser?.email || null,
+        user_role: log.userRole || sessionUser?.role || null
+      }
+    }));
+    const { data, error } = await client.from("activity_logs").insert(rows).select("id");
+    if (!error) {
+      newLogs.forEach((l) => syncedIds.add(l.id));
+      localStorage.setItem(syncedKey, JSON.stringify(Array.from(syncedIds).slice(-200)));
+    }
   }
 
-  async function syncOperationalStore(store, changed) {
+  async function syncOperationalStore(store, changed = {}) {
+    if (!getSupabaseClient()) return;
     const jobs = [];
     if (changed.truckExpenses && hasModuleAccessForSync("truck")) jobs.push(syncTruckJobs(store.truckExpenses));
     if (changed.equipmentFleet && hasModuleAccessForSync("equipment")) jobs.push(syncEquipment(store.equipmentFleet));
@@ -1039,22 +1068,23 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (changed.employees && hasModuleAccessForSync("employee")) jobs.push(syncEmployees(store.employees));
     if (changed.customerKhatas && hasModuleAccessForSync("khata")) jobs.push(syncAccounts(store.customerKhatas, "receivable"));
     if (changed.vendorKhatas && hasModuleAccessForSync("accounts-payable")) jobs.push(syncAccounts(store.vendorKhatas, "payable"));
-    if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs));
-    await Promise.all(jobs);
-  }
-
-  async function signedImage(path) {
-    return path ? await getPrivateDocumentUrl(path) : "";
+    if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs || []));
+    await Promise.allSettled(jobs);
   }
 
   async function hydrateOperationalStore(store) {
     const client = getSupabaseClient();
     if (!client) return;
-    const load = async (table, allowed, order = "created_at") => {
+    const load = async (table, allowed, orderField) => {
       if (!allowed) return null;
-      const { data, error } = await client.from(table).select("*").order(order, { ascending: false });
-      if (error) { console.warn(`${table} load skipped.`, error.message); return null; }
-      return data;
+      let query = client.from(table).select("*");
+      if (orderField) query = query.order(orderField, { ascending: false });
+      const { data, error } = await query;
+      if (error) {
+        console.warn(`Supabase load failed for ${table}:`, error.message);
+        return null;
+      }
+      return data || [];
     };
     const [trucks, equipment, maintenance, employees, accounts, logs] = await Promise.all([
       load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
@@ -1117,17 +1147,27 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (Array.isArray(accounts)) {
       const { data: entries, error } = await client.from("account_entries").select("*").order("entry_date", { ascending: true });
       if (!error) {
-        const mappedAccounts = accounts.map((account) => ({
-          id: account.id, customer: account.party_name, phone: account.phone || "",
-          city: account.city || "", openingBalance: Number(account.opening_balance || 0),
-          entries: (entries || []).filter((entry) => entry.account_id === account.id)
+        const receivableAccounts = accounts.filter((a) => a.account_type === "receivable");
+        const payableAccounts = accounts.filter((a) => a.account_type === "payable");
+        const mapAccount = (account) => ({
+          id: account.id,
+          customer: account.party_name,
+          phone: account.phone || "",
+          city: account.city || "",
+          openingBalance: Number(account.opening_balance || 0),
+          entries: (entries || []).filter((entry) => String(entry.account_id) === String(account.id))
             .map((entry) => ({
-              id: entry.id, date: entry.entry_date, type: entry.entry_type, description: entry.description,
-              amount: Number(entry.amount || 0), imagePath: entry.image_path || "", image: getCachedSignedUrl(entry.image_path)
+              id: String(entry.id),
+              date: entry.entry_date,
+              type: entry.entry_type,
+              description: entry.description,
+              amount: Number(entry.amount || 0),
+              imagePath: entry.image_path || "",
+              image: getCachedSignedUrl(entry.image_path)
             }))
-        }));
-        replaceArrayContents(store.customerKhatas, mappedAccounts.filter((_, index) => accounts[index].account_type === "receivable"));
-        replaceArrayContents(store.vendorKhatas, mappedAccounts.filter((_, index) => accounts[index].account_type === "payable"));
+        });
+        replaceArrayContents(store.customerKhatas, receivableAccounts.map(mapAccount));
+        replaceArrayContents(store.vendorKhatas, payableAccounts.map(mapAccount));
       } else {
         replaceArrayContents(store.customerKhatas, []);
         replaceArrayContents(store.vendorKhatas, []);
@@ -5538,11 +5578,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     let editingCustomerId = "";
     let entryImageData = "";
     let entryImagePromise = Promise.resolve("");
-    let pendingAccountId = "";
     const allAccountsValue = "__all_accounts__";
 
+    function showNotice(el, msg) {
+      if (!el) return;
+      el.textContent = msg;
+      el.hidden = !msg;
+    }
+
+    function findAccountByIdOrName(idOrName) {
+      if (!idOrName || idOrName === allAccountsValue) return null;
+      return accounts.find((item) => String(item.id) === String(idOrName) || String(item.customer).trim().toLowerCase() === String(idOrName).trim().toLowerCase()) || null;
+    }
+
     function getVisibleAccounts() {
-      return accounts.filter((account) => (account.entries || []).length > 0 || account.id === pendingAccountId);
+      return accounts;
     }
 
     function getAggregateAccount() {
@@ -5551,7 +5601,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         customer: isPayable ? "All Payees" : "All Customers",
         phone: "-",
         city: "-",
-        entries: getVisibleAccounts().flatMap((account) => (account.entries || []).map((entry) => ({
+        entries: accounts.flatMap((account) => (account.entries || []).map((entry) => ({
           ...entry,
           sourceAccountId: account.id,
           sourceAccountName: account.customer,
@@ -5616,12 +5666,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function getSelectedAccount() {
       if (select.value === allAccountsValue) return getAggregateAccount();
-      return accounts.find((item) => item.id === select.value) || getAggregateAccount();
+      return findAccountByIdOrName(select.value) || getAggregateAccount();
     }
 
     function getStatementData(account) {
       const totals = calculateKhataSummary(account);
-      const sortedEntries = [...account.entries].sort((a, b) => a.date.localeCompare(b.date));
+      const sortedEntries = [...(account.entries || [])].sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
       const startDate = sortedEntries[0]?.date || "";
       const endDate = sortedEntries.length ? getTodayIsoDate() : "";
       let runningBalance = 0;
@@ -5786,9 +5836,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       try {
         const file = await buildStatementPdfFile(account);
         triggerFileDownload(file);
-        exportNotice.textContent = `${account.customer} ${isPayable ? "payable" : "receivable"} PDF downloaded successfully.`;
+        showNotice(exportNotice, `${account.customer} ${isPayable ? "payable" : "receivable"} PDF downloaded successfully.`);
       } catch (error) {
-        exportNotice.textContent = "The PDF could not be generated. Please try again.";
+        showNotice(exportNotice, "The PDF could not be generated. Please try again.");
       }
     }
 
@@ -5815,7 +5865,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             title: `${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`,
             text: `${account.customer} ${isPayable ? "payable" : "receivable"} statement`
           });
-          exportNotice.textContent = "The share sheet is open. Select WhatsApp to send the statement directly.";
+          showNotice(exportNotice, "The share sheet is open. Select WhatsApp to send the statement directly.");
           return;
         }
 
@@ -5830,22 +5880,31 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           ? `${baseUrl}${phone}?text=${message}`
           : `${baseUrl}${phone}&text=${message}`;
         window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-        exportNotice.textContent = isMobileDevice()
+        showNotice(exportNotice, isMobileDevice()
           ? "WhatsApp chat is open. The PDF has been downloaded; attach it and send it."
-          : "WhatsApp Web is open and the PDF has been downloaded. Attach the downloaded PDF in the chat and send it.";
+          : "WhatsApp Web is open and the PDF has been downloaded. Attach the downloaded PDF in the chat and send it.");
       } else {
-        exportNotice.textContent = `A valid WhatsApp number was not found for this ${partyLabel.toLowerCase()}.`;
+        showNotice(exportNotice, `A valid WhatsApp number was not found for this ${partyLabel.toLowerCase()}.`);
       }
     }
 
     function populateCustomers(preferredValue = select.value || allAccountsValue) {
       const visibleAccounts = getVisibleAccounts();
+      const currentSelectedAccount = findAccountByIdOrName(select.value);
+      const targetName = currentSelectedAccount?.customer || preferredValue;
+
       select.innerHTML = `<option value="${allAccountsValue}">${isPayable ? "All Payees" : "All Customers"}</option>${visibleAccounts.map((account) => `
         <option value="${account.id}">${account.customer}</option>
       `).join("")}`;
-      select.value = preferredValue === allAccountsValue || visibleAccounts.some((account) => account.id === preferredValue)
-        ? preferredValue
-        : allAccountsValue;
+
+      const matchedAccount = visibleAccounts.find((a) => String(a.id) === String(preferredValue) || String(a.customer).trim().toLowerCase() === String(targetName).trim().toLowerCase() || String(a.id) === String(targetName));
+      if (matchedAccount) {
+        select.value = matchedAccount.id;
+      } else if (preferredValue === allAccountsValue || !visibleAccounts.length) {
+        select.value = allAccountsValue;
+      } else {
+        select.value = visibleAccounts[0]?.id || allAccountsValue;
+      }
     }
 
     function resetCustomerForm() {
@@ -5868,7 +5927,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function renderCustomerList() {
       if (!customerListBody) return;
-      customerListBody.innerHTML = getVisibleAccounts().map((account) => {
+      const visibleAccounts = getVisibleAccounts();
+      customerListBody.innerHTML = visibleAccounts.length ? visibleAccounts.map((account) => {
         const totals = calculateKhataSummary(account);
         return `
           <tr>
@@ -5882,7 +5942,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               : totals.closingBalance < 0
                 ? (isPayable ? " Advance Paid" : " (+)")
                 : ""}</td>
-            <td>${account.entries.length}</td>
+            <td>${(account.entries || []).length}</td>
             <td>
               <div class="table-actions">
                 <button class="btn small" data-open-customer="${account.id}">Open</button>
@@ -5891,19 +5951,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             </td>
           </tr>
         `;
-      }).join("");
+      }).join("") : `<tr><td colspan="8" class="text-center muted" style="padding: 24px;">No ${partyLabel.toLowerCase()} accounts recorded.</td></tr>`;
     }
 
     function renderAccount(accountId) {
-      const isAggregate = accountId === allAccountsValue;
+      const isAggregate = !accountId || accountId === allAccountsValue;
       const account = isAggregate
         ? getAggregateAccount()
-        : accounts.find((item) => item.id === accountId) || getAggregateAccount();
+        : (findAccountByIdOrName(accountId) || getAggregateAccount());
       if (!account) return;
 
       const totals = calculateKhataSummary(account);
       const statement = getStatementData(account);
-      const sortedEntries = [...account.entries].sort((a, b) => a.date.localeCompare(b.date));
+      const sortedEntries = [...(account.entries || [])].sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
       statementTitle.textContent = `${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`;
       statementRange.textContent = `${statement.startDate} - ${statement.endDate}`;
       customerCard.innerHTML = `
@@ -5940,7 +6000,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       `;
 
       let runningBalance = 0;
-      body.innerHTML = sortedEntries.map((entry) => {
+      body.innerHTML = sortedEntries.length ? sortedEntries.map((entry) => {
         const amount = Number(entry.amount || 0);
         runningBalance += entry.type === "Debit" ? amount : -amount;
         return `
@@ -5970,7 +6030,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             </td>
           </tr>
         `;
-      }).join("");
+      }).join("") : `<tr><td colspan="7" class="text-center muted" style="padding: 24px;">No statement entries recorded for this ${partyLabel.toLowerCase()}.</td></tr>`;
 
       body.querySelectorAll("[data-lazy-khata-img]").forEach((btn) => {
         const path = btn.getAttribute("data-lazy-khata-img");
@@ -5985,19 +6045,23 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         });
       });
 
-      form.elements.accountId.value = isAggregate ? "" : account.id;
+      if (form.elements.accountId) {
+        form.elements.accountId.value = isAggregate ? "" : account.id;
+      }
       Array.from(form.elements).forEach((control) => {
         if (control.name !== "accountId") control.disabled = isAggregate;
       });
-      select.value = account.id;
+      select.value = isAggregate ? allAccountsValue : account.id;
       renderCustomerList();
     }
 
     function resetForm() {
       const isAggregate = select.value === allAccountsValue;
-      form.elements.accountId.value = isAggregate ? "" : select.value;
-      form.elements.date.value = "";
-      form.elements.type.value = "";
+      if (form.elements.accountId) {
+        form.elements.accountId.value = isAggregate ? "" : select.value;
+      }
+      form.elements.date.value = getTodayIsoDate();
+      form.elements.type.value = "Debit";
       form.elements.description.value = "";
       form.elements.amount.value = "";
       entryImageInput.value = "";
@@ -6034,33 +6098,32 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const data = Object.fromEntries(new FormData(customerForm).entries());
       const normalized = {
         id: editingCustomerId,
-        customer: data.customer.trim(),
-        phone: data.phone.trim(),
-        city: data.city.trim(),
+        customer: String(data.customer || "").trim(),
+        phone: String(data.phone || "").trim(),
+        city: String(data.city || "").trim(),
         openingBalance: 0,
         entries: []
       };
 
       if (!normalized.customer) {
-        customerNotice.textContent = `${partyLabel} name is required.`;
+        showNotice(customerNotice, `${partyLabel} name is required.`);
         return;
       }
 
       if (!editingCustomerId) {
         normalized.id = getNextSequentialId(accounts, isPayable ? "PAY" : "CUS");
         accounts.unshift(normalized);
-        pendingAccountId = normalized.id;
-        customerNotice.textContent = `${partyLabel} ${normalized.customer} was added successfully.`;
+        showNotice(customerNotice, `${partyLabel} ${normalized.customer} was added successfully.`);
       } else {
-        const index = accounts.findIndex((item) => item.id === editingCustomerId);
+        const index = accounts.findIndex((item) => String(item.id) === String(editingCustomerId));
         if (index === -1) {
-          customerNotice.textContent = `${partyLabel} record not found.`;
+          showNotice(customerNotice, `${partyLabel} record not found.`);
           return;
         }
         normalized.id = editingCustomerId;
         normalized.entries = accounts[index].entries || [];
         accounts[index] = normalized;
-        customerNotice.textContent = `${partyLabel} ${normalized.customer} updated successfully.`;
+        showNotice(customerNotice, `${partyLabel} ${normalized.customer} updated successfully.`);
       }
 
       saveStore(store);
@@ -6081,7 +6144,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         .catch((error) => {
           entryImageInput.value = "";
           setEntryImage("");
-          notice.textContent = error.message;
+          showNotice(notice, error.message);
           return "";
         })
         .finally(() => {
@@ -6099,32 +6162,39 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       event.preventDefault();
       await entryImagePromise;
       const data = Object.fromEntries(new FormData(form).entries());
-      const account = accounts.find((item) => item.id === data.accountId);
-      if (!account) return;
+      const accountId = data.accountId || select.value;
+      const account = findAccountByIdOrName(accountId) || findAccountByIdOrName(select.value);
+
+      if (!account || account.id === allAccountsValue) {
+        showNotice(notice, `Please select a specific ${partyLabel.toLowerCase()} from the dropdown before saving an entry.`);
+        return;
+      }
 
       const normalized = {
         id: editingId,
-        date: data.date,
-        type: data.type,
-        description: data.description,
-        image: entryImageData,
+        date: data.date || getTodayIsoDate(),
+        type: data.type || "Debit",
+        description: data.description || "",
+        image: entryImageData || "",
         amount: Number(data.amount || 0)
       };
+
+      if (!account.entries) account.entries = [];
 
       if (!editingId) {
         const allEntries = accounts.flatMap((item) => Array.isArray(item.entries) ? item.entries : []);
         normalized.id = getNextSequentialId(allEntries, entryPrefix);
         account.entries.unshift(normalized);
-        pendingAccountId = "";
-        notice.textContent = `Statement entry ${normalized.id} saved successfully.`;
+        showNotice(notice, `Statement entry ${normalized.id} saved successfully.`);
       } else {
-        const index = account.entries.findIndex((entry) => entry.id === editingId);
+        const index = account.entries.findIndex((entry) => String(entry.id) === String(editingId));
         if (index === -1) {
-          notice.textContent = "Entry not found. Please try again.";
+          showNotice(notice, "Entry not found. Please try again.");
           return;
         }
+        normalized.imagePath = account.entries[index].imagePath || "";
         account.entries[index] = normalized;
-        notice.textContent = `Statement entry ${editingId} updated successfully.`;
+        showNotice(notice, `Statement entry ${editingId} updated successfully.`);
       }
 
       saveStore(store);
@@ -6137,27 +6207,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const imageTrigger = event.target.closest("[data-view-khata-image]");
       const editId = event.target.getAttribute("data-edit-khata");
       const deleteId = event.target.getAttribute("data-delete-khata");
-      const account = accounts.find((item) => item.id === select.value);
+      const account = findAccountByIdOrName(select.value);
       if (!account) return;
 
       if (imageTrigger) {
-        const entry = account.entries.find((item) => item.id === imageTrigger.getAttribute("data-view-khata-image"));
+        const entry = (account.entries || []).find((item) => String(item.id) === String(imageTrigger.getAttribute("data-view-khata-image")));
         if (entry?.image) openEntryImageModal(entry.image);
         return;
       }
-      if (editId) fillForm(account, account.entries.find((entry) => entry.id === editId));
+      if (editId) fillForm(account, (account.entries || []).find((entry) => String(entry.id) === String(editId)));
       if (deleteId) {
-        account.entries = account.entries.filter((entry) => entry.id !== deleteId);
+        account.entries = (account.entries || []).filter((entry) => String(entry.id) !== String(deleteId));
         saveStore(store);
-        if (!account.entries.length) {
-          pendingAccountId = "";
-          populateCustomers(allAccountsValue);
-          renderAccount(allAccountsValue);
-        } else {
-          populateCustomers(account.id);
-          renderAccount(account.id);
-        }
-        notice.textContent = `Statement entry ${deleteId} deleted successfully.`;
+        populateCustomers(account.id);
+        renderAccount(account.id);
+        showNotice(notice, `Statement entry ${deleteId} deleted successfully.`);
         if (editingId === deleteId) resetForm();
       }
     });
@@ -6167,11 +6231,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         const openId = event.target.getAttribute("data-open-customer");
         const editCustomerId = event.target.getAttribute("data-edit-customer");
         if (openId) {
+          populateCustomers(openId);
           renderAccount(openId);
           resetForm();
+          const statementEl = document.querySelector(".statement-shell");
+          if (statementEl) statementEl.scrollIntoView({ behavior: "smooth" });
         }
         if (editCustomerId) {
-          fillCustomerForm(accounts.find((item) => item.id === editCustomerId));
+          const account = findAccountByIdOrName(editCustomerId);
+          if (account) fillCustomerForm(account);
         }
       });
     }
