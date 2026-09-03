@@ -3208,9 +3208,44 @@ body[data-page="booking"] .ledger-table .table-actions {
   box-shadow: inset 3px 0 0 #c97937;
 }
 
-.account-overview-table .overview-actions {
-  justify-content: flex-end;
-  min-width: 190px;
+body[data-page="khata"] .account-overview-table,
+body[data-page="accounts-payable"] .account-overview-table {
+  width: 100%;
+}
+
+body[data-page="khata"] .account-overview-table thead th[colspan="2"],
+body[data-page="accounts-payable"] .account-overview-table thead th[colspan="2"] {
+  text-align: center;
+  width: 200px;
+}
+
+body[data-page="khata"] .account-overview-table th:nth-child(2),
+body[data-page="accounts-payable"] .account-overview-table th:nth-child(2),
+body[data-page="khata"] .account-overview-table td:nth-child(2),
+body[data-page="accounts-payable"] .account-overview-table td:nth-child(2) {
+  width: 220px;
+  text-align: left;
+}
+
+body[data-page="khata"] .account-overview-table tbody td:nth-child(3),
+body[data-page="accounts-payable"] .account-overview-table tbody td:nth-child(3) {
+  width: 100px;
+  text-align: right;
+  padding-right: 4px;
+}
+
+body[data-page="khata"] .account-overview-table tbody td:nth-child(4),
+body[data-page="accounts-payable"] .account-overview-table tbody td:nth-child(4) {
+  width: 100px;
+  text-align: left;
+  padding-left: 4px;
+}
+
+body[data-page="khata"] .account-overview-table .overview-action-button,
+body[data-page="accounts-payable"] .account-overview-table .overview-action-button {
+  min-width: 82px;
+  padding: 6px 12px;
+  font-size: 12.5px;
 }
 
 .account-overview-table .amount-cell .muted {
