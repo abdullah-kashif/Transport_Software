@@ -6245,11 +6245,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       body.innerHTML = sortedEntries.length ? sortedEntries.map((entry) => {
         const amount = Number(entry.amount || 0);
         runningBalance += entry.type === "Debit" ? amount : -amount;
+        const isDebit = entry.type === "Debit";
+        const hasAttachment = Boolean((entry.image || entry.imagePath) && !isAggregate);
+        const hasActions = !isAggregate;
         return `
-          <tr>
-            <td data-label="Date">${formatStatementDate(entry.date)}</td>
-            <td data-label="Description">${text(entry.description)}</td>
-            <td data-label="Image">${entry.image && !isAggregate ? `
+          <tr class="statement-card-row ${isDebit ? "is-debit-card" : "is-credit-card"}${hasAttachment ? " has-attachment" : " no-attachment"}${hasActions ? " has-actions" : " no-actions"}">
+            <td class="st-cell-date" data-label="Date">
+              <span class="st-date-badge">${formatStatementDate(entry.date)}</span>
+            </td>
+            <td class="st-cell-desc" data-label="Description">
+              <span class="st-desc-text">${text(entry.description)}</span>
+            </td>
+            <td class="st-cell-image" data-label="Image">${entry.image && !isAggregate ? `
               <button class="bilty-thumbnail" type="button" data-view-khata-image="${escapeHtml(entry.id)}" aria-label="View entry image" title="View image">
                 <img src="${escapeHtml(entry.image)}" alt="Entry attachment thumbnail" />
               </button>
@@ -6258,14 +6265,20 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                 <span class="loading-placeholder">...</span>
               </button>
             ` : entry.image ? '<span class="muted">Attached</span>' : "-"}</td>
-            <td data-label="${isPayable ? "Payable" : "Debit (-)"}" class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
-            <td data-label="${isPayable ? "Paid" : "Credit (+)"}" class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
-            <td data-label="${isPayable ? "Outstanding" : "Balance"}" class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0
-              ? "0"
-              : `${money(Math.abs(runningBalance))} ${runningBalance > 0
-                ? (isPayable ? "Outstanding" : "(-)")
-                : (isPayable ? "Advance" : "(+)")}`}</td>
-            <td data-label="Actions">
+            <td class="st-cell-debit amount-cell debit-text" data-label="${isPayable ? "Payable" : "Debit (-)"}">
+              <span class="st-amount-value">${entry.type === "Debit" ? money(entry.amount) : "-"}</span>
+            </td>
+            <td class="st-cell-credit amount-cell credit-text" data-label="${isPayable ? "Paid" : "Credit (+)"}">
+              <span class="st-amount-value">${entry.type === "Credit" ? money(entry.amount) : "-"}</span>
+            </td>
+            <td class="st-cell-balance amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}" data-label="${isPayable ? "Outstanding" : "Balance"}">
+              <span class="st-amount-value">${runningBalance === 0
+                ? "0"
+                : `${money(Math.abs(runningBalance))} ${runningBalance > 0
+                  ? (isPayable ? "Outstanding" : "(-)")
+                  : (isPayable ? "Advance" : "(+)")}`}</span>
+            </td>
+            <td class="st-cell-actions" data-label="Actions">
               <div class="table-actions">
                 ${isAggregate ? "-" : `<button class="btn small" data-edit-khata="${entry.id}">Edit</button><button class="btn small danger" data-delete-khata="${entry.id}">Delete</button>`}
               </div>

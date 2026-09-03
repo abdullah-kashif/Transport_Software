@@ -3651,6 +3651,7 @@ body[data-page="booking"] .ledger-table .table-actions {
   body[data-page="khata"] .statement-table,
   body[data-page="accounts-payable"] .statement-table {
     display: block;
+    width: 100%;
     overflow: visible;
     white-space: normal;
   }
@@ -3662,50 +3663,385 @@ body[data-page="booking"] .ledger-table .table-actions {
 
   body[data-page="khata"] .statement-table tbody,
   body[data-page="accounts-payable"] .statement-table tbody {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+    width: 100%;
   }
 
   body[data-page="khata"] .statement-table tbody tr,
   body[data-page="accounts-payable"] .statement-table tbody tr {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 10px 14px;
-    padding: 14px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px 8px;
+    padding: 14px 15px 12px;
+    border: 1px solid #e3d8cc;
+    border-radius: 13px;
+    background: #ffffff;
+    box-shadow: 0 3px 12px rgba(24, 48, 77, 0.05);
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  body[data-page="khata"] .statement-table tbody tr.is-debit-card,
+  body[data-page="accounts-payable"] .statement-table tbody tr.is-debit-card {
+    border-left: 4.5px solid #ba3a2f !important;
+  }
+
+  body[data-page="khata"] .statement-table tbody tr.is-credit-card,
+  body[data-page="accounts-payable"] .statement-table tbody tr.is-credit-card {
+    border-left: 4.5px solid #1f8a70 !important;
+  }
+
+  /* Empty state row */
+  body[data-page="khata"] .statement-table tbody tr:not(.statement-card-row),
+  body[data-page="accounts-payable"] .statement-table tbody tr:not(.statement-card-row) {
+    display: block;
+    padding: 24px 16px;
+    text-align: center;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
     background: #fffdf9;
   }
 
-  body[data-page="khata"] .statement-table tbody td,
-  body[data-page="accounts-payable"] .statement-table tbody td {
-    min-width: 0;
+  body[data-page="khata"] .statement-table tbody tr:not(.statement-card-row) td,
+  body[data-page="accounts-payable"] .statement-table tbody tr:not(.statement-card-row) td {
+    display: block;
     padding: 0;
     border: 0;
-    overflow-wrap: anywhere;
   }
 
-  body[data-page="khata"] .statement-table tbody td::before,
-  body[data-page="accounts-payable"] .statement-table tbody td::before {
-    display: block;
-    margin-bottom: 3px;
-    color: #6f7782;
+  body[data-page="khata"] .statement-table tbody tr:not(.statement-card-row) td::before,
+  body[data-page="accounts-payable"] .statement-table tbody tr:not(.statement-card-row) td::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  /* Date row (Header of Card) */
+  body[data-page="khata"] .statement-table tbody td.st-cell-date,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-date,
+  body[data-page="khata"] .statement-table tbody td[data-label="Date"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Date"] {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 2px;
+    border: 0;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-date::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-date::before,
+  body[data-page="khata"] .statement-table tbody td[data-label="Date"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Date"]::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-date .st-date-badge,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-date .st-date-badge,
+  body[data-page="khata"] .statement-table tbody td[data-label="Date"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Date"] {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #556475;
+  }
+
+  /* Status / Type pill on top-right of the card */
+  body[data-page="khata"] .statement-table tbody tr.is-debit-card td.st-cell-date::after {
+    content: "Debit (-)";
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
     font-size: 11px;
     font-weight: 700;
+    background: #fef2f2;
+    color: #ba3a2f;
+    border: 1px solid rgba(186, 58, 47, 0.22);
     text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  body[data-page="khata"] .statement-table tbody tr.is-credit-card td.st-cell-date::after {
+    content: "Credit (+)";
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #ecfdf5;
+    color: #1f8a70;
+    border: 1px solid rgba(31, 138, 112, 0.22);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  body[data-page="accounts-payable"] .statement-table tbody tr.is-debit-card td.st-cell-date::after {
+    content: "Payable";
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #fef2f2;
+    color: #ba3a2f;
+    border: 1px solid rgba(186, 58, 47, 0.22);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  body[data-page="accounts-payable"] .statement-table tbody tr.is-credit-card td.st-cell-date::after {
+    content: "Paid";
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #ecfdf5;
+    color: #1f8a70;
+    border: 1px solid rgba(31, 138, 112, 0.22);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* Description Row (Full Width Headline) */
+  body[data-page="khata"] .statement-table tbody td.st-cell-desc,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-desc,
+  body[data-page="khata"] .statement-table tbody td[data-label="Description"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Description"] {
+    grid-column: 1 / -1;
+    display: block;
+    padding: 3px 0 6px;
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.45;
+    color: #18283d;
+    word-break: break-word;
+    border: 0;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-desc::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-desc::before,
+  body[data-page="khata"] .statement-table tbody td[data-label="Description"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Description"]::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  /* Financial Metric Boxes (Debit, Credit, Balance) */
+  body[data-page="khata"] .statement-table tbody td.st-cell-debit,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-debit,
+  body[data-page="khata"] .statement-table tbody td.st-cell-credit,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-credit,
+  body[data-page="khata"] .statement-table tbody td.st-cell-balance,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-balance,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Debit"],
+  body[data-page="khata"] .statement-table tbody td[data-label*="Credit"],
+  body[data-page="khata"] .statement-table tbody td[data-label*="Balance"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Payable"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Paid"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Outstanding"] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 8px 4px;
+    border-radius: 8px;
+    min-height: 52px;
+    box-sizing: border-box;
+    border: 0;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-debit::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-debit::before,
+  body[data-page="khata"] .statement-table tbody td.st-cell-credit::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-credit::before,
+  body[data-page="khata"] .statement-table tbody td.st-cell-balance::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-balance::before,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Debit"]::before,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Credit"]::before,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Balance"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Payable"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Paid"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Outstanding"]::before {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
     content: attr(data-label);
   }
 
+  /* Specific styles for Debit / Payable Box */
+  body[data-page="khata"] .statement-table tbody td.st-cell-debit,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-debit,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Debit"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Payable"] {
+    background: rgba(186, 58, 47, 0.05);
+    border: 1px solid rgba(186, 58, 47, 0.18);
+    color: #ba3a2f;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-debit::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-debit::before,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Debit"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Payable"]::before {
+    color: #a12b21;
+  }
+
+  /* Specific styles for Credit / Paid Box */
+  body[data-page="khata"] .statement-table tbody td.st-cell-credit,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-credit,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Credit"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Paid"] {
+    background: rgba(31, 138, 112, 0.05);
+    border: 1px solid rgba(31, 138, 112, 0.18);
+    color: #1f8a70;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-credit::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-credit::before,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Credit"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Paid"]::before {
+    color: #156d58;
+  }
+
+  /* Specific styles for Balance / Outstanding Box */
+  body[data-page="khata"] .statement-table tbody td.st-cell-balance,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-balance,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Balance"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Outstanding"] {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-balance::before,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-balance::before,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Balance"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Outstanding"]::before {
+    color: #475569;
+  }
+
+  /* Image Attachment Cell */
+  body[data-page="khata"] .statement-table tbody tr.no-attachment td.st-cell-image,
+  body[data-page="accounts-payable"] .statement-table tbody tr.no-attachment td.st-cell-image {
+    display: none !important;
+  }
+
+  body[data-page="khata"] .statement-table tbody tr.has-attachment td.st-cell-image,
+  body[data-page="accounts-payable"] .statement-table tbody tr.has-attachment td.st-cell-image {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #fffaf5;
+    border: 1px solid #f0dfce;
+    border-radius: 8px;
+    margin-top: 2px;
+  }
+
+  body[data-page="khata"] .statement-table tbody tr.has-attachment td.st-cell-image::before,
+  body[data-page="accounts-payable"] .statement-table tbody tr.has-attachment td.st-cell-image::before {
+    display: block;
+    content: "Attachment:";
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* Actions Cell */
+  body[data-page="khata"] .statement-table tbody tr.no-actions td.st-cell-actions,
+  body[data-page="accounts-payable"] .statement-table tbody tr.no-actions td.st-cell-actions {
+    display: none !important;
+  }
+
+  body[data-page="khata"] .statement-table tbody tr.has-actions td.st-cell-actions,
+  body[data-page="accounts-payable"] .statement-table tbody tr.has-actions td.st-cell-actions,
   body[data-page="khata"] .statement-table tbody td[data-label="Actions"],
   body[data-page="accounts-payable"] .statement-table tbody td[data-label="Actions"] {
     grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 10px;
+    margin-top: 3px;
+    border-top: 1px dashed rgba(232, 216, 199, 0.8);
+    border-bottom: 0;
+    border-left: 0;
+    border-right: 0;
   }
 
+  body[data-page="khata"] .statement-table tbody tr.has-actions td.st-cell-actions::before,
+  body[data-page="accounts-payable"] .statement-table tbody tr.has-actions td.st-cell-actions::before,
+  body[data-page="khata"] .statement-table tbody td[data-label="Actions"]::before,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Actions"]::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-actions .table-actions,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-actions .table-actions,
   body[data-page="khata"] .statement-table tbody td[data-label="Actions"] .table-actions,
   body[data-page="accounts-payable"] .statement-table tbody td[data-label="Actions"] .table-actions {
-    justify-content: flex-start;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
   }
 
+  body[data-page="khata"] .statement-table tbody td.st-cell-actions .btn,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-actions .btn,
+  body[data-page="khata"] .statement-table tbody td[data-label="Actions"] .btn,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Actions"] .btn {
+    min-height: 35px;
+    padding: 6px 15px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 7px;
+  }
+}
+
+@media (max-width: 400px) {
+  body[data-page="khata"] .statement-table tbody tr,
+  body[data-page="accounts-payable"] .statement-table tbody tr {
+    padding: 12px 11px 10px;
+    gap: 7px 6px;
+  }
+
+  body[data-page="khata"] .statement-table tbody td.st-cell-debit,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-debit,
+  body[data-page="khata"] .statement-table tbody td.st-cell-credit,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-credit,
+  body[data-page="khata"] .statement-table tbody td.st-cell-balance,
+  body[data-page="accounts-payable"] .statement-table tbody td.st-cell-balance,
+  body[data-page="khata"] .statement-table tbody td[data-label*="Debit"],
+  body[data-page="khata"] .statement-table tbody td[data-label*="Credit"],
+  body[data-page="khata"] .statement-table tbody td[data-label*="Balance"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Payable"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Paid"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Outstanding"] {
+    padding: 6px 3px;
+    min-height: 48px;
+    font-size: 12.5px;
+  }
+}
   body[data-page="khata"] .account-overview-table tbody tr,
   body[data-page="accounts-payable"] .account-overview-table tbody tr {
     cursor: pointer;
