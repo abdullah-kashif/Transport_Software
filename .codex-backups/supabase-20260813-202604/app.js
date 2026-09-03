@@ -1309,8 +1309,8 @@
     const day = date.getDate();
     const suffix = day % 10 === 1 && day !== 11 ? "st"
       : day % 10 === 2 && day !== 12 ? "nd"
-      : day % 10 === 3 && day !== 13 ? "rd"
-      : "th";
+        : day % 10 === 3 && day !== 13 ? "rd"
+          : "th";
     const month = date.toLocaleString("en-US", { month: "short" });
     const year = date.toLocaleString("en-US", { year: "2-digit" });
     return `${day}${suffix} ${month}, ${year}`;
@@ -1636,17 +1636,17 @@
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
         return [
-        String(index + 1),
-        formatShortDate(item.date),
-        text(item.bookingNo || item.id),
-        text(item.invoiceNo || "-"),
-        text(item.customer || customer || "-"),
-        formatContainerSizeSummary(item),
-        money(item.rate),
-        money(item.salesTaxAmount || tax.salesTaxAmount),
-        money(item.totalAmount || tax.totalAmount),
-        text(item.remarks || "-")
-      ];
+          String(index + 1),
+          formatShortDate(item.date),
+          text(item.bookingNo || item.id),
+          text(item.invoiceNo || "-"),
+          text(item.customer || customer || "-"),
+          formatContainerSizeSummary(item),
+          money(item.rate),
+          money(item.salesTaxAmount || tax.salesTaxAmount),
+          money(item.totalAmount || tax.totalAmount),
+          text(item.remarks || "-")
+        ];
       }),
       foot: [["", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
       styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
@@ -1887,7 +1887,7 @@
 
   function bindPaymentNotifications(bookingsSource) {
     const center = document.querySelector("[data-payment-notifications]");
-    if (!center) return () => {};
+    if (!center) return () => { };
     const trigger = center.querySelector("[data-notification-trigger]");
     const panel = center.querySelector("[data-notification-panel]");
     const closeButton = center.querySelector("[data-notification-close]");
@@ -2700,7 +2700,7 @@
       const customer = event.target.getAttribute("data-download-summary");
       if (!customer) return;
       const bookings = getPendingBookings().filter((item) => (String(item.customer || "").trim() || "Unknown Customer") === customer);
-      buildSummaryRecordPdf(customer, bookings).catch(() => {});
+      buildSummaryRecordPdf(customer, bookings).catch(() => { });
     });
     renderCustomerOptions();
     render();
@@ -3333,8 +3333,8 @@
                 </thead>
                 <tbody>
                   ${legs.map((leg) => {
-                    serialNumber += 1;
-                    return `<tr>
+          serialNumber += 1;
+          return `<tr>
                       <td>${serialNumber}</td>
                       <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${leg.type}</span></td>
                       <td>${leg.date ? formatShortDate(leg.date) : "-"}</td>
@@ -3348,7 +3348,7 @@
                       <td>${text(leg.broker)}</td>
                       <td>${text(leg.remarks)}</td>
                     </tr>`;
-                  }).join("")}
+        }).join("")}
                 </tbody>
               </table>
             </div>
@@ -3364,7 +3364,7 @@
     if (pendingSummaryDownloadButton) {
       pendingSummaryDownloadButton.addEventListener("click", () => {
         if (!currentPendingSummaryTruckNo || !currentPendingSummaryTrips.length) return;
-        buildPendingTruckSummaryPdf(currentPendingSummaryTrips, currentPendingSummaryTruckNo).catch(() => {});
+        buildPendingTruckSummaryPdf(currentPendingSummaryTrips, currentPendingSummaryTruckNo).catch(() => { });
       });
     }
     render();
@@ -3482,8 +3482,8 @@
           <td>${expiryCell(item.punjabPermitExpiry)}</td>
           <td>${expiryCell(item.taxPaidUpTo)}</td>
           <td class="equipment-docs">${item.documentData
-            ? `<button class="btn small" type="button" data-view-equipment-document="${item.id}">${escapeHtml(item.documentName || "View File")}</button>`
-            : text(item.originalDocs || "-")}</td>
+          ? `<button class="btn small" type="button" data-view-equipment-document="${item.id}">${escapeHtml(item.documentName || "View File")}</button>`
+          : text(item.originalDocs || "-")}</td>
           <td>
             <div class="table-actions">
               <button class="btn small" type="button" data-download-equipment="${item.id}">Download PDF</button>
@@ -4832,10 +4832,10 @@
             <td>${money(totals.debit)}</td>
             <td>${money(totals.credit)}</td>
             <td class="${totals.closingBalance > 0 ? "debit-text" : totals.closingBalance < 0 ? "credit-text" : ""}">${money(Math.abs(totals.closingBalance))}${totals.closingBalance > 0
-              ? (isPayable ? " Outstanding" : " (-)")
-              : totals.closingBalance < 0
-                ? (isPayable ? " Advance Paid" : " (+)")
-                : ""}</td>
+            ? (isPayable ? " Outstanding" : " (-)")
+            : totals.closingBalance < 0
+              ? (isPayable ? " Advance Paid" : " (+)")
+              : ""}</td>
             <td>${account.entries.length}</td>
             <td>
               <div class="table-actions">
@@ -4884,12 +4884,12 @@
           <span>${balanceLabel}</span>
           <strong>Rs ${money(Math.abs(totals.closingBalance))}</strong>
           <small>${totals.hasEntries
-            ? (totals.closingBalance > 0
-              ? (isPayable ? "Outstanding" : "Debit (-)")
-              : totals.closingBalance < 0
-                ? (isPayable ? "Advance Paid" : "Credit (+)")
-                : "Settled")
-            : "-"}</small>
+          ? (totals.closingBalance > 0
+            ? (isPayable ? "Outstanding" : "Debit (-)")
+            : totals.closingBalance < 0
+              ? (isPayable ? "Advance Paid" : "Credit (+)")
+              : "Settled")
+          : "-"}</small>
         </div>
       `;
 
@@ -4909,10 +4909,10 @@
             <td class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
             <td class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0
-              ? "0"
-              : `${money(Math.abs(runningBalance))} ${runningBalance > 0
-                ? (isPayable ? "Outstanding" : "(-)")
-                : (isPayable ? "Advance" : "(+)")}`}</td>
+            ? "0"
+            : `${money(Math.abs(runningBalance))} ${runningBalance > 0
+              ? (isPayable ? "Outstanding" : "(-)")
+              : (isPayable ? "Advance" : "(+)")}`}</td>
             <td>
               <div class="table-actions">
                 ${isAggregate ? "-" : `<button class="btn small" data-edit-khata="${entry.id}">Edit</button><button class="btn small danger" data-delete-khata="${entry.id}">Delete</button>`}

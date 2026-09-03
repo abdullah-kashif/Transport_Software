@@ -3196,6 +3196,30 @@ body[data-page="booking"] .ledger-table .table-actions {
   white-space: nowrap;
 }
 
+.account-overview-table tbody tr[data-overview-account] {
+  cursor: pointer;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.account-overview-table tbody tr[data-overview-account]:hover,
+.account-overview-table tbody tr[data-overview-account]:focus-visible {
+  background: #fff5ea;
+  outline: none;
+  box-shadow: inset 3px 0 0 #c97937;
+}
+
+.account-overview-table .overview-actions {
+  justify-content: flex-end;
+  min-width: 190px;
+}
+
+.account-overview-table .amount-cell .muted {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .amount-cell {
   font-variant-numeric: tabular-nums;
 }

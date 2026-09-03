@@ -68,5 +68,10 @@ The local workspace cannot log into the user's live Supabase session or click th
   cannot block all later Khata edits and updates.
 - Optimized normal Khata account and entry saves to sync only the affected
   account instead of serially reconciling the complete account register.
+- Added a Customer/Payee Account Overview table above the statement wizard on
+  both Khata pages, with clickable rows and Share PDF/Download actions.
+- Corrected Share PDF so it no longer triggers an automatic download; it uses
+  the native file share sheet where supported and otherwise opens WhatsApp
+  without downloading a duplicate file.
 - Re-checked JavaScript syntax, loaded all 15 HTML pages through a local server,
   and confirmed the unauthenticated redirect/sign-in path has no console errors.

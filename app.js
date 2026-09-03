@@ -5768,6 +5768,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const summary = document.querySelector("[data-khata-summary]");
     const customerCard = document.querySelector("[data-khata-customer]");
     const customerListBody = document.querySelector("[data-khata-customers]");
+    const accountOverviewRows = document.querySelector("[data-account-overview-rows]");
+    const accountOverviewTitle = document.querySelector("[data-account-overview-title]");
+    const accountPartyHeading = document.querySelector("[data-account-party-heading]");
+    const accountBalanceHeading = document.querySelector("[data-account-balance-heading]");
     const statementRange = document.querySelector("[data-khata-range]");
     const statementTitle = document.querySelector("[data-khata-title]");
     const form = document.querySelector("[data-khata-form]");
@@ -6079,7 +6083,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
       try {
         const file = await buildStatementPdfFile(account);
-        if (isMobileDevice() && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+        if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
           await navigator.share({
             files: [file],
             title: `${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`,
@@ -6088,8 +6092,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           showNotice(exportNotice, "The share sheet is open. Select WhatsApp to send the statement directly.");
           return;
         }
-
-        triggerFileDownload(file);
       } catch (error) {
         // Fallback to chat open below.
       }
@@ -6101,8 +6103,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           : `${baseUrl}${phone}&text=${message}`;
         window.open(whatsappUrl, "_blank", "noopener,noreferrer");
         showNotice(exportNotice, isMobileDevice()
-          ? "WhatsApp chat is open. The PDF has been downloaded; attach it and send it."
-          : "WhatsApp Web is open and the PDF has been downloaded. Attach the downloaded PDF in the chat and send it.");
+          ? "WhatsApp chat is open. Attach the statement PDF if required and send it."
+          : "WhatsApp Web is open. Attach the statement PDF if required and send it.");
       } else {
         showNotice(exportNotice, `A valid WhatsApp number was not found for this ${partyLabel.toLowerCase()}.`);
       }
@@ -6172,6 +6174,36 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </tr>
         `;
       }).join("") : `<tr><td colspan="8" class="text-center muted" style="padding: 24px;">No ${partyLabel.toLowerCase()} accounts recorded.</td></tr>`;
+    }
+
+    function renderAccountOverview() {
+      if (!accountOverviewRows) return;
+      if (accountOverviewTitle) accountOverviewTitle.textContent = isPayable ? "Payee Account Overview" : "Customer Account Overview";
+      if (accountPartyHeading) accountPartyHeading.textContent = partyLabel;
+      if (accountBalanceHeading) accountBalanceHeading.textContent = isPayable ? "Outstanding Balance" : "Current Balance";
+      accountOverviewRows.innerHTML = accounts.length ? accounts.map((account, index) => {
+        const totals = calculateKhataSummary(account);
+        const balance = Math.abs(totals.closingBalance);
+        const balanceLabel = totals.closingBalance > 0
+          ? (isPayable ? "Outstanding" : "Debit")
+          : totals.closingBalance < 0
+            ? (isPayable ? "Advance" : "Credit")
+            : "Settled";
+        const balanceClass = totals.closingBalance === 0 ? "" : totals.closingBalance > 0 ? "debit-text" : "credit-text";
+        return `
+          <tr data-overview-account="${text(account.id)}" tabindex="0" title="Open ${text(account.customer)} statement">
+            <td>${index + 1}</td>
+            <td><strong>${text(account.customer)}</strong></td>
+            <td class="amount-cell ${balanceClass}">${money(balance)} <span class="muted">${balanceLabel}</span></td>
+            <td>
+              <div class="table-actions overview-actions">
+                <button class="btn small" type="button" data-overview-action="share" data-overview-account="${text(account.id)}" title="Share PDF">Share PDF</button>
+                <button class="btn small" type="button" data-overview-action="download" data-overview-account="${text(account.id)}" title="Download PDF">Download</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("") : `<tr><td colspan="4" class="text-center muted" style="padding: 24px;">No ${partyLabel.toLowerCase()} accounts recorded.</td></tr>`;
     }
 
     function renderAccount(accountId) {
@@ -6275,6 +6307,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       renderCustomerList();
     }
 
+    function openOverviewAccount(accountId) {
+      const account = findAccountByIdOrName(accountId);
+      if (!account) return;
+      populateCustomers(account.id);
+      renderAccount(account.id);
+      resetForm();
+      document.querySelector(".statement-shell")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     function resetForm() {
       const isAggregate = select.value === allAccountsValue;
       if (form.elements.accountId) {
@@ -6362,6 +6403,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       showNotice(customerNotice, successMessage);
       populateCustomers(normalized.id);
+      renderAccountOverview();
       renderAccount(normalized.id);
       resetCustomerForm();
     });
@@ -6447,11 +6489,32 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       showNotice(notice, successMessage);
       populateCustomers(account.id);
+      renderAccountOverview();
       renderAccount(account.id);
       resetForm();
     });
 
     body.addEventListener("click", async (event) => {
+      const overviewAction = event.target.closest("[data-overview-action]");
+      if (overviewAction) {
+        const account = findAccountByIdOrName(overviewAction.getAttribute("data-overview-account"));
+        if (!account) return;
+        if (overviewAction.getAttribute("data-overview-action") === "share") {
+          await shareStatementOnWhatsapp(account);
+        } else {
+          await printStatement(account);
+        }
+        return;
+      }
+      const overviewRow = event.target.closest("tr[data-overview-account]");
+      if (overviewRow) {
+        const accountId = overviewRow.getAttribute("data-overview-account");
+        populateCustomers(accountId);
+        renderAccount(accountId);
+        resetForm();
+        document.querySelector(".statement-shell")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
       const imageTrigger = event.target.closest("[data-view-khata-image]");
       const editId = event.target.getAttribute("data-edit-khata");
       const deleteId = event.target.getAttribute("data-delete-khata");
@@ -6506,6 +6569,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           removeLocalAccount(acc);
           saveStore(store, { skipRemote: true });
           populateCustomers(allAccountsValue);
+          renderAccountOverview();
           renderAccount(allAccountsValue);
           renderCustomerList();
           resetForm();
@@ -6513,12 +6577,37 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         } else {
           saveStore(store, { skipRemote: true });
           populateCustomers(acc.id);
+          renderAccountOverview();
           renderAccount(acc.id);
           renderCustomerList();
           showNotice(notice, "Statement entry deleted successfully.");
           if (editingId === deleteId) resetForm();
         }
       }
+    });
+
+    accountOverviewRows?.addEventListener("click", async (event) => {
+      const action = event.target.closest("[data-overview-action]");
+      if (action) {
+        const account = findAccountByIdOrName(action.getAttribute("data-overview-account"));
+        if (!account) return;
+        if (action.getAttribute("data-overview-action") === "share") {
+          await shareStatementOnWhatsapp(account);
+        } else {
+          await printStatement(account);
+        }
+        return;
+      }
+      const row = event.target.closest("tr[data-overview-account]");
+      if (row) openOverviewAccount(row.getAttribute("data-overview-account"));
+    });
+
+    accountOverviewRows?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const row = event.target.closest("tr[data-overview-account]");
+      if (!row || event.target.closest("button")) return;
+      event.preventDefault();
+      openOverviewAccount(row.getAttribute("data-overview-account"));
     });
 
     if (customerListBody) {
@@ -6560,8 +6649,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       showNotice(notice, `Supabase sync failed: ${event.detail?.message || "Please try again."}`);
     });
     populateCustomers(allAccountsValue);
+    renderAccountOverview();
     window.activePageRender = () => {
       populateCustomers(select.value);
+      renderAccountOverview();
       renderAccount(select.value);
     };
     renderAccount(allAccountsValue);
