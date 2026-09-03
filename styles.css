@@ -3752,6 +3752,13 @@ body[data-page="booking"] .ledger-table .table-actions {
   body[data-page="khata"] .account-overview-table td::before,
   body[data-page="accounts-payable"] .account-overview-table td::before {
     display: none;
+    content: none;
+  }
+
+  body[data-page="khata"] .account-overview-table tbody td::before,
+  body[data-page="accounts-payable"] .account-overview-table tbody td::before {
+    display: none !important;
+    content: none !important;
   }
 
   body[data-page="khata"] .account-overview-table th:nth-child(1),
