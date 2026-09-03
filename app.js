@@ -6192,12 +6192,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         const balanceClass = totals.closingBalance === 0 ? "" : totals.closingBalance > 0 ? "debit-text" : "credit-text";
         return `
           <tr data-overview-account="${text(account.id)}" tabindex="0" title="Open ${text(account.customer)} statement">
-            <td>${index + 1}</td>
-            <td><strong>${text(account.customer)}</strong></td>
-            <td class="amount-cell ${balanceClass}">${money(balance)} <span class="muted">${balanceLabel}</span></td>
-            <td>
+            <td data-label="S.No">${index + 1}</td>
+            <td data-label="${partyLabel}"><strong>${text(account.customer)}</strong></td>
+            <td data-label="${isPayable ? "Outstanding Balance" : "Current Balance"}" class="amount-cell ${balanceClass}">${money(balance)} <span class="muted">${balanceLabel}</span></td>
+            <td data-label="Actions">
               <div class="table-actions overview-actions">
-                <button class="btn small" type="button" data-overview-action="share" data-overview-account="${text(account.id)}" title="Share PDF">Share PDF</button>
+                <button class="btn small" type="button" data-overview-action="share" data-overview-account="${text(account.id)}" title="Share PDF">Share</button>
                 <button class="btn small" type="button" data-overview-action="download" data-overview-account="${text(account.id)}" title="Download PDF">Download</button>
               </div>
             </td>
@@ -6257,9 +6257,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         runningBalance += entry.type === "Debit" ? amount : -amount;
         return `
           <tr>
-            <td>${formatStatementDate(entry.date)}</td>
-            <td>${text(entry.description)}</td>
-            <td>${entry.image && !isAggregate ? `
+            <td data-label="Date">${formatStatementDate(entry.date)}</td>
+            <td data-label="Description">${text(entry.description)}</td>
+            <td data-label="Image">${entry.image && !isAggregate ? `
               <button class="bilty-thumbnail" type="button" data-view-khata-image="${escapeHtml(entry.id)}" aria-label="View entry image" title="View image">
                 <img src="${escapeHtml(entry.image)}" alt="Entry attachment thumbnail" />
               </button>
@@ -6268,14 +6268,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                 <span class="loading-placeholder">...</span>
               </button>
             ` : entry.image ? '<span class="muted">Attached</span>' : "-"}</td>
-            <td class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
-            <td class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
-            <td class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0
+            <td data-label="${isPayable ? "Payable" : "Debit (-)"}" class="amount-cell debit-text">${entry.type === "Debit" ? money(entry.amount) : "-"}</td>
+            <td data-label="${isPayable ? "Paid" : "Credit (+)"}" class="amount-cell credit-text">${entry.type === "Credit" ? money(entry.amount) : "-"}</td>
+            <td data-label="${isPayable ? "Outstanding" : "Balance"}" class="amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}">${runningBalance === 0
               ? "0"
               : `${money(Math.abs(runningBalance))} ${runningBalance > 0
                 ? (isPayable ? "Outstanding" : "(-)")
                 : (isPayable ? "Advance" : "(+)")}`}</td>
-            <td>
+            <td data-label="Actions">
               <div class="table-actions">
                 ${isAggregate ? "-" : `<button class="btn small" data-edit-khata="${entry.id}">Edit</button><button class="btn small danger" data-delete-khata="${entry.id}">Delete</button>`}
               </div>

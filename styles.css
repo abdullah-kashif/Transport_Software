@@ -3647,6 +3647,149 @@ body[data-page="booking"] .ledger-table .table-actions {
   }
 }
 
+@media (max-width: 760px) {
+  body[data-page="khata"] .statement-table,
+  body[data-page="accounts-payable"] .statement-table {
+    display: block;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  body[data-page="khata"] .statement-table thead,
+  body[data-page="accounts-payable"] .statement-table thead {
+    display: none;
+  }
+
+  body[data-page="khata"] .statement-table tbody,
+  body[data-page="accounts-payable"] .statement-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  body[data-page="khata"] .statement-table tbody tr,
+  body[data-page="accounts-payable"] .statement-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 14px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fffdf9;
+  }
+
+  body[data-page="khata"] .statement-table tbody td,
+  body[data-page="accounts-payable"] .statement-table tbody td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  body[data-page="khata"] .statement-table tbody td::before,
+  body[data-page="accounts-payable"] .statement-table tbody td::before {
+    display: block;
+    margin-bottom: 3px;
+    color: #6f7782;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+
+  body[data-page="khata"] .statement-table tbody td[data-label="Actions"],
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Actions"] {
+    grid-column: 1 / -1;
+  }
+
+  body[data-page="khata"] .statement-table tbody td[data-label="Actions"] .table-actions,
+  body[data-page="accounts-payable"] .statement-table tbody td[data-label="Actions"] .table-actions {
+    justify-content: flex-start;
+  }
+
+  body[data-page="khata"] .account-overview-table tbody tr,
+  body[data-page="accounts-payable"] .account-overview-table tbody tr {
+    cursor: pointer;
+  }
+
+  body[data-page="khata"] .account-overview-table,
+  body[data-page="accounts-payable"] .account-overview-table {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  body[data-page="khata"] .account-overview-table thead,
+  body[data-page="accounts-payable"] .account-overview-table thead {
+    display: table-header-group;
+  }
+
+  body[data-page="khata"] .account-overview-table tbody,
+  body[data-page="accounts-payable"] .account-overview-table tbody {
+    display: table-row-group;
+  }
+
+  body[data-page="khata"] .account-overview-table tbody tr,
+  body[data-page="accounts-payable"] .account-overview-table tbody tr {
+    display: table-row;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  body[data-page="khata"] .account-overview-table th,
+  body[data-page="accounts-payable"] .account-overview-table th,
+  body[data-page="khata"] .account-overview-table td,
+  body[data-page="accounts-payable"] .account-overview-table td {
+    display: table-cell;
+    padding: 9px 5px;
+    font-size: 11px;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+  }
+
+  body[data-page="khata"] .account-overview-table td::before,
+  body[data-page="accounts-payable"] .account-overview-table td::before {
+    display: none;
+  }
+
+  body[data-page="khata"] .account-overview-table th:nth-child(1),
+  body[data-page="accounts-payable"] .account-overview-table th:nth-child(1),
+  body[data-page="khata"] .account-overview-table td:nth-child(1),
+  body[data-page="accounts-payable"] .account-overview-table td:nth-child(1) { width: 10%; }
+
+  body[data-page="khata"] .account-overview-table th:nth-child(2),
+  body[data-page="accounts-payable"] .account-overview-table th:nth-child(2),
+  body[data-page="khata"] .account-overview-table td:nth-child(2),
+  body[data-page="accounts-payable"] .account-overview-table td:nth-child(2) { width: 27%; }
+
+  body[data-page="khata"] .account-overview-table th:nth-child(3),
+  body[data-page="accounts-payable"] .account-overview-table th:nth-child(3),
+  body[data-page="khata"] .account-overview-table td:nth-child(3),
+  body[data-page="accounts-payable"] .account-overview-table td:nth-child(3) { width: 28%; }
+
+  body[data-page="khata"] .account-overview-table th:nth-child(4),
+  body[data-page="accounts-payable"] .account-overview-table th:nth-child(4),
+  body[data-page="khata"] .account-overview-table td:nth-child(4),
+  body[data-page="accounts-payable"] .account-overview-table td:nth-child(4) { width: 35%; }
+
+  body[data-page="khata"] .account-overview-table .overview-actions,
+  body[data-page="accounts-payable"] .account-overview-table .overview-actions {
+    min-width: 0;
+    gap: 3px;
+    flex-wrap: nowrap;
+  }
+
+  body[data-page="khata"] .account-overview-table .overview-actions .btn,
+  body[data-page="accounts-payable"] .account-overview-table .overview-actions .btn {
+    min-width: 0;
+    padding: 6px 5px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+}
+
 .skeleton-text {
   height: 16px;
   border-radius: 4px;

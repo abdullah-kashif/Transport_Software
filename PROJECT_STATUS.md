@@ -73,5 +73,7 @@ The local workspace cannot log into the user's live Supabase session or click th
 - Corrected Share PDF so it no longer triggers an automatic download; it uses
   the native file share sheet where supported and otherwise opens WhatsApp
   without downloading a duplicate file.
+- Added a compact mobile layout for the account overview so S.No, name,
+  balance, Share and Download remain visible together without horizontal scrolling.
 - Re-checked JavaScript syntax, loaded all 15 HTML pages through a local server,
   and confirmed the unauthenticated redirect/sign-in path has no console errors.
