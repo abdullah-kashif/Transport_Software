@@ -6084,16 +6084,25 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       try {
         const file = await buildStatementPdfFile(account);
         if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-          await navigator.share({
-            files: [file],
-            title: `${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`,
-            text: `${account.customer} ${isPayable ? "payable" : "receivable"} statement`
-          });
-          showNotice(exportNotice, "The share sheet is open. Select WhatsApp to send the statement directly.");
-          return;
+          try {
+            await navigator.share({
+              files: [file],
+              title: `${account.customer} ${isPayable ? "Payable" : "Receivable"} Statement`,
+              text: `${account.customer} ${isPayable ? "payable" : "receivable"} statement`
+            });
+            showNotice(exportNotice, "The share sheet is open. Select WhatsApp to send the statement directly.");
+            return;
+          } catch (shareError) {
+            // If the user cancelled, dismissed, or clicked outside the native share sheet, stop cleanly without forcing open WhatsApp
+            if (shareError && (shareError.name === "AbortError" || shareError.name === "NotAllowedError" || String(shareError.message || "").toLowerCase().includes("abort") || String(shareError.message || "").toLowerCase().includes("cancel"))) {
+              return;
+            }
+            // If sharing failed for an unexpected device reason, fallback below
+          }
         }
       } catch (error) {
-        // Fallback to chat open below.
+        showNotice(exportNotice, "The statement file could not be generated. Please try again.");
+        return;
       }
 
       if (phone) {
