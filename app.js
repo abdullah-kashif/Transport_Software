@@ -6181,25 +6181,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (accountOverviewTitle) accountOverviewTitle.textContent = isPayable ? "Payee Account Overview" : "Customer Account Overview";
       if (accountPartyHeading) accountPartyHeading.textContent = partyLabel;
       if (accountBalanceHeading) accountBalanceHeading.textContent = isPayable ? "Outstanding Balance" : "Current Balance";
-      accountOverviewRows.innerHTML = accounts.length ? accounts.map((account, index) => {
+      accountOverviewRows.innerHTML = accounts.length ? accounts.map((account) => {
         const totals = calculateKhataSummary(account);
         const balance = Math.abs(totals.closingBalance);
-        const balanceLabel = totals.closingBalance > 0
-          ? (isPayable ? "Outstanding" : "Debit")
-          : totals.closingBalance < 0
-            ? (isPayable ? "Advance" : "Credit")
-            : "Settled";
         const balanceClass = totals.closingBalance === 0 ? "" : totals.closingBalance > 0 ? "debit-text" : "credit-text";
         return `
           <tr data-overview-account="${text(account.id)}" tabindex="0" title="Open ${text(account.customer)} statement">
-            <td data-label="S.No">${index + 1}</td>
             <td data-label="${partyLabel}"><strong>${text(account.customer)}</strong></td>
-            <td data-label="${isPayable ? "Outstanding Balance" : "Current Balance"}" class="amount-cell ${balanceClass}">${money(balance)} <span class="muted">${balanceLabel}</span></td>
+            <td data-label="${isPayable ? "Outstanding Balance" : "Current Balance"}" class="amount-cell ${balanceClass}">${money(balance)}</td>
             <td data-label="Download"><button class="btn small overview-action-button" type="button" data-overview-action="download" data-overview-account="${text(account.id)}" title="Download PDF">Download</button></td>
             <td data-label="Share"><button class="btn small overview-action-button" type="button" data-overview-action="share" data-overview-account="${text(account.id)}" title="Share PDF">Share</button></td>
           </tr>
         `;
-      }).join("") : `<tr><td colspan="5" class="text-center muted" style="padding: 24px;">No ${partyLabel.toLowerCase()} accounts recorded.</td></tr>`;
+      }).join("") : `<tr><td colspan="4" class="text-center muted" style="padding: 24px;">No ${partyLabel.toLowerCase()} accounts recorded.</td></tr>`;
     }
 
     function renderAccount(accountId) {
