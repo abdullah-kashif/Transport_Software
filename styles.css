@@ -3772,17 +3772,15 @@ body[data-page="booking"] .ledger-table .table-actions {
   body[data-page="khata"] .account-overview-table th:nth-child(4),
   body[data-page="accounts-payable"] .account-overview-table th:nth-child(4),
   body[data-page="khata"] .account-overview-table td:nth-child(4),
-  body[data-page="accounts-payable"] .account-overview-table td:nth-child(4) { width: 35%; }
+  body[data-page="accounts-payable"] .account-overview-table td:nth-child(4) { width: 17%; }
 
-  body[data-page="khata"] .account-overview-table .overview-actions,
-  body[data-page="accounts-payable"] .account-overview-table .overview-actions {
-    min-width: 0;
-    gap: 3px;
-    flex-wrap: nowrap;
-  }
+  body[data-page="khata"] .account-overview-table th:nth-child(5),
+  body[data-page="accounts-payable"] .account-overview-table th:nth-child(5),
+  body[data-page="khata"] .account-overview-table td:nth-child(5),
+  body[data-page="accounts-payable"] .account-overview-table td:nth-child(5) { width: 15%; }
 
-  body[data-page="khata"] .account-overview-table .overview-actions .btn,
-  body[data-page="accounts-payable"] .account-overview-table .overview-actions .btn {
+  body[data-page="khata"] .account-overview-table .overview-action-button,
+  body[data-page="accounts-payable"] .account-overview-table .overview-action-button {
     min-width: 0;
     padding: 6px 5px;
     font-size: 10px;

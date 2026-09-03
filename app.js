@@ -6195,15 +6195,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <td data-label="S.No">${index + 1}</td>
             <td data-label="${partyLabel}"><strong>${text(account.customer)}</strong></td>
             <td data-label="${isPayable ? "Outstanding Balance" : "Current Balance"}" class="amount-cell ${balanceClass}">${money(balance)} <span class="muted">${balanceLabel}</span></td>
-            <td data-label="Actions">
-              <div class="table-actions overview-actions">
-                <button class="btn small" type="button" data-overview-action="share" data-overview-account="${text(account.id)}" title="Share PDF">Share</button>
-                <button class="btn small" type="button" data-overview-action="download" data-overview-account="${text(account.id)}" title="Download PDF">Download</button>
-              </div>
-            </td>
+            <td data-label="Download"><button class="btn small overview-action-button" type="button" data-overview-action="download" data-overview-account="${text(account.id)}" title="Download PDF">Download</button></td>
+            <td data-label="Share"><button class="btn small overview-action-button" type="button" data-overview-action="share" data-overview-account="${text(account.id)}" title="Share PDF">Share</button></td>
           </tr>
         `;
-      }).join("") : `<tr><td colspan="4" class="text-center muted" style="padding: 24px;">No ${partyLabel.toLowerCase()} accounts recorded.</td></tr>`;
+      }).join("") : `<tr><td colspan="5" class="text-center muted" style="padding: 24px;">No ${partyLabel.toLowerCase()} accounts recorded.</td></tr>`;
     }
 
     function renderAccount(accountId) {
