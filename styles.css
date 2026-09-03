@@ -3683,6 +3683,7 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
 }
 
 @media (max-width: 760px) {
+
   /* ==========================================================================
      STATEMENT REGISTER (MOBILE CARDS)
      ========================================================================== */
@@ -4200,6 +4201,7 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
 }
 
 @media (max-width: 400px) {
+
   body[data-page="khata"] .statement-table:not(.account-overview-table) tbody tr,
   body[data-page="accounts-payable"] .statement-table:not(.account-overview-table) tbody tr {
     padding: 12px 11px 10px;
