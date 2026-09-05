@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Accounts Receivable</title>
-  <link rel="stylesheet" href="styles.css?v=20260903-8" />
+  <link rel="stylesheet" href="styles.css?v=20260904-2" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -61,89 +61,75 @@
           </div>
         </div>
       </section>
-      <section class="screen">
-        <div class="screen-head">
-          <div>
-            <h3>Add Customer</h3>
-          </div>
-        </div>
-        <form data-customer-form class="form-grid">
-          <div class="field"><label>Customer Name</label><input name="customer" required /></div>
-          <div class="field"><label>Phone</label><input name="phone" /></div>
-          <div class="field"><label>City</label><input name="city" /></div>
-          <div class="field full actions">
-            <button class="btn primary" type="submit" data-customer-submit-label>Save Customer</button>
-            <button class="btn" type="button" data-reset-customer-form>Clear Form</button>
-          </div>
-        </form>
-        <div class="notice" data-customer-notice hidden></div>
-      </section>
-
-      <section class="screen account-overview-screen">
-        <div class="screen-head">
-          <div>
-            <h3 data-account-overview-title>Account Overview</h3>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="statement-table account-overview-table">
-            <thead>
-              <tr>
-                <th data-account-party-heading>Customer</th>
-                <th data-account-balance-heading>Balance</th>
-                <th colspan="2">Actions</th>
-              </tr>
-            </thead>
-            <tbody data-account-overview-rows></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="screen statement-shell">
-        <div class="statement-topbar">
-          <div>
-            <div class="statement-brand">Global Transport And Logistics Services</div>
-            <h2 class="statement-title" data-khata-title>Customer Statement</h2>
-            <div class="statement-sub" data-khata-customer></div>
-            <div class="statement-range" data-khata-range>-</div>
-          </div>
-          <div class="actions statement-actions">
-            <select data-khata-select></select>
-            <div class="statement-action-buttons">
-              <button class="btn" type="button" data-print-statement>Save PDF</button>
-              <button class="btn primary" type="button" data-whatsapp-statement>Share</button>
+      <section class="screen statement-shell unified-statement-screen">
+        <div class="khata-sub-block">
+          <div class="screen-head">
+            <div>
+              <h3>Add Customer</h3>
             </div>
           </div>
+          <form data-customer-form class="form-grid">
+            <div class="field"><label>Customer Name</label><input name="customer" required /></div>
+            <div class="field"><label>Phone</label><input name="phone" /></div>
+            <div class="field"><label>City</label><input name="city" /></div>
+            <div class="field full actions">
+              <button class="btn primary" type="submit" data-customer-submit-label>Save Customer</button>
+              <button class="btn" type="button" data-reset-customer-form>Clear Form</button>
+            </div>
+          </form>
+          <div class="notice" data-customer-notice hidden></div>
         </div>
-        <div class="statement-stats" data-khata-summary></div>
-        <div class="notice" data-export-notice hidden></div>
-      </section>
 
-      <section class="screen">
-        <div class="screen-head">
-          <div>
-            <h3>Add Receivable Entry</h3>
-          </div>
-        </div>
-        <form data-khata-form class="form-grid">
-          <input type="hidden" name="accountId" />
-          <div class="field"><label>Date</label><input name="date" type="date" required /></div>
-          <div class="field"><label>Type</label><select name="type"><option>Debit</option><option>Credit</option></select></div>
-          <div class="field wide"><label>Description</label><input name="description" placeholder="Example: Transport billing entry" required /></div>
-          <div class="field bilty-upload-field">
-            <label for="receivable-entry-image">Image</label>
-            <div class="bilty-input-group">
-              <input id="receivable-entry-image" name="entryImageUpload" type="file" accept="image/*" data-entry-image-input />
-              <button class="bilty-clear" type="button" data-remove-entry-image aria-label="Remove selected image" title="Remove selected image" hidden>&times;</button>
+        <div class="khata-section-divider"></div>
+
+        <div class="khata-sub-block">
+          <div class="statement-topbar">
+            <div>
+              <div class="statement-brand">Global Transport And Logistics Services</div>
+              <h2 class="statement-title" data-khata-title>Customer Statement</h2>
+              <div class="statement-sub" data-khata-customer></div>
+              <div class="statement-range" data-khata-range>-</div>
+            </div>
+            <div class="actions statement-actions">
+              <select data-khata-select></select>
+              <div class="statement-action-buttons">
+                <button class="btn" type="button" data-print-statement>Save PDF</button>
+                <button class="btn primary" type="button" data-whatsapp-statement>Share</button>
+              </div>
             </div>
           </div>
-          <div class="field"><label>Amount</label><input name="amount" type="number" placeholder="0" required /></div>
-          <div class="field full actions">
-            <button class="btn primary" type="submit" data-submit-label>Save Entry</button>
-            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          <div class="statement-stats" data-khata-summary></div>
+          <div class="notice" data-export-notice hidden></div>
+        </div>
+
+        <div class="khata-section-divider"></div>
+
+        <div class="khata-sub-block">
+          <div class="screen-head">
+            <div>
+              <h3>Add Receivable Entry</h3>
+            </div>
           </div>
-        </form>
-        <div class="notice" data-notice hidden></div>
+          <form data-khata-form class="form-grid">
+            <input type="hidden" name="accountId" />
+            <div class="field"><label>Date</label><input name="date" type="date" required /></div>
+            <div class="field"><label>Type</label><select name="type"><option>Debit</option><option>Credit</option></select></div>
+            <div class="field wide"><label>Description</label><input name="description" placeholder="Example: Transport billing entry" required /></div>
+            <div class="field bilty-upload-field">
+              <label for="receivable-entry-image">Image</label>
+              <div class="bilty-input-group">
+                <input id="receivable-entry-image" name="entryImageUpload" type="file" accept="image/*" data-entry-image-input />
+                <button class="bilty-clear" type="button" data-remove-entry-image aria-label="Remove selected image" title="Remove selected image" hidden>&times;</button>
+              </div>
+            </div>
+            <div class="field"><label>Amount</label><input name="amount" type="number" placeholder="0" required /></div>
+            <div class="field full actions">
+              <button class="btn primary" type="submit" data-submit-label>Save Entry</button>
+              <button class="btn" type="button" data-reset-form>Clear Form</button>
+            </div>
+          </form>
+          <div class="notice" data-notice hidden></div>
+        </div>
       </section>
 
       <section class="screen">
@@ -168,6 +154,26 @@
         </table>
       </section>
 
+      <section class="screen account-overview-screen">
+        <div class="screen-head">
+          <div>
+            <h3 data-account-overview-title>Account Overview</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="statement-table account-overview-table">
+            <thead>
+              <tr>
+                <th data-account-party-heading>Customer</th>
+                <th data-account-balance-heading>Balance</th>
+                <th colspan="2">Actions</th>
+              </tr>
+            </thead>
+            <tbody data-account-overview-rows></tbody>
+          </table>
+        </div>
+      </section>
+
     </main>
   </div>
   <div class="bilty-modal" data-entry-image-modal hidden role="dialog" aria-modal="true" aria-label="Statement entry image preview">
@@ -176,7 +182,7 @@
   </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
-<script src="app.js?v=20260903-5"></script>
+<script src="app.js?v=20260904-2"></script>
 </body>
 </html>
 
