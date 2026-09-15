@@ -1295,6 +1295,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
           <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
           <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
+          <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 50px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
         </div>
         <div style="margin-bottom: 20px;">
           <div class="skeleton-text skeleton-shimmer" style="width: 180px; height: 20px; margin-bottom: 12px; background: #e8d8c7;"></div>
@@ -2691,6 +2692,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     return calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount;
   }
 
+  function getBookingTotalWorkAmount(item) {
+    const storedAmount = Number(item.totalAmount);
+    if (Number.isFinite(storedAmount) && storedAmount > 0) return storedAmount;
+    return calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).totalAmount;
+  }
+
   function getPaymentTermDays(value) {
     const term = String(value || "").trim().toLowerCase();
     if (!term) return null;
@@ -2916,6 +2923,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const pendingBills = awaitingBookings.length;
       const delivered = bookings.filter((b) => b.status === "Delivered").length;
       const bookingReceivable = awaitingBookings.reduce((sum, item) => sum + getBookingReceivableAmount(item), 0);
+      const bookingTotalWorkAmount = bookings.reduce((sum, item) => sum + getBookingTotalWorkAmount(item), 0);
       const completedTruckJobs = truckJobs.filter(hasAllTruckPaymentsCredited);
       const pendingTruckJobRows = truckJobs.filter((item) => !hasAllTruckPaymentsCredited(item));
       const pendingTruckJobs = pendingTruckJobRows.length;
@@ -2944,6 +2952,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       setKpi("customerBillingTotal", money(customerAccountMetrics.totalDebit));
       setKpi("receipts", money(customerAccountMetrics.totalCredit));
       setKpi("bookingReceivable", money(bookingReceivable));
+      setKpi("bookingTotalWorkAmount", money(bookingTotalWorkAmount));
       setFinancialAlertKpi("accountsReceivable", customerAccountMetrics.outstanding, true);
       setFinancialAlertKpi("pendingCustomerCount", customerAccountMetrics.pendingAccounts);
       setKpi("supplierPayableTotal", money(supplierAccountMetrics.totalDebit));
@@ -3527,7 +3536,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
 
   function ledgerPage(store) {
-    const body = document.querySelector("[data-ledger-rows]");
+    const body = document.querySelector("[data-ledger-container]") || document.querySelector("[data-ledger-rows]");
     const totalElement = document.querySelector("[data-summary-total]");
     const countElement = document.querySelector("[data-summary-count]");
     const customerFilter = document.querySelector("[data-summary-customer-filter]");
@@ -3555,71 +3564,134 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     function render() {
       const selectedCustomer = customerFilter ? String(customerFilter.value || "").trim() : "";
       const debitBookings = getPendingBookings()
-        .filter((item) => !selectedCustomer || String(item.customer || "").trim() === selectedCustomer)
-        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
+        .filter((item) => !selectedCustomer || String(item.customer || "").trim() === selectedCustomer);
 
       const grouped = new Map();
-
       debitBookings.forEach((item) => {
         const customer = String(item.customer || "").trim() || "Unknown Customer";
-        const pendingAmount = Number(item.receivableAmount || calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount);
+        const pendingAmount = Number(item.receivableAmount || calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount || 0);
         if (!grouped.has(customer)) {
           grouped.set(customer, {
             customer,
             bookings: [],
-            dates: [],
-            bookingNumbers: [],
-            categories: [],
-            totalRate: 0
+            totalReceivable: 0
           });
         }
-
         const entry = grouped.get(customer);
-        entry.bookings.push(item);
-        if (item.date && !entry.dates.includes(item.date)) entry.dates.push(item.date);
-        const bookingNumber = String(item.bookingNo || item.id || "").trim();
-        if (bookingNumber && !entry.bookingNumbers.includes(bookingNumber)) entry.bookingNumbers.push(bookingNumber);
-        if (item.category && !entry.categories.includes(item.category)) entry.categories.push(item.category);
-        entry.totalRate += pendingAmount;
+        entry.bookings.push({
+          ...item,
+          computedReceivable: pendingAmount
+        });
+        entry.totalReceivable += (Number.isFinite(pendingAmount) ? pendingAmount : 0);
       });
 
-      const summaryRows = [...grouped.values()];
-      if (totalElement) {
-        totalElement.textContent = `PKR ${money(summaryRows.reduce((sum, item) => sum + item.totalRate, 0))}`;
-      }
-      countElement.textContent = `${summaryRows.length} customer(s)`;
+      const customerGroups = [...grouped.values()];
 
-      if (!summaryRows.length) {
+      // Sort bookings inside each customer group according to dateSort
+      customerGroups.forEach((group) => {
+        group.bookings.sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
+      });
+
+      // Sort customer groups by newest/oldest booking date
+      customerGroups.sort((a, b) => {
+        const aDate = a.bookings[0]?.date || "";
+        const bDate = b.bookings[0]?.date || "";
+        return compareDateValues(aDate, bDate, dateSort?.value || "desc");
+      });
+
+      const grandTotal = customerGroups.reduce((sum, g) => sum + g.totalReceivable, 0);
+      const totalBookingsCount = customerGroups.reduce((sum, g) => sum + g.bookings.length, 0);
+
+      if (totalElement) {
+        totalElement.textContent = `PKR ${money(grandTotal)}`;
+      }
+      countElement.textContent = `${customerGroups.length} customer(s) • ${totalBookingsCount} booking(s)`;
+
+      if (!customerGroups.length) {
         body.innerHTML = `
-          <tr>
-            <td colspan="6">No awaited summary records are available yet.</td>
-          </tr>
+          <div class="empty-state-box" style="padding: 40px; text-align: center; background: var(--paper); border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); margin-top: 14px;">
+            <p>No awaited summary records are available yet.</p>
+          </div>
         `;
         return;
       }
 
-      body.innerHTML = summaryRows.map((item) => `
-        <tr>
-          <td>${renderStackedCell(item.dates.map((date) => formatShortDate(date)), text)}</td>
-          <td>${renderStackedCell(item.bookingNumbers, text)}</td>
-          <td>${renderStackedCell(item.categories.map((category) => text(category)), text)}</td>
-          <td>${text(item.customer)}</td>
-          <td>${money(item.totalRate)}</td>
-          <td><button class="btn small" type="button" data-download-summary="${escapeHtml(item.customer)}">Download PDF</button></td>
-        </tr>
-      `).join("");
+      body.innerHTML = customerGroups.map((group) => {
+        const rowsHtml = group.bookings.map((item) => `
+          <tr>
+            <td>${formatShortDate(item.date)}</td>
+            <td><strong>${text(item.bookingNo || item.id || "-")}</strong></td>
+            <td>${text(item.category || "-")}</td>
+            <td>${money(item.computedReceivable)}</td>
+          </tr>
+        `).join("");
+
+        return `
+          <div class="customer-summary-box">
+            <div class="customer-box-header">
+              <div class="customer-box-identity">
+                <div class="customer-box-avatar">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+                <div class="customer-box-info">
+                  <h3 class="customer-box-name">${text(group.customer)}</h3>
+                  <span class="customer-box-badge">${group.bookings.length} booking(s)</span>
+                </div>
+              </div>
+              <div class="customer-box-actions">
+                <button class="btn small customer-box-btn" type="button" data-download-summary="${escapeHtml(group.customer)}" title="Download ${escapeHtml(group.customer)} Summary PDF">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Download PDF
+                </button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="statement-table customer-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Booking No</th>
+                    <th>Category</th>
+                    <th>Receivable Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowsHtml}
+                </tbody>
+                <tfoot>
+                  <tr class="customer-box-foot">
+                    <td colspan="3" class="foot-label">Total Receivable:</td>
+                    <td class="foot-value">PKR ${money(group.totalReceivable)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join("");
     }
 
     if (customerFilter) {
       customerFilter.addEventListener("change", render);
     }
     if (dateSort) dateSort.addEventListener("change", render);
+
     body.addEventListener("click", async (event) => {
-      const customer = event.target.getAttribute("data-download-summary");
+      const downloadBtn = event.target.closest("[data-download-summary]");
+      if (!downloadBtn) return;
+      const customer = downloadBtn.getAttribute("data-download-summary");
       if (!customer) return;
       const bookings = getPendingBookings().filter((item) => (String(item.customer || "").trim() || "Unknown Customer") === customer);
       buildSummaryRecordPdf(customer, bookings).catch(() => {});
     });
+
     renderCustomerOptions();
     window.activePageRender = render;
     render();
