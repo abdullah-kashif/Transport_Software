@@ -1881,11 +1881,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
 
   function normalizeContainerLine(line = {}) {
+    const rawQty = line.quantity !== undefined && line.quantity !== null && line.quantity !== "" ? Number(line.quantity) : NaN;
+    const rawPrice = line.unitPrice !== undefined && line.unitPrice !== null && line.unitPrice !== "" ? Number(line.unitPrice) : NaN;
+    const rateVal = Number(line.rate || 0);
+    const quantity = !isNaN(rawQty) && rawQty > 0 ? rawQty : 1;
+    const unitPrice = !isNaN(rawPrice) && rawPrice >= 0 ? rawPrice : (rateVal > 0 ? rateVal : 0);
     return {
       containerNo: String(line.containerNo || "").trim(),
       size: String(line.size || "40 FT").trim() || "40 FT",
       truckNo: String(line.truckNo || "").trim(),
-      rate: Number(line.rate || 0),
+      quantity: quantity,
+      unitPrice: unitPrice,
+      rate: Number(line.rate || (quantity * unitPrice) || 0),
       gatePass: String(line.gatePass || "").trim(),
       detention: Number(line.detention || 0)
     };
@@ -3103,15 +3110,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function createContainerRowMarkup(line = {}, index = 0) {
       const item = normalizeContainerLine(line);
+      const qtyVal = line.quantity !== undefined && line.quantity !== null && line.quantity !== "" ? line.quantity : (item.quantity || "1");
+      const priceVal = line.unitPrice !== undefined && line.unitPrice !== null && line.unitPrice !== "" ? line.unitPrice : (item.unitPrice ? item.unitPrice : (item.rate || ""));
       return `
         <div class="container-row" data-container-row="${index}">
           <div class="field-lite">
             <label>Container No</label>
-            <input name="containerNo" value="${item.containerNo}" placeholder="Example: TRHU5588410" />
+            <input name="containerNo" value="${escapeHtml(item.containerNo)}" placeholder="Example: TRHU5588410" required />
           </div>
           <div class="field-lite">
             <label>Container Size</label>
-            <select name="size">
+            <select name="size" required>
               <option value="20 FT" ${item.size === "20 FT" ? "selected" : ""}>20 FT</option>
               <option value="40 FT" ${item.size === "40 FT" ? "selected" : ""}>40 FT</option>
               <option value="45 FT" ${item.size === "45 FT" ? "selected" : ""}>45 FT</option>
@@ -3119,7 +3128,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </div>
           <div class="field-lite">
             <label>Truck No</label>
-            <input name="truckNo" value="${item.truckNo}" placeholder="Example: TMT-066" />
+            <input name="truckNo" value="${escapeHtml(item.truckNo)}" placeholder="Example: TMT-066" required />
+          </div>
+          <div class="field-lite">
+            <label>Quantity</label>
+            <input name="quantity" type="number" min="1" step="any" value="${escapeHtml(String(qtyVal))}" placeholder="Quantity" required />
+          </div>
+          <div class="field-lite">
+            <label>Unit Price</label>
+            <input name="unitPrice" type="number" min="0" step="any" value="${escapeHtml(String(priceVal))}" placeholder="Unit Price" required />
           </div>
           <div class="row-action">
             <button class="btn small danger" type="button" data-remove-container-row="${index}">Remove</button>
@@ -3139,17 +3156,37 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function collectContainerLines() {
       const rows = Array.from(containerRows.querySelectorAll("[data-container-row]"));
-      const lines = rows.map((row) => normalizeContainerLine({
-        containerNo: row.querySelector("[name='containerNo']").value,
-        size: row.querySelector("[name='size']").value,
-        truckNo: row.querySelector("[name='truckNo']").value
-      })).filter((line) => line.containerNo || line.truckNo);
+      const lines = rows.map((row) => {
+        const cNo = row.querySelector("[name='containerNo']")?.value || "";
+        const size = row.querySelector("[name='size']")?.value || "40 FT";
+        const tNo = row.querySelector("[name='truckNo']")?.value || "";
+        const qStr = row.querySelector("[name='quantity']")?.value;
+        const pStr = row.querySelector("[name='unitPrice']")?.value;
+        const q = qStr !== undefined && qStr !== "" ? parseFloat(qStr) : 1;
+        const p = pStr !== undefined && pStr !== "" ? parseFloat(pStr) : 0;
+        return normalizeContainerLine({
+          containerNo: cNo,
+          size: size,
+          truckNo: tNo,
+          quantity: isNaN(q) ? 1 : q,
+          unitPrice: isNaN(p) ? 0 : p,
+          rate: (isNaN(q) ? 1 : q) * (isNaN(p) ? 0 : p)
+        });
+      });
 
       return lines.length ? lines : [normalizeContainerLine()];
     }
 
     function updateContainerSummary(lines) {
-      return lines;
+      const activeLines = lines || collectContainerLines();
+      const totalHaulage = activeLines.reduce((sum, line) => {
+        const q = Number(line.quantity || 0);
+        const p = Number(line.unitPrice || 0);
+        return sum + (q * p);
+      }, 0);
+      rateField.value = String(totalHaulage || 0);
+      syncTotalAmount();
+      return activeLines;
     }
 
     function syncBookingDate(value) {
@@ -3188,11 +3225,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       setBiltyPreview("");
       if (form.elements.bookingNo) form.elements.bookingNo.value = "";
       if (form.elements.invoiceNo) form.elements.invoiceNo.value = "";
+      form.querySelectorAll(".input-error").forEach((el) => el.classList.remove("input-error"));
+      if (notice) {
+        notice.hidden = true;
+        notice.textContent = "";
+        notice.classList.remove("error");
+      }
       syncBookingDate(getTodayIsoDate());
       form.elements.category.value = "Inter City Transport";
       form.elements.accountFlow.value = "Awaited";
       form.elements.paymentTerm.value = "30 Days";
-      form.elements.rate.value = "";
+      form.elements.rate.value = "0";
       form.elements.gatePass.value = "";
       form.elements.detention.value = "0";
       form.elements.salesTaxAuthority.value = "Sindh Revenue Board";
@@ -3204,7 +3247,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         {
           containerNo: "",
           size: "40 FT",
-          truckNo: ""
+          truckNo: "",
+          quantity: 1,
+          unitPrice: ""
         }
       ]);
       editingId = "";
@@ -3334,8 +3379,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         if (key === "date") syncBookingDate(item[key]);
         else if (form.elements[key]) form.elements[key].value = item[key];
       });
-      syncTotalAmount();
-      renderContainerRows(getBookingContainerLines(item));
+      const lines = getBookingContainerLines(item);
+      renderContainerRows(lines);
+      updateContainerSummary(lines);
+      if (item.rate && Number(rateField.value || 0) <= 0) {
+        rateField.value = String(item.rate);
+        syncTotalAmount();
+      }
       biltyInput.value = "";
       biltyStoragePath = String(item.biltyPath || "");
       setBiltyPreview(item.biltyImage);
@@ -3430,13 +3480,161 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       updateContainerSummary(collectContainerLines());
     });
 
+    form.addEventListener("input", (event) => {
+      if (event.target && event.target.classList.contains("input-error")) {
+        event.target.classList.remove("input-error");
+        if (!form.querySelector(".input-error")) {
+          if (notice && notice.classList.contains("error") && !notice.textContent.includes("already exists")) {
+            notice.hidden = true;
+            notice.textContent = "";
+            notice.classList.remove("error");
+          }
+        }
+      }
+    });
+
+    form.addEventListener("change", (event) => {
+      if (event.target && event.target.classList.contains("input-error")) {
+        event.target.classList.remove("input-error");
+        if (!form.querySelector(".input-error")) {
+          if (notice && notice.classList.contains("error") && !notice.textContent.includes("already exists")) {
+            notice.hidden = true;
+            notice.textContent = "";
+            notice.classList.remove("error");
+          }
+        }
+      }
+    });
+
+    const invoiceInputField = form.elements.invoiceNo;
+    if (invoiceInputField) {
+      invoiceInputField.addEventListener("blur", () => {
+        const val = String(invoiceInputField.value || "").trim();
+        if (!val) return;
+        const duplicate = store.bookings.find((item) => {
+          if (editingId && item.id === editingId) return false;
+          return String(item.invoiceNo || "").trim().toLowerCase() === val.toLowerCase();
+        });
+        if (duplicate) {
+          invoiceInputField.classList.add("input-error");
+          notice.hidden = false;
+          notice.classList.add("error");
+          notice.textContent = `Invoice No "${val}" already exists in Booking (${duplicate.bookingNo || duplicate.id}). Please enter a unique Invoice Number.`;
+        }
+      });
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       await biltyImagePromise;
+
+      form.querySelectorAll(".input-error").forEach((el) => el.classList.remove("input-error"));
+      const invalidElements = [];
+      const missingLabels = [];
+
+      function checkRequired(field, label, isNumeric = false) {
+        if (!field) return;
+        const val = String(field.value || "").trim();
+        if (!val || (isNumeric && (Number(val) <= 0 || isNaN(Number(val))))) {
+          invalidElements.push(field);
+          missingLabels.push(label);
+        }
+      }
+
+      checkRequired(form.elements.invoiceNo, "Invoice");
+      checkRequired(dateTextField, "Booking Date");
+      checkRequired(form.elements.blNo, "BL No");
+      checkRequired(form.elements.gatePass, "NTN");
+      checkRequired(form.elements.customer, "Customer / Payer");
+      checkRequired(form.elements.consignee, "Consignee Address");
+      checkRequired(form.elements.route, "Route");
+      checkRequired(form.elements.origin, "Origin");
+      checkRequired(form.elements.destination, "Destination");
+      checkRequired(form.elements.category, "Category");
+      checkRequired(form.elements.goodsType, "Goods Type");
+      checkRequired(rateField, "Road Haulage Charges", true);
+      checkRequired(form.elements.salesTaxAuthority, "Sales Tax Authority");
+      checkRequired(form.elements.salesTaxWithholding, "Sales Tax Withholding");
+      checkRequired(form.elements.detention, "Detention");
+      checkRequired(form.elements.paymentTerm, "Payment Term");
+      checkRequired(form.elements.status, "Status");
+      checkRequired(form.elements.accountFlow, "Payment Status");
+      checkRequired(form.elements.remarks, "Remarks");
+
+      const containerRowElements = Array.from(containerRows.querySelectorAll("[data-container-row]"));
+      if (containerRowElements.length === 0) {
+        missingLabels.push("At least one container row is required");
+      } else {
+        containerRowElements.forEach((row, idx) => {
+          const cNo = row.querySelector("[name='containerNo']");
+          const tNo = row.querySelector("[name='truckNo']");
+          const qty = row.querySelector("[name='quantity']");
+          const uPrice = row.querySelector("[name='unitPrice']");
+          if (!String(cNo?.value || "").trim()) {
+            invalidElements.push(cNo);
+            missingLabels.push(`Container No (Row ${idx + 1})`);
+          }
+          if (!String(tNo?.value || "").trim()) {
+            invalidElements.push(tNo);
+            missingLabels.push(`Truck No (Row ${idx + 1})`);
+          }
+          if (!String(qty?.value || "").trim() || Number(qty.value) <= 0) {
+            invalidElements.push(qty);
+            missingLabels.push(`Quantity (Row ${idx + 1})`);
+          }
+          if (!String(uPrice?.value || "").trim() || Number(uPrice.value) <= 0) {
+            invalidElements.push(uPrice);
+            missingLabels.push(`Unit Price (Row ${idx + 1})`);
+          }
+        });
+      }
+
+      if (form.elements.accountFlow?.value === "Credit") {
+        checkRequired(form.elements.paymentReceivedDate, "Payment Received Date");
+        checkRequired(form.elements.chequeNumber, "Cheque Number");
+      }
+
+      if (invalidElements.length > 0) {
+        invalidElements.forEach((el) => {
+          if (el) el.classList.add("input-error");
+        });
+        notice.hidden = false;
+        notice.classList.add("error");
+        notice.textContent = `Please fill all required fields: ${missingLabels.slice(0, 5).join(", ")}${missingLabels.length > 5 ? ` and ${missingLabels.length - 5} more` : ""}.`;
+        if (invalidElements[0]) {
+          invalidElements[0].focus();
+          invalidElements[0].scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+
       const data = Object.fromEntries(new FormData(form).entries());
+      const invoiceNo = String(data.invoiceNo || "").trim();
+
+      if (invoiceNo) {
+        const duplicateBooking = store.bookings.find((item) => {
+          if (editingId && item.id === editingId) return false;
+          return String(item.invoiceNo || "").trim().toLowerCase() === invoiceNo.toLowerCase();
+        });
+        if (duplicateBooking) {
+          const duplicateName = duplicateBooking.bookingNo || duplicateBooking.id;
+          notice.hidden = false;
+          notice.classList.add("error");
+          notice.textContent = `Invoice No "${invoiceNo}" already exists in Booking (${duplicateName}). Please enter a unique Invoice Number.`;
+          if (invoiceInputField) {
+            invoiceInputField.focus();
+            invoiceInputField.classList.add("input-error");
+          }
+          (notice || form).scrollIntoView({ behavior: "smooth", block: "nearest" });
+          return;
+        }
+      }
+
       const bookingDate = formatShortDate(datePickerField.value || data.date);
       const containerLines = collectContainerLines();
       const primaryLine = containerLines[0] || normalizeContainerLine();
+      const totalContainerQuantity = containerLines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+      const totalCalculatedRate = containerLines.reduce((sum, line) => sum + (Number(line.quantity || 0) * Number(line.unitPrice || 0)), 0);
       const normalized = {
         ...data,
         date: bookingDate,
@@ -3444,7 +3642,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         containerNo: primaryLine.containerNo,
         size: primaryLine.size,
         truckNo: primaryLine.truckNo,
-        rate: Number(data.rate || 0),
+        quantity: totalContainerQuantity || 1,
+        rate: Number(totalCalculatedRate || data.rate || 0),
         gatePass: String(data.gatePass || "").trim(),
         detention: Number(data.detention || 0),
         salesTaxAmount: Number(data.salesTaxAmount || 0),
@@ -3487,6 +3686,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       render();
       refreshPaymentNotifications();
       resetForm();
+      notice.hidden = false;
+      notice.classList.remove("error");
       notice.textContent = syncMessage;
     });
 

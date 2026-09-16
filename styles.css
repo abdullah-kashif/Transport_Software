@@ -1832,8 +1832,8 @@ input[type="file"]:focus-visible {
 .container-table-head,
 .container-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.9fr) minmax(160px, 1fr) minmax(0, 1.35fr) minmax(120px, auto);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(110px, 0.9fr) minmax(0, 1.1fr) minmax(80px, 0.7fr) minmax(100px, 0.9fr) minmax(80px, auto);
+  gap: 12px;
   align-items: end;
 }
 
@@ -1962,6 +1962,11 @@ th {
   background: #fff7ed;
   border: 1px solid #f4d6b7;
   color: #8a4b15;
+}
+
+.input-error {
+  border-color: #ba3a2f !important;
+  box-shadow: 0 0 0 3px rgba(186, 58, 47, 0.18) !important;
 }
 
 .table-actions {
@@ -2839,8 +2844,43 @@ body.confirm-modal-open {
   background: rgba(255, 248, 241, 0.78);
 }
 
-body[data-page="booking"] .table-wrap {
-  overflow-x: auto;
+body[data-page="booking"] .table-wrap,
+body[data-page="truck"] .table-wrap,
+body[data-page="truck-summary"] .table-wrap,
+body[data-page="completed-truck-summary"] .table-wrap {
+  overflow: auto;
+  max-height: 72vh;
+  position: relative;
+}
+
+.table-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+  background: #f6eee4;
+  border-radius: 8px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #c9a788;
+  border-radius: 8px;
+  border: 2px solid #f6eee4;
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #9d7553;
+}
+
+body[data-page="booking"] .ledger-table thead th,
+body[data-page="truck"] .truck-trip-table thead th,
+body[data-page="truck-summary"] .truck-summary-table thead th,
+body[data-page="completed-truck-summary"] .truck-summary-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-shadow: 0 2px 5px rgba(24, 48, 77, 0.08);
 }
 
 body[data-page="booking"] .ledger-table {
@@ -3104,6 +3144,9 @@ body[data-page="ledger"] .statement-table td {
   border: none;
   border-radius: 0;
   background: transparent;
+  overflow: auto;
+  max-height: 60vh;
+  position: relative;
 }
 
 .customer-summary-box .statement-table {
@@ -3112,7 +3155,11 @@ body[data-page="ledger"] .statement-table td {
 }
 
 .customer-summary-box .statement-table th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   background: #b7dce8;
+  box-shadow: 0 1px 3px rgba(24, 48, 77, 0.08);
   color: #111;
   font-size: 12px;
   font-weight: 700;
