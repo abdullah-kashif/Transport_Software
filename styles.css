@@ -1987,6 +1987,20 @@ th {
   flex-wrap: wrap;
 }
 
+.booking-broker-fields {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 1000px) {
+  .booking-broker-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .booking-broker-fields { grid-template-columns: minmax(0, 1fr); }
+}
+
 .ledger-filter-control {
   min-width: 130px;
   max-width: 175px;

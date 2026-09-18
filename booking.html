@@ -130,7 +130,7 @@
               <option value="0">0% Withheld (100% by us)</option>
             </select>
           </div>
-          <div class="field quarter"><label>Detention</label><input name="detention" type="number" inputmode="numeric"
+          <div class="field quarter"><label>Detention</label><input name="detention" type="number" inputmode="decimal" step="any"
               class="manual-number-input" value="0" required /></div>
           <div class="field quarter"><label>15% Sales Tax</label><input name="salesTaxAmount" type="text" value="0"
               readonly /></div>
@@ -183,6 +183,18 @@
               <button class="btn" type="button" data-add-container-row>Add Container Row</button>
             </div>
           </div>
+          <div class="field full booking-broker-fields">
+            <div><label for="booking-trucker-broker">Trucker/Broker</label><input id="booking-trucker-broker"
+                name="truckerBroker" placeholder="Trucker or broker name" /></div>
+            <div><label for="booking-broker-amount">Amount</label><input id="booking-broker-amount"
+                name="brokerAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" /></div>
+            <div><label for="booking-broker-payment">Payment/Cheque/IBFT</label><input id="booking-broker-payment"
+                name="brokerPaymentDetails" placeholder="Payment / cheque / IBFT reference" /></div>
+            <div><label for="booking-broker-payment-date">Payment Date</label><input id="booking-broker-payment-date"
+                name="brokerPaymentDate" type="date" /></div>
+            <div><label for="booking-broker-profit-loss">P&amp;L</label><input id="booking-broker-profit-loss"
+                name="brokerProfitLoss" type="text" readonly placeholder="Receivable Amount - Amount" /></div>
+          </div>
           <div class="field full"><label>Remarks</label><textarea
               name="remarks" placeholder="Enter booking remarks..." required></textarea></div>
           <div class="field full actions">
@@ -199,6 +211,11 @@
             <h3>Booking Ledger</h3>
           </div>
           <div class="ledger-filter">
+            <div class="ledger-filter-control">
+              <label for="booking-search-filter">General Filter</label>
+              <input id="booking-search-filter" type="search" data-booking-search-filter
+                placeholder="Search bookings..." />
+            </div>
             <div class="ledger-filter-control">
               <label for="booking-customer-filter">Customer</label>
               <select id="booking-customer-filter" data-booking-customer-filter>

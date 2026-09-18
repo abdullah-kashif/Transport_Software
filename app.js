@@ -543,6 +543,10 @@
       salesTaxWithheldAmount: Number(row.sales_tax_withheld_amount || 0),
       salesTaxByUsAmount: Number(row.sales_tax_by_us_amount || 0),
       receivableAmount: Number(row.receivable_amount || 0),
+      truckerBroker: row.trucker_broker,
+      brokerAmount: row.broker_amount,
+      brokerPaymentDetails: row.broker_payment_details,
+      brokerPaymentDate: row.broker_payment_date,
       paymentTerm: row.payment_term,
       paymentReceivedDate: row.payment_received_date || "",
       chequeNumber: row.cheque_number,
@@ -585,6 +589,10 @@
       sales_tax_withheld_amount: Number(booking.salesTaxWithheldAmount || 0),
       sales_tax_by_us_amount: Number(booking.salesTaxByUsAmount || 0),
       receivable_amount: Number(booking.receivableAmount || 0),
+      trucker_broker: booking.truckerBroker || null,
+      broker_amount: booking.brokerAmount == null || booking.brokerAmount === "" ? null : Number(booking.brokerAmount),
+      broker_payment_details: booking.brokerPaymentDetails || null,
+      broker_payment_date: formatIsoDate(booking.brokerPaymentDate) || null,
       payment_term: booking.paymentTerm || null,
       payment_received_date: formatIsoDate(booking.paymentReceivedDate) || null,
       cheque_number: booking.chequeNumber || null,
@@ -1945,6 +1953,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     return `Job-${highestJobNumber + 1}`;
   }
 
+  function calculateBookingBrokerProfitLoss(amount, receivableAmount) {
+    if (amount == null || String(amount).trim() === "" || !Number.isFinite(Number(amount))) return null;
+    return roundAmount(Number(receivableAmount || 0) - Number(amount));
+  }
+
   function normalizeBookingContainers(booking = {}) {
     const containerLines = getBookingContainerLines(booking);
     const primaryLine = containerLines[0] || normalizeContainerLine();
@@ -1971,6 +1984,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       salesTaxWithheldAmount: Number(booking.salesTaxWithheldAmount ?? taxBreakdown.salesTaxWithheldAmount),
       salesTaxByUsAmount: Number(booking.salesTaxByUsAmount ?? taxBreakdown.salesTaxByUsAmount),
       receivableAmount: Number(booking.receivableAmount ?? taxBreakdown.receivableAmount),
+      truckerBroker: String(booking.truckerBroker || "").trim(),
+      brokerAmount: booking.brokerAmount == null || String(booking.brokerAmount).trim() === "" ? null : Number(booking.brokerAmount),
+      brokerPaymentDetails: String(booking.brokerPaymentDetails || "").trim(),
+      brokerPaymentDate: String(booking.brokerPaymentDate || "").trim(),
+      brokerProfitLoss: calculateBookingBrokerProfitLoss(booking.brokerAmount, booking.receivableAmount ?? taxBreakdown.receivableAmount),
       gatePass: String(booking.gatePass || "").trim(),
       paymentReceivedDate: String(booking.paymentReceivedDate || "").trim(),
       chequeNumber: String(booking.chequeNumber || "").trim(),
@@ -2323,6 +2341,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const right = pageWidth - 36;
     const brandImage = await loadInvoiceTemplateDataUrl();
     const tax = calculateBookingTaxBreakdown(booking.rate, booking.detention, booking.salesTaxAuthority);
+    const rawDetentionAmount = Number(booking.detention ?? 0);
+    if (!Number.isFinite(rawDetentionAmount)) throw new Error("Detention must be a valid number.");
+    const detentionAmount = roundAmount(rawDetentionAmount);
+    const invoiceHaulageAmount = roundAmount(Number(booking.rate || 0) + detentionAmount);
+    const invoiceTotalAmount = roundAmount(invoiceHaulageAmount + tax.salesTaxAmount);
     const lines = getBookingContainerLines(booking);
     const sizeText = formatInvoiceContainerSizes(lines);
     const quantityTotal = booking.containerPricingAvailable === false
@@ -2377,7 +2400,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ["Destination", text(booking.destination)],
         ["Category", text(booking.category)],
         ["Quantity", quantityTotal == null ? "-" : money(quantityTotal)],
-        ["Unit Price", unitPriceTotal == null ? "-" : money(unitPriceTotal)]
+        ["Unit Price", unitPriceTotal == null ? "-" : money(unitPriceTotal)],
+        ...(detentionAmount !== 0 ? [["Detention", money(detentionAmount)]] : [])
       ],
       styles: {
         font: "helvetica",
@@ -2400,9 +2424,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       margin: { left, right: left },
       head: [["S.No", "Particular", "Amount In Pak Rs."]],
       body: [
-        ["1", "Road Haulage Charges", money(booking.rate)],
+        ["1", "Road Haulage Charges", money(invoiceHaulageAmount)],
         ["2", taxLineLabel, money(tax.salesTaxAmount)],
-        ["", "Total", money(tax.totalAmount)]
+        ["", "Total", money(invoiceTotalAmount)]
       ],
       styles: {
         fontSize: 10,
@@ -3030,6 +3054,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const form = document.querySelector("[data-booking-form]");
     const body = document.querySelector("[data-booking-rows]");
     const notice = document.querySelector("[data-notice]");
+    const searchFilter = document.querySelector("[data-booking-search-filter]");
     const customerFilter = document.querySelector("[data-booking-customer-filter]");
     const startDateFilter = document.querySelector("[data-booking-start-date]");
     const endDateFilter = document.querySelector("[data-booking-end-date]");
@@ -3049,6 +3074,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const salesTaxWithheldAmountField = form.querySelector("[name='salesTaxWithheldAmount']");
     const salesTaxByUsAmountField = form.querySelector("[name='salesTaxByUsAmount']");
     const receivableAmountField = form.querySelector("[name='receivableAmount']");
+    const brokerAmountField = form.querySelector("[name='brokerAmount']");
+    const brokerProfitLossField = form.querySelector("[name='brokerProfitLoss']");
     const dateTextField = form.querySelector("[name='date']");
     const datePickerField = form.querySelector("[name='datePicker']");
     const datePickerButton = form.querySelector("[data-open-date-picker]");
@@ -3209,6 +3236,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       datePickerField.value = isoValue;
     }
 
+    function syncBrokerProfitLoss() {
+      const profitLoss = calculateBookingBrokerProfitLoss(brokerAmountField.value, receivableAmountField.value);
+      brokerProfitLossField.value = profitLoss == null ? "" : String(profitLoss);
+    }
+
     function syncTotalAmount() {
       const breakdown = calculateBookingTaxBreakdown(
         rateField.value,
@@ -3222,6 +3254,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       salesTaxWithheldAmountField.value = String(breakdown.salesTaxWithheldAmount);
       salesTaxByUsAmountField.value = String(breakdown.salesTaxByUsAmount);
       receivableAmountField.value = String(breakdown.receivableAmount);
+      syncBrokerProfitLoss();
 
       if (salesTaxWithheldLabel) {
         salesTaxWithheldLabel.textContent = `Sale Tax With Held ${breakdown.salesTaxWithheldPercent}%`;
@@ -3282,12 +3315,31 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function render() {
       renderCustomerFilter();
+      const searchTerms = String(searchFilter?.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
       const selectedCustomer = customerFilter.value;
       const startDate = parseDateValue(startDateFilter?.value);
       const endDate = parseDateValue(endDateFilter?.value);
       const bookings = (selectedCustomer
         ? store.bookings.filter((item) => String(item.customer || "").trim() === selectedCustomer)
         : [...store.bookings])
+        .filter((item) => {
+          if (!searchTerms.length) return true;
+          const searchableText = [
+            item.id, item.bookingNo, item.invoiceNo, item.date, formatShortDate(item.date),
+            item.blNo, item.gatePass, item.customer, item.consignee, item.route,
+            item.origin, item.destination, item.category, item.goodsType, item.quantity,
+            item.salesTaxAuthority, item.paymentTerm, item.paymentReceivedDate,
+            item.paymentReceivedDate ? formatShortDate(item.paymentReceivedDate) : "",
+            item.chequeNumber, item.status, item.accountFlow, item.remarks,
+            item.truckerBroker, item.brokerAmount, item.brokerPaymentDetails, item.brokerPaymentDate,
+            item.brokerPaymentDate ? formatShortDate(item.brokerPaymentDate) : "", item.brokerProfitLoss,
+            ...[item.rate, item.detention, item.salesTaxAmount, item.totalAmount,
+              item.incomeTaxAmount, item.salesTaxWithheldAmount, item.salesTaxByUsAmount,
+              item.receivableAmount].flatMap((amount) => [amount, money(amount)]),
+            ...getBookingContainerLines(item).flatMap((line) => [line.containerNo, line.size, line.truckNo])
+          ].join(" ").toLowerCase();
+          return searchTerms.every((term) => searchableText.includes(term));
+        })
         .filter((item) => {
           if (startDate && endDate && startDate > endDate) return false;
           if (!startDate && !endDate) return true;
@@ -3312,7 +3364,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (!bookings.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="34">No records found for this customer.</td>
+            <td colspan="34">No records match the selected filters.</td>
           </tr>
         `;
         return;
@@ -3438,6 +3490,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     });
 
     rateField.addEventListener("input", syncTotalAmount);
+    brokerAmountField.addEventListener("input", syncBrokerProfitLoss);
     detentionField.addEventListener("input", syncTotalAmount);
     salesTaxAuthorityField.addEventListener("change", syncTotalAmount);
     salesTaxWithholdingField?.addEventListener("change", syncTotalAmount);
@@ -3570,10 +3623,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       checkRequired(form.elements.salesTaxAuthority, "Sales Tax Authority");
       checkRequired(form.elements.salesTaxWithholding, "Sales Tax Withholding");
       checkRequired(form.elements.detention, "Detention");
+      if (detentionField.validity.badInput || (detentionField.value !== "" && !Number.isFinite(Number(detentionField.value)))) {
+        invalidElements.push(detentionField);
+        missingLabels.push("Detention (a valid number)");
+      }
       checkRequired(form.elements.paymentTerm, "Payment Term");
       checkRequired(form.elements.status, "Status");
       checkRequired(form.elements.accountFlow, "Payment Status");
       checkRequired(form.elements.remarks, "Remarks");
+      if (brokerAmountField.validity.badInput || (brokerAmountField.value !== "" &&
+          (!Number.isFinite(Number(brokerAmountField.value)) || Number(brokerAmountField.value) < 0 || brokerAmountField.validity.stepMismatch))) {
+        invalidElements.push(brokerAmountField);
+        missingLabels.push("Amount (a non-negative number with up to 2 decimal places)");
+      }
 
       const containerRowElements = Array.from(containerRows.querySelectorAll("[data-container-row]"));
       if (containerRowElements.length === 0) {
@@ -3741,6 +3803,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     });
 
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
+    searchFilter?.addEventListener("input", render);
+    searchFilter?.addEventListener("search", render);
     if (customerFilter) customerFilter.addEventListener("change", render);
     if (startDateFilter) startDateFilter.addEventListener("change", render);
     if (endDateFilter) endDateFilter.addEventListener("change", render);
