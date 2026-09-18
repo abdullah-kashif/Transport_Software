@@ -513,7 +513,9 @@
       .map((line) => normalizeContainerLine({
         containerNo: line.container_no,
         size: line.container_size,
-        truckNo: line.truck_no
+        truckNo: line.truck_no,
+        quantity: line.quantity,
+        unitPrice: line.unit_price
       }));
     const primaryLine = containerLines[0] || normalizeContainerLine();
     return normalizeBookingContainers({
@@ -549,6 +551,8 @@
       biltyPath: row.bilty_path || "",
       biltyImage: "",
       remarks: row.remarks,
+      containerPricingAvailable: (row.booking_containers || []).length > 0 &&
+        row.booking_containers.every((line) => line.quantity != null && line.unit_price != null),
       containerLines,
       containerNo: primaryLine.containerNo,
       size: primaryLine.size,
@@ -704,6 +708,8 @@ async function uploadBookingBilty(booking) {
       container_no: line.containerNo,
       container_size: line.size || null,
       truck_no: line.truckNo || null,
+      quantity: line.quantity,
+      unit_price: line.unitPrice,
       sort_order: index
     }));
   if (lines.length) {
@@ -2319,6 +2325,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const tax = calculateBookingTaxBreakdown(booking.rate, booking.detention, booking.salesTaxAuthority);
     const lines = getBookingContainerLines(booking);
     const sizeText = formatInvoiceContainerSizes(lines);
+    const quantityTotal = booking.containerPricingAvailable === false
+      ? booking.quantity
+      : lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+    const unitPriceTotal = booking.containerPricingAvailable === false
+      ? null
+      : lines.reduce((sum, line) => sum + Number(line.unitPrice || 0), 0);
     const customerName = String(booking.customer || "").trim() || "-";
     const consigneeText = String(booking.consignee || "").trim() || "-";
     const descriptionText = [booking.goodsType, booking.quantity].filter(Boolean).join(", ") || "-";
@@ -2363,7 +2375,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ["Description", descriptionText],
         ["Consignee", customerName],
         ["Destination", text(booking.destination)],
-        ["Category", text(booking.category)]
+        ["Category", text(booking.category)],
+        ["Quantity", quantityTotal == null ? "-" : money(quantityTotal)],
+        ["Unit Price", unitPriceTotal == null ? "-" : money(unitPriceTotal)]
       ],
       styles: {
         font: "helvetica",
