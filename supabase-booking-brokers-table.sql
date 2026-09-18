@@ -20,6 +20,7 @@ create table if not exists public.booking_brokers (
   broker_amount numeric,
   broker_payment_details text,
   broker_payment_date date,
+  container_ref text default 'all',
   sort_order int default 0,
   created_at timestamptz default now()
 );

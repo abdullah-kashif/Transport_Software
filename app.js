@@ -526,7 +526,8 @@
             truckerBroker: line.trucker_broker,
             brokerAmount: line.broker_amount,
             brokerPaymentDetails: line.broker_payment_details,
-            brokerPaymentDate: formatShortDate(line.broker_payment_date)
+            brokerPaymentDate: formatShortDate(line.broker_payment_date),
+            containerRef: line.container_ref || "all"
           }))
       : null;
     return normalizeBookingContainers({
@@ -766,6 +767,7 @@ async function uploadBookingBilty(booking) {
           broker_amount: line.brokerAmount == null || line.brokerAmount === "" ? null : Number(line.brokerAmount),
           broker_payment_details: line.brokerPaymentDetails || null,
           broker_payment_date: formatIsoDate(line.brokerPaymentDate) || null,
+          container_ref: line.containerRef || "all",
           sort_order: index
         }));
       if (brokerLines.length) {
@@ -2023,12 +2025,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       ? Number(line.brokerAmount)
       : (line.amount !== undefined && line.amount !== null && String(line.amount).trim() !== "" ? Number(line.amount) : null);
     const brokerAmount = rawAmount !== null && !isNaN(rawAmount) ? roundAmount(rawAmount) : null;
+    const rawRef = line.containerRef !== undefined && line.containerRef !== null && String(line.containerRef).trim() !== ""
+      ? String(line.containerRef).trim()
+      : (line.container_ref !== undefined && line.container_ref !== null && String(line.container_ref).trim() !== ""
+        ? String(line.container_ref).trim()
+        : "all");
     return {
       truckerBroker: String(line.truckerBroker || line.broker || "").trim(),
       brokerAmount: brokerAmount,
       brokerPaymentDetails: String(line.brokerPaymentDetails || line.paymentDetails || "").trim(),
       brokerPaymentDate: String(line.brokerPaymentDate || line.paymentDate || "").trim(),
-      brokerProfitLoss: line.brokerProfitLoss !== undefined ? line.brokerProfitLoss : null
+      brokerProfitLoss: line.brokerProfitLoss !== undefined ? line.brokerProfitLoss : null,
+      containerRef: rawRef
     };
   }
 
@@ -3338,6 +3346,20 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       datePickerField.value = isoValue;
     }
 
+    function buildContainerRefOptions(savedRef = "all") {
+      const containerRowEls = Array.from(containerRows.querySelectorAll("[data-container-row]"));
+      const containerLabels = containerRowEls.map((row, i) => {
+        const cNo = row.querySelector("[name='containerNo']")?.value || "";
+        const label = cNo ? `Container ${i + 1} – ${cNo}` : `Container ${i + 1}`;
+        return { value: String(i), label };
+      });
+      const allOption = `<option value="all" ${savedRef === "all" ? "selected" : ""}>All Containers</option>`;
+      const containerOptions = containerLabels.map(({ value, label }) =>
+        `<option value="${escapeHtml(value)}" ${savedRef === value ? "selected" : ""}>${escapeHtml(label)}</option>`
+      ).join("");
+      return allOption + containerOptions;
+    }
+
     function createBrokerRowMarkup(line = {}, index = 0) {
       const item = normalizeBrokerLine(line);
       const amountVal = item.brokerAmount != null ? String(item.brokerAmount) : "";
@@ -3347,6 +3369,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <div class="field-lite">
             <label>Trucker/Broker</label>
             <input name="truckerBroker" value="${escapeHtml(item.truckerBroker)}" placeholder="Trucker or broker name" required />
+          </div>
+          <div class="field-lite">
+            <label>Container Ref</label>
+            <select name="containerRef" title="Link this broker cost to a specific container (or leave as All Containers for booking-level cost)">
+              ${buildContainerRefOptions(item.containerRef)}
+            </select>
           </div>
           <div class="field-lite">
             <label>Amount</label>
@@ -3362,13 +3390,25 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </div>
           <div class="field-lite">
             <label>P&amp;L</label>
-            <input name="brokerProfitLoss" type="text" readonly value="${escapeHtml(plVal)}" placeholder="Receivable - Amount" />
+            <input name="brokerProfitLoss" type="text" readonly value="${escapeHtml(plVal)}" placeholder="Container Rev - Amount" />
           </div>
           <div class="row-action">
             <button class="btn small danger" type="button" data-remove-broker-row="${index}">Remove</button>
           </div>
         </div>
       `;
+    }
+
+    function refreshBrokerContainerDropdowns() {
+      if (!brokerRows) return;
+      const brokerRowEls = Array.from(brokerRows.querySelectorAll("[data-broker-row]"));
+      brokerRowEls.forEach((row) => {
+        const select = row.querySelector("[name='containerRef']");
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = buildContainerRefOptions(currentVal);
+      });
+      updateBrokerSummary();
     }
 
     function renderBrokerRows(lines = [normalizeBrokerLine()]) {
@@ -3384,21 +3424,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     function collectBrokerLines() {
       if (!brokerRows) return [normalizeBrokerLine()];
       const rows = Array.from(brokerRows.querySelectorAll("[data-broker-row]"));
-      const currentReceivable = Number(receivableAmountField.value || 0);
       const lines = rows.map((row) => {
         const broker = row.querySelector("[name='truckerBroker']")?.value || "";
         const amountStr = row.querySelector("[name='brokerAmount']")?.value;
         const details = row.querySelector("[name='brokerPaymentDetails']")?.value || "";
         const date = row.querySelector("[name='brokerPaymentDate']")?.value || "";
+        const cRef = row.querySelector("[name='containerRef']")?.value || "all";
         const amt = amountStr !== undefined && amountStr !== "" ? parseFloat(amountStr) : null;
         const validAmt = amt != null && !isNaN(amt) && amt >= 0 ? roundAmount(amt) : null;
-        const pl = validAmt != null ? roundAmount(currentReceivable - validAmt) : null;
         return normalizeBrokerLine({
           truckerBroker: broker,
           brokerAmount: validAmt,
           brokerPaymentDetails: details,
           brokerPaymentDate: date,
-          brokerProfitLoss: pl
+          containerRef: cRef,
+          brokerProfitLoss: null
         });
       });
       return lines.length ? lines : [normalizeBrokerLine()];
@@ -3410,12 +3450,30 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       let totalBrokerAmount = 0;
       let hasAnyAmount = false;
 
+      // Build container revenue map for per-container P&L
+      const containerRowEls = Array.from(containerRows.querySelectorAll("[data-container-row]"));
+      const containerRevenues = containerRowEls.map((row) => {
+        const qty = parseFloat(row.querySelector("[name='quantity']")?.value || "0") || 0;
+        const price = parseFloat(row.querySelector("[name='unitPrice']")?.value || "0") || 0;
+        return qty * price;
+      });
+
       const rowElements = brokerRows ? Array.from(brokerRows.querySelectorAll("[data-broker-row]")) : [];
       activeLines.forEach((line, idx) => {
         if (line.brokerAmount != null && !isNaN(line.brokerAmount)) {
           totalBrokerAmount += Number(line.brokerAmount);
           hasAnyAmount = true;
-          line.brokerProfitLoss = roundAmount(currentReceivable - Number(line.brokerAmount));
+          // Per-container P&L: if linked to specific container use its revenue, else use booking receivable
+          const cRef = line.containerRef || "all";
+          if (cRef !== "all") {
+            const containerIdx = parseInt(cRef, 10);
+            const containerRevenue = (Number.isFinite(containerIdx) && containerRevenues[containerIdx] != null)
+              ? containerRevenues[containerIdx]
+              : currentReceivable;
+            line.brokerProfitLoss = roundAmount(containerRevenue - Number(line.brokerAmount));
+          } else {
+            line.brokerProfitLoss = roundAmount(currentReceivable - Number(line.brokerAmount));
+          }
         } else {
           line.brokerProfitLoss = null;
         }
@@ -3540,7 +3598,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             ...getBookingBrokerLines(item).flatMap((bLine) => [
               bLine.truckerBroker, bLine.brokerAmount, bLine.brokerPaymentDetails, bLine.brokerPaymentDate,
               bLine.brokerPaymentDate ? formatShortDate(bLine.brokerPaymentDate) : "", bLine.brokerProfitLoss,
-              bLine.brokerAmount ? money(bLine.brokerAmount) : ""
+              bLine.brokerAmount ? money(bLine.brokerAmount) : "", bLine.containerRef
             ]),
             ...[item.rate, item.detention, item.salesTaxAmount, item.totalAmount,
               item.incomeTaxAmount, item.salesTaxWithheldAmount, item.salesTaxByUsAmount,
@@ -3576,7 +3634,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (!bookings.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="42">No records match the selected filters.</td>
+            <td colspan="44">No records match the selected filters.</td>
           </tr>
         `;
         return;
@@ -3594,6 +3652,30 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <span class="loading-placeholder">...</span>
           </button>
         ` : "-";
+
+        // Compute per-container P&L using linked broker costs
+        const containerPnL = lines.map((line, cIdx) => {
+          const containerRevenue = Number(line.quantity || 0) * Number(line.unitPrice || 0);
+          const linkedBrokerCost = brokerLines.reduce((sum, bLine) => {
+            const cRef = String(bLine.containerRef || "all");
+            if (cRef !== "all" && parseInt(cRef, 10) === cIdx) {
+              return sum + (bLine.brokerAmount != null ? Number(bLine.brokerAmount) : 0);
+            }
+            return sum;
+          }, 0);
+          return (containerRevenue > 0 || linkedBrokerCost > 0) ? roundAmount(containerRevenue - linkedBrokerCost) : null;
+        });
+
+        // Broker container ref label for ledger display
+        const containerRefLabels = brokerLines.map((bLine) => {
+          const cRef = String(bLine.containerRef || "all");
+          if (cRef === "all") return "All Containers";
+          const cIdx = parseInt(cRef, 10);
+          const refLine = lines[cIdx];
+          return refLine
+            ? `Container ${cIdx + 1}${refLine.containerNo ? " – " + refLine.containerNo : ""}`
+            : `Container ${cIdx + 1}`;
+        });
 
         return `
           <tr>
@@ -3632,7 +3714,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <td>${renderStackedCell(lines.map((line) => text(line.truckNo)))}</td>
             <td>${renderStackedCell(lines.map((line) => text(line.quantity != null && line.quantity !== "" ? line.quantity : "-")))}</td>
             <td>${renderStackedCell(lines.map((line) => line.unitPrice != null && line.unitPrice !== "" ? money(line.unitPrice) : "-"))}</td>
+            <td>${renderStackedCell(containerPnL.map((pl) => pl != null ? money(pl) : "-"))}</td>
             <td>${renderStackedCell(brokerLines.map((bLine) => text(bLine.truckerBroker || "-")))}</td>
+            <td>${renderStackedCell(containerRefLabels.map((label) => text(label)))}</td>
             <td>${renderStackedCell(brokerLines.map((bLine) => bLine.brokerAmount != null && bLine.brokerAmount !== "" ? money(bLine.brokerAmount) : "-"))}</td>
             <td>${renderStackedCell(brokerLines.map((bLine) => text(bLine.brokerPaymentDetails || "-")))}</td>
             <td>${renderStackedCell(brokerLines.map((bLine) => bLine.brokerPaymentDate ? formatShortDate(bLine.brokerPaymentDate) : "-"))}</td>
@@ -3647,6 +3731,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </tr>
         `;
       }).join("");
+
 
       body.querySelectorAll("[data-lazy-bilty]").forEach((btn) => {
         const path = btn.getAttribute("data-lazy-bilty");
@@ -3755,6 +3840,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const lines = collectContainerLines();
       lines.push(normalizeContainerLine());
       renderContainerRows(lines);
+      refreshBrokerContainerDropdowns();
     });
 
     containerRows.addEventListener("click", (event) => {
@@ -3762,15 +3848,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (removeIndex === null) return;
       const lines = collectContainerLines().filter((_, index) => index !== Number(removeIndex));
       renderContainerRows(lines.length ? lines : [normalizeContainerLine()]);
+      refreshBrokerContainerDropdowns();
     });
 
     containerRows.addEventListener("input", () => {
       updateContainerSummary(collectContainerLines());
+      refreshBrokerContainerDropdowns();
     });
 
     containerRows.addEventListener("change", () => {
       updateContainerSummary(collectContainerLines());
+      refreshBrokerContainerDropdowns();
     });
+
 
     if (addBrokerRowButton) {
       addBrokerRowButton.addEventListener("click", () => {
@@ -3795,7 +3885,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       });
 
       brokerRows.addEventListener("change", (event) => {
-        if (event.target.name === "brokerAmount") {
+        if (event.target.name === "brokerAmount" || event.target.name === "containerRef") {
           updateBrokerSummary();
         }
       });
