@@ -1987,18 +1987,88 @@ th {
   flex-wrap: wrap;
 }
 
-.booking-broker-fields {
+.broker-block {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.broker-table-head,
+.broker-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(100px, 0.9fr) minmax(0, 1.3fr) minmax(130px, 1fr) minmax(110px, 0.9fr) minmax(80px, auto);
+  gap: 12px;
+  align-items: end;
 }
 
-@media (max-width: 1000px) {
-  .booking-broker-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.broker-table-head {
+  padding: 0 4px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-@media (max-width: 600px) {
-  .booking-broker-fields { grid-template-columns: minmax(0, 1fr); }
+.broker-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.broker-row {
+  padding: 14px;
+  border: 1px solid rgba(213, 184, 150, 0.75);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 8px 22px rgba(31, 43, 68, 0.04);
+}
+
+.broker-row label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.broker-row .field-lite {
+  min-width: 0;
+}
+
+.broker-row .field-lite label {
+  display: none;
+}
+
+.broker-row .row-action {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100%;
+}
+
+.broker-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.broker-total-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.broker-total-summary strong {
+  color: var(--text);
+  font-size: 14px;
 }
 
 .ledger-filter-control {
@@ -2898,7 +2968,7 @@ body[data-page="completed-truck-summary"] .truck-summary-table thead th {
 }
 
 body[data-page="booking"] .ledger-table {
-  min-width: 2900px;
+  min-width: 3800px;
   width: max-content;
   table-layout: auto;
   font-size: 11.5px;
@@ -3708,6 +3778,33 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
 
   .container-row .row-action {
     justify-content: flex-start;
+  }
+
+  .broker-table-head {
+    display: none;
+  }
+
+  .broker-row {
+    grid-template-columns: 1fr;
+  }
+
+  .broker-row .field-lite label {
+    display: block;
+  }
+
+  .broker-row .row-action {
+    justify-content: flex-start;
+  }
+
+  .broker-actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .broker-total-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 
   .hero h2,
