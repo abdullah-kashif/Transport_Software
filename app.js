@@ -2748,6 +2748,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
     const totalAmount = bookings.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
+    const totalSalesTax = bookings.reduce((sum, item) => {
+      const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+      return sum + Number(item.salesTaxAmount || tax.salesTaxAmount || 0);
+    }, 0);
     if (letterheadHeader) {
       pdf.addImage(letterheadHeader, "JPEG", 20, 10, 520, 124);
     }
@@ -2763,26 +2767,29 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       margin: { left: 28, right: 28 },
       theme: "grid",
       showFoot: "lastPage",
-      head: [["S.No", "Date", "NTN", "Customer / Payer", "Invoice", "Road Haulage Charges", "Sales Tax Authority", "Total Amount", "Remarks"]],
-      body: bookings.map((item, index) => [
-        String(index + 1),
-        formatShortDate(item.date),
-        text(item.gatePass),
-        text(item.customer),
-        text(item.invoiceNo),
-        money(item.rate),
-        text(item.salesTaxAuthority),
-        money(item.totalAmount),
-        text(item.remarks)
-      ]),
-      foot: [["", "", "", "", "", "Total", "", money(totalAmount), ""]],
+      head: [["S.No", "Date", "NTN", "Customer / Payer", "Invoice", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
+      body: bookings.map((item, index) => {
+        const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+        return [
+          String(index + 1),
+          formatShortDate(item.date),
+          text(item.gatePass),
+          text(item.customer),
+          text(item.invoiceNo),
+          money(item.rate),
+          money(item.salesTaxAmount || tax.salesTaxAmount),
+          money(item.totalAmount),
+          text(item.remarks)
+        ];
+      }),
+      foot: [["", "", "", "", "", "Total", money(totalSalesTax), money(totalAmount), ""]],
       styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
       headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
       footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold" },
       columnStyles: {
         0: { cellWidth: 34 }, 1: { cellWidth: 62 }, 2: { cellWidth: 72 }, 3: { cellWidth: 130 },
-        4: { cellWidth: 78 }, 5: { cellWidth: 100, halign: "right" }, 6: { cellWidth: 126 },
-        7: { cellWidth: 82, halign: "right" }, 8: { cellWidth: 150 }
+        4: { cellWidth: 78 }, 5: { cellWidth: 100, halign: "right" }, 6: { cellWidth: 96, halign: "right" },
+        7: { cellWidth: 92, halign: "right" }, 8: { cellWidth: 140 }
       }
     });
     pdf.setFont("helvetica", "normal");
@@ -4581,18 +4588,24 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
 
       body.innerHTML = customerGroups.map((group) => {
-        const rowsHtml = group.bookings.map((item) => `
+        const rowsHtml = group.bookings.map((item) => {
+          const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+          const salesTaxVal = item.salesTaxAmount != null && item.salesTaxAmount !== ""
+            ? Number(item.salesTaxAmount)
+            : tax.salesTaxAmount;
+          return `
           <tr>
             <td>${formatShortDate(item.date)}</td>
             <td><strong>${text(item.bookingNo || item.id || "-")}</strong></td>
             <td>${text(item.invoiceNo || "-")}</td>
             <td>${text(formatContainerSizeSummary(item))}</td>
             <td>${money(item.rate)}</td>
-            <td>${text(item.salesTaxAuthority || "-")}</td>
-            <td>${money(item.totalAmount || calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).totalAmount)}</td>
+            <td>${money(salesTaxVal)}</td>
+            <td>${money(item.totalAmount || tax.totalAmount)}</td>
             <td>${money(item.computedReceivable)}</td>
           </tr>
-        `).join("");
+        `;
+        }).join("");
 
         return `
           <div class="customer-summary-box">
@@ -4629,7 +4642,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                     <th>Invoice No</th>
                     <th>Container</th>
                     <th>Road Haulage Charges</th>
-                    <th>Sales Tax Authority</th>
+                    <th>15% Sales Tax</th>
                     <th>Total Amount</th>
                     <th>Receivable Amount</th>
                   </tr>

@@ -238,7 +238,7 @@ Operations Summary is the navigation umbrella for the complete Booking Summary a
 
 The Booking Form's Booking Ledger exposes every saved form field in a 44-column row. Container No, Size, Truck No, Quantity, and Unit Price retain one-to-one stacked row alignment. For historical remote rows without container pricing, Quantity falls back to the saved aggregate and Unit Price displays `-` rather than inventing a value. Repeatable broker values display as aligned stacks. Broker P&L shows one calculated value per broker row, followed by a separate Net P&L column and then Remarks. The selected sales-tax withholding ratio, customer payment fields, broker payment fields, Bilty, Broker P&L, and Net P&L are included in General Filter search.
 
-The Booking Ledger also has a Download Summary button beside Date Order. It remains disabled until a Customer, Start Date, or End Date filter is selected. The filtered PDF contains only S.No, Date, NTN, Customer / Payer, Invoice, Road Haulage Charges, Sales Tax Authority, Total Amount, and Remarks.
+The Booking Ledger also has a Download Summary button beside Date Order. It remains disabled until a Customer, Start Date, or End Date filter is selected. The filtered PDF contains only S.No, Date, NTN, Customer / Payer, Invoice, Road Haulage Charges, 15% Sales Tax, Total Amount, and Remarks.
 
 ### 2. Khata Balance Engine (`calculateKhataSummary`)
 
@@ -327,6 +327,7 @@ P&L example: a Receivable Amount of 257.90 with two broker rows of 100 each give
 
 | Date | Changed Component | Description of Change | Impacted Files |
 | :--- | :--- | :--- | :--- |
+| **2026-09-20** | Booking Summary 15% Sales Tax Column | Replaced `Sales Tax Authority` with `15% Sales Tax` in the Booking Summary customer boxes table on `ledger.html` and in the filtered Booking Summary PDF download (`buildBookingFilteredSummaryPdf`). Both now display the calculated 15% sales tax amount rather than the tax authority name. | `app.js`, `ledger.html`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 | **2026-09-19** | Booking Summary Dropdown & Trucker/Broker Summary | Added a Booking Summary navigation dropdown with separate Booking Summary and read-only Trucker/Broker Summary pages. The broker page defaults to Payable payments, supports status/customer/date/general filters, and displays paid/payable totals while preserving the existing complete booking record. | `broker-summary.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 | **2026-09-19** | Broker Summary Download & Fields | Removed the separate Paid status option from the Trucker/Broker Summary filter and added a Download Summary action that exports the currently filtered broker rows to PDF. The UI table omits Broker Amount while retaining Broker P&L and per-row actions; exported PDFs omit both Broker Amount and Broker P&L. | `broker-summary.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 | **2026-09-19** | Broker Row Download & Navigation Layout | Added a Download action after Broker P&L for each broker row and kept Operations Summary on one line in the sidebar. | `broker-summary.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
