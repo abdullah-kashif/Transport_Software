@@ -519,6 +519,18 @@
         unitPrice: line.unit_price
       }));
     const primaryLine = containerLines[0] || normalizeContainerLine();
+    const brokerLinesFromRelational = Array.isArray(row.booking_brokers) && row.booking_brokers.length > 0
+      ? row.booking_brokers
+          .slice()
+          .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
+          .map((line) => normalizeBrokerLine({
+            truckerBroker: line.trucker_broker,
+            brokerAmount: line.broker_amount,
+            brokerPaymentDetails: line.broker_payment_details,
+            brokerPaymentDate: formatShortDate(line.broker_payment_date),
+            containerRef: line.container_ref || "all"
+          }))
+      : null;
     return normalizeBookingContainers({
       id: row.job_no,
       remoteId: row.id,
@@ -545,6 +557,7 @@
       salesTaxWithheldAmount: Number(row.sales_tax_withheld_amount || 0),
       salesTaxByUsAmount: Number(row.sales_tax_by_us_amount || 0),
       receivableAmount: Number(row.receivable_amount || 0),
+      brokerLines: brokerLinesFromRelational || (Array.isArray(row.broker_lines) && row.broker_lines.length > 0 ? row.broker_lines : undefined),
       truckerBroker: row.trucker_broker,
       brokerAmount: row.broker_amount,
       brokerPaymentDetails: row.broker_payment_details,
@@ -611,6 +624,14 @@
         amount: entry.amount,
         paymentDetails: entry.paymentDetails,
         paymentDate: entry.paymentDate,
+        paymentStatus: entry.paymentStatus
+      })),
+      broker_lines: brokerEntries.map((entry) => ({
+        truckerBroker: entry.truckerBroker,
+        containerRef: entry.containerRef,
+        brokerAmount: entry.amount,
+        brokerPaymentDetails: entry.paymentDetails,
+        brokerPaymentDate: entry.paymentDate,
         paymentStatus: entry.paymentStatus
       })),
       payment_term: booking.paymentTerm || null,
@@ -721,11 +742,26 @@ async function uploadBookingBilty(booking) {
     if (!client) return null;
     const biltyPath = await uploadBookingBilty(booking);
     const payload = mapBookingForSupabase({ ...booking, biltyPath });
-    const { data: saved, error } = await client.from("bookings")
+    let saved;
+    const { data: savedData, error } = await client.from("bookings")
       .upsert(payload, { onConflict: "job_no" })
       .select("id,bilty_path")
       .single();
-    if (error) throw error;
+    if (error) {
+      if (payload.broker_lines && error.message && error.message.includes("broker_lines")) {
+        delete payload.broker_lines;
+        const retryRes = await client.from("bookings")
+          .upsert(payload, { onConflict: "job_no" })
+          .select("id,bilty_path")
+          .single();
+        if (retryRes.error) throw retryRes.error;
+        saved = retryRes.data;
+      } else {
+        throw error;
+      }
+    } else {
+      saved = savedData;
+    }
 
     const { error: deleteError } = await client.from("booking_containers")
       .delete()
@@ -744,6 +780,34 @@ async function uploadBookingBilty(booking) {
     const { error: linesError } = await client.from("booking_containers").insert(lines);
     if (linesError) throw linesError;
   }
+
+  try {
+    const { error: deleteBrokersError } = await client.from("booking_brokers")
+      .delete()
+      .eq("booking_id", saved.id);
+    if (!deleteBrokersError) {
+      const brokerLines = getBookingBrokerLines(booking)
+        .filter((line) => line.truckerBroker || line.brokerAmount != null || line.brokerPaymentDetails || line.brokerPaymentDate)
+        .map((line, index) => ({
+          booking_id: saved.id,
+          trucker_broker: line.truckerBroker || null,
+          broker_amount: line.brokerAmount == null || line.brokerAmount === "" ? null : Number(line.brokerAmount),
+          broker_payment_details: line.brokerPaymentDetails || null,
+          broker_payment_date: formatIsoDate(line.brokerPaymentDate) || null,
+          container_ref: line.containerRef || "all",
+          sort_order: index
+        }));
+      if (brokerLines.length) {
+        const { error: insertBrokersError } = await client.from("booking_brokers").insert(brokerLines);
+        if (insertBrokersError) {
+          console.warn("Supabase booking_brokers insert warning:", insertBrokersError.message);
+        }
+      }
+    }
+  } catch (brokerErr) {
+    console.warn("booking_brokers sync bypassed (run supabase-booking-brokers-table.sql):", brokerErr.message);
+  }
+
   const savedPath = String(saved.bilty_path || biltyPath || "");
   await removeStaleBookingBiltyFiles(booking, savedPath);
   return { remoteId: saved.id, biltyPath: savedPath };
@@ -763,14 +827,19 @@ async function uploadBookingBilty(booking) {
   async function hydrateBookingsFromSupabase(store) {
     const client = getSupabaseClient();
     if (!client) return;
-    const { data, error } = await client.from("bookings")
-      .select("*,booking_containers(*)")
+    let res = await client.from("bookings")
+      .select("*,booking_containers(*),booking_brokers(*)")
       .order("booking_date", { ascending: false });
-    if (error) {
-      console.warn("Supabase booking load failed; browser data remains available.", error.message);
+    if (res.error) {
+      res = await client.from("bookings")
+        .select("*,booking_containers(*)")
+        .order("booking_date", { ascending: false });
+    }
+    if (res.error) {
+      console.warn("Supabase booking load failed; browser data remains available.", res.error.message);
       return;
     }
-    const mapped = (data || []).map((row) => {
+    const mapped = (res.data || []).map((row) => {
       const booking = mapBookingRowFromSupabase(row);
       booking.biltyImage = getCachedSignedUrl(booking.biltyPath);
       return booking;
@@ -1989,9 +2058,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const amount = rawAmount == null || String(rawAmount).trim() === "" || !Number.isFinite(Number(rawAmount))
       ? null
       : Number(rawAmount);
+    const rawRef = entry.containerRef !== undefined && entry.containerRef !== null && String(entry.containerRef).trim() !== ""
+      ? String(entry.containerRef).trim()
+      : (entry.container_ref !== undefined && entry.container_ref !== null && String(entry.container_ref).trim() !== ""
+        ? String(entry.container_ref).trim()
+        : "All Containers");
     return {
-      truckerBroker: String(entry.truckerBroker || "").trim(),
-      containerRef: String(entry.containerRef || "All Containers").trim() || "All Containers",
+      truckerBroker: String(entry.truckerBroker || entry.broker || "").trim(),
+      containerRef: rawRef === "all" ? "All Containers" : rawRef,
       amount,
       paymentDetails: String(entry.paymentDetails ?? entry.brokerPaymentDetails ?? "").trim(),
       paymentDate: String(entry.paymentDate ?? entry.brokerPaymentDate ?? "").trim(),
@@ -2000,14 +2074,20 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     };
   }
 
+  function normalizeBrokerLine(line = {}) {
+    return normalizeBookingBrokerEntry(line);
+  }
+
   function getBookingBrokerEntries(booking = {}, receivableAmount = booking.receivableAmount) {
-    let entries = Array.isArray(booking.brokerEntries) ? booking.brokerEntries : [];
+    let entries = Array.isArray(booking.brokerEntries) && booking.brokerEntries.length
+      ? booking.brokerEntries
+      : (Array.isArray(booking.brokerLines) && booking.brokerLines.length ? booking.brokerLines : []);
     if (!entries.length) {
       const hasLegacyBroker = [booking.truckerBroker, booking.brokerAmount, booking.brokerPaymentDetails, booking.brokerPaymentDate]
         .some((value) => value != null && String(value).trim() !== "");
       if (hasLegacyBroker) entries = [{
         truckerBroker: booking.truckerBroker,
-        containerRef: booking.brokerContainerRef || "All Containers",
+        containerRef: booking.brokerContainerRef || booking.containerRef || "All Containers",
         amount: booking.brokerAmount,
         paymentDetails: booking.brokerPaymentDetails,
         paymentDate: booking.brokerPaymentDate,
@@ -2015,6 +2095,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }];
     }
     return entries.map((entry) => normalizeBookingBrokerEntry(entry, receivableAmount));
+  }
+
+  function getBookingBrokerLines(booking = {}) {
+    const entries = getBookingBrokerEntries(booking);
+    return entries.map((entry) => ({
+      truckerBroker: entry.truckerBroker,
+      brokerAmount: entry.amount,
+      brokerPaymentDetails: entry.paymentDetails,
+      brokerPaymentDate: entry.paymentDate,
+      brokerProfitLoss: entry.profitLoss,
+      containerRef: entry.containerRef === "All Containers" ? "all" : entry.containerRef,
+      paymentStatus: entry.paymentStatus
+    }));
   }
 
   function calculateBookingNetProfitLoss(entries = [], receivableAmount = 0) {
@@ -2036,12 +2129,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const taxBreakdown = calculateBookingTaxBreakdown(rate, detention, booking.salesTaxAuthority, booking.salesTaxWithholding);
     const receivableAmount = Number(booking.receivableAmount ?? taxBreakdown.receivableAmount);
     const brokerEntries = getBookingBrokerEntries(booking, receivableAmount);
+    const brokerLines = getBookingBrokerLines({ brokerEntries });
     const primaryBroker = brokerEntries[0] || normalizeBookingBrokerEntry({}, receivableAmount);
     const brokerAmounts = brokerEntries.filter((entry) => entry.amount != null);
     const totalBrokerAmount = brokerAmounts.length
       ? roundAmount(brokerAmounts.reduce((sum, entry) => sum + Number(entry.amount || 0), 0))
       : null;
     const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, receivableAmount);
+
     return {
       ...booking,
       invoiceNo: String(booking.invoiceNo || "").trim(),
@@ -2060,6 +2155,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       salesTaxByUsAmount: Number(booking.salesTaxByUsAmount ?? taxBreakdown.salesTaxByUsAmount),
       receivableAmount,
       brokerEntries,
+      brokerLines,
       truckerBroker: primaryBroker.truckerBroker,
       brokerAmount: totalBrokerAmount,
       brokerPaymentDetails: primaryBroker.paymentDetails,
@@ -3241,8 +3337,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const receivableAmountField = form.querySelector("[name='receivableAmount']");
     const brokerRows = form.querySelector("[data-broker-rows]");
     const addBrokerRowButton = form.querySelector("[data-add-broker-row]");
-    const totalBrokerAmountElement = form.querySelector("[data-total-broker-amount]");
-    const netProfitLossElement = form.querySelector("[data-booking-net-profit-loss]");
+    const totalBrokerAmountElement = form.querySelector("[data-total-broker-amount]") || form.querySelector("[data-broker-total-amount]");
+    const netProfitLossElement = form.querySelector("[data-booking-net-profit-loss]") || form.querySelector("[data-broker-total-pl]");
     const dateTextField = form.querySelector("[name='date']");
     const datePickerField = form.querySelector("[name='datePicker']");
     const datePickerButton = form.querySelector("[data-open-date-picker]");
@@ -3483,6 +3579,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       datePickerField.value = isoValue;
     }
 
+    const refreshBrokerContainerDropdowns = syncBrokerContainerReferences;
+    const collectBrokerLines = () => collectBrokerEntries();
     function syncTotalAmount() {
       const breakdown = calculateBookingTaxBreakdown(
         rateField.value,
@@ -3586,13 +3684,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             item.paymentReceivedDate ? formatShortDate(item.paymentReceivedDate) : "",
             item.chequeNumber, item.status, item.accountFlow, item.remarks,
             item.netProfitLoss,
-            ...brokerEntries.flatMap((entry) => [entry.truckerBroker, entry.containerRef, entry.amount,
+            ...brokerEntries.flatMap((entry) => [
+              entry.truckerBroker, entry.containerRef, entry.amount, entry.amount ? money(entry.amount) : "",
               entry.paymentDetails, entry.paymentDate, entry.paymentDate ? formatShortDate(entry.paymentDate) : "",
-              entry.paymentStatus, entry.profitLoss]),
+              entry.paymentStatus, entry.profitLoss, entry.profitLoss ? money(entry.profitLoss) : ""
+            ]),
             ...[item.rate, item.detention, item.salesTaxAmount, item.totalAmount,
               item.incomeTaxAmount, item.salesTaxWithheldAmount, item.salesTaxByUsAmount,
               item.receivableAmount].flatMap((amount) => [amount, money(amount)]),
-            ...getBookingContainerLines(item).flatMap((line) => [line.containerNo, line.size, line.truckNo, line.quantity, line.unitPrice])
+            ...getBookingContainerLines(item).flatMap((line) => [
+              line.containerNo, line.size, line.truckNo, line.quantity, line.unitPrice,
+              line.unitPrice ? money(line.unitPrice) : ""
+            ])
           ].join(" ").toLowerCase();
           return searchTerms.every((term) => searchableText.includes(term));
         })
@@ -3638,6 +3741,30 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         const unitPriceCells = item.containerPricingAvailable === false
           ? []
           : lines.map((line) => line.unitPrice);
+
+        const biltyMarkup = item.biltyImage ? `
+          <button class="bilty-thumbnail" type="button" data-view-bilty="${escapeHtml(item.id)}" aria-label="View Bilty image" title="View Bilty">
+            <img src="${escapeHtml(item.biltyImage)}" alt="Bilty thumbnail" />
+          </button>
+        ` : item.biltyPath ? `
+          <button class="bilty-thumbnail" type="button" data-view-bilty="${escapeHtml(item.id)}" aria-label="View Bilty image" title="View Bilty" data-lazy-bilty="${escapeHtml(item.biltyPath)}">
+            <span class="loading-placeholder">...</span>
+          </button>
+        ` : "-";
+
+        // Compute per-container P&L using linked broker costs
+        const containerPnL = lines.map((line, cIdx) => {
+          const containerRevenue = Number(line.quantity || 0) * Number(line.unitPrice || 0);
+          const linkedBrokerCost = brokerEntries.reduce((sum, entry) => {
+            const cRef = String(entry.containerRef || "All Containers");
+            if (cRef !== "All Containers" && (cRef === line.containerNo || cRef === String(cIdx) || (line.containerNo && cRef.includes(line.containerNo)))) {
+              return sum + (entry.amount != null ? Number(entry.amount) : 0);
+            }
+            return sum;
+          }, 0);
+          return (containerRevenue > 0 || linkedBrokerCost > 0) ? roundAmount(containerRevenue - linkedBrokerCost) : null;
+        });
+
         return `
           <tr>
             <td>${text(item.id)}</td>
@@ -3655,7 +3782,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <td>${text(item.goodsType)}</td>
             <td>${money(item.rate)}</td>
             <td>${text(item.salesTaxAuthority)}</td>
-            <td>${text(`${item.salesTaxWithholding ?? 20}% Withheld`)}</td>
+            <td>${text(item.salesTaxWithholding != null && item.salesTaxWithholding !== "" ? `${item.salesTaxWithholding}% Withheld` : "20% Withheld")}</td>
             <td>${money(item.detention)}</td>
             <td>${money(item.salesTaxAmount)}</td>
             <td>${money(item.totalAmount)}</td>
@@ -3668,26 +3795,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <td>${text(item.chequeNumber || "-")}</td>
             <td><span class="badge ${item.status === "In Transit" ? "good" : "warn"}">${text(item.status)}</span></td>
             <td><span class="badge ${item.accountFlow === "Credit" ? "good" : "bad"}">${text(item.accountFlow || "Awaited")}</span></td>
-            <td>${item.biltyImage ? `
-              <button class="bilty-thumbnail" type="button" data-view-bilty="${escapeHtml(item.id)}" aria-label="View Bilty image" title="View Bilty">
-                <img src="${escapeHtml(item.biltyImage)}" alt="Bilty thumbnail" />
-              </button>
-            ` : item.biltyPath ? `
-              <button class="bilty-thumbnail" type="button" data-view-bilty="${escapeHtml(item.id)}" aria-label="View Bilty image" title="View Bilty" data-lazy-bilty="${escapeHtml(item.biltyPath)}">
-                <span class="loading-placeholder">...</span>
-              </button>
-            ` : "-"}</td>
+            <td>${biltyMarkup}</td>
             <td>${renderStackedCell(lines.map((line) => text(line.containerNo)))}</td>
             <td>${renderStackedCell(lines.map((line) => text(line.size)))}</td>
             <td>${renderStackedCell(lines.map((line) => text(line.truckNo)))}</td>
-            <td>${renderStackedCell(quantityCells, money)}</td>
-            <td>${renderStackedCell(unitPriceCells, money)}</td>
-            <td>${renderStackedCell(brokerEntries.map((entry) => entry.truckerBroker))}</td>
-            <td>${renderStackedCell(brokerEntries.map((entry) => entry.containerRef))}</td>
+            <td>${renderStackedCell(quantityCells, (val) => val != null && val !== "" ? val : "-")}</td>
+            <td>${renderStackedCell(unitPriceCells, (val) => val != null && val !== "" ? money(val) : "-")}</td>
+            <td>${renderStackedCell(containerPnL.map((pl) => pl != null ? money(pl) : "-"))}</td>
+            <td>${renderStackedCell(brokerEntries.map((entry) => text(entry.truckerBroker || "-")))}</td>
+            <td>${renderStackedCell(brokerEntries.map((entry) => text(entry.containerRef || "All Containers")))}</td>
             <td>${renderStackedCell(brokerEntries.map((entry) => entry.amount), (value) => value == null ? "-" : money(value))}</td>
-            <td>${renderStackedCell(brokerEntries.map((entry) => entry.paymentDetails))}</td>
+            <td>${renderStackedCell(brokerEntries.map((entry) => text(entry.paymentDetails || "-")))}</td>
             <td>${renderStackedCell(brokerEntries.map((entry) => entry.paymentDate), (value) => value ? formatShortDate(value) : "-")}</td>
-            <td>${renderStackedCell(brokerEntries.map((entry) => entry.paymentStatus))}</td>
+            <td>${renderStackedCell(brokerEntries.map((entry) => text(entry.paymentStatus || "-")))}</td>
             <td>${renderStackedCell(brokerEntries.map((entry) => entry.profitLoss), (value) => value == null ? "-" : money(value))}</td>
             <td>${netProfitLoss == null ? "-" : `<span class="badge ${netProfitLoss < 0 ? "bad" : "good"}">${money(netProfitLoss)}</span>`}</td>
             <td>${text(item.remarks)}</td>
@@ -3700,6 +3820,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </tr>
         `;
       }).join("");
+
 
       body.querySelectorAll("[data-lazy-bilty]").forEach((btn) => {
         const path = btn.getAttribute("data-lazy-bilty");
@@ -3806,6 +3927,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const lines = collectContainerLines();
       lines.push(normalizeContainerLine());
       renderContainerRows(lines);
+      refreshBrokerContainerDropdowns();
     });
 
     containerRows.addEventListener("click", (event) => {
@@ -3813,31 +3935,38 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (removeIndex === null) return;
       const lines = collectContainerLines().filter((_, index) => index !== Number(removeIndex));
       renderContainerRows(lines.length ? lines : [normalizeContainerLine()]);
+      refreshBrokerContainerDropdowns();
     });
 
     containerRows.addEventListener("input", () => {
       updateContainerSummary(collectContainerLines());
+      refreshBrokerContainerDropdowns();
     });
 
     containerRows.addEventListener("change", () => {
       updateContainerSummary(collectContainerLines());
+      refreshBrokerContainerDropdowns();
     });
 
-    addBrokerRowButton.addEventListener("click", () => {
-      const entries = collectBrokerEntries(true);
-      entries.push(normalizeBookingBrokerEntry({}, receivableAmountField.value));
-      renderBrokerRows(entries);
-    });
+    if (addBrokerRowButton) {
+      addBrokerRowButton.addEventListener("click", () => {
+        const entries = collectBrokerEntries(true);
+        entries.push(normalizeBookingBrokerEntry({}, receivableAmountField.value));
+        renderBrokerRows(entries);
+      });
+    }
 
-    brokerRows.addEventListener("click", (event) => {
-      const removeIndex = event.target.getAttribute("data-remove-broker-row");
-      if (removeIndex === null) return;
-      const entries = collectBrokerEntries(true).filter((_, index) => index !== Number(removeIndex));
-      renderBrokerRows(entries);
-    });
+    if (brokerRows) {
+      brokerRows.addEventListener("click", (event) => {
+        const removeIndex = event.target.getAttribute("data-remove-broker-row");
+        if (removeIndex === null) return;
+        const entries = collectBrokerEntries(true).filter((_, index) => index !== Number(removeIndex));
+        renderBrokerRows(entries);
+      });
 
-    brokerRows.addEventListener("input", updateBrokerSummary);
-    brokerRows.addEventListener("change", updateBrokerSummary);
+      brokerRows.addEventListener("input", updateBrokerSummary);
+      brokerRows.addEventListener("change", updateBrokerSummary);
+    }
 
     form.addEventListener("input", (event) => {
       if (event.target && event.target.classList.contains("input-error")) {
@@ -3924,25 +4053,46 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       checkRequired(form.elements.accountFlow, "Payment Status");
       checkRequired(form.elements.remarks, "Remarks");
 
-      const brokerRowElements = Array.from(brokerRows.querySelectorAll("[data-broker-row]"));
-      brokerRowElements.forEach((row, idx) => {
-        const nameField = row.querySelector("[name='brokerTrucker']");
-        const amountField = row.querySelector("[name='brokerRowAmount']");
-        const detailsField = row.querySelector("[name='brokerRowPaymentDetails']");
-        const dateField = row.querySelector("[name='brokerRowPaymentDate']");
-        const hasAnyValue = [nameField?.value, amountField?.value, detailsField?.value, dateField?.value]
-          .some((value) => String(value || "").trim());
-        if (!hasAnyValue) return;
-        if (!String(nameField?.value || "").trim()) {
-          invalidElements.push(nameField);
-          missingLabels.push(`Trucker/Broker (Row ${idx + 1})`);
+      const hasBilty = Boolean(
+        (biltyInput && biltyInput.files && biltyInput.files.length > 0) ||
+        biltyStoragePath ||
+        (editingId && store.bookings.find((item) => item.id === editingId)?.biltyPath)
+      );
+      if (!hasBilty) {
+        invalidElements.push(biltyInput);
+        missingLabels.push("Bilty");
+      }
+
+      if (brokerRows) {
+        const brokerRowElements = Array.from(brokerRows.querySelectorAll("[data-broker-row]"));
+        if (brokerRowElements.length === 0) {
+          missingLabels.push("At least one trucker/broker row is required");
+        } else {
+          brokerRowElements.forEach((row, idx) => {
+            const bName = row.querySelector("[name='brokerTrucker']") || row.querySelector("[name='truckerBroker']");
+            const amtField = row.querySelector("[name='brokerRowAmount']") || row.querySelector("[name='brokerAmount']");
+            const bDetails = row.querySelector("[name='brokerRowPaymentDetails']") || row.querySelector("[name='brokerPaymentDetails']");
+            const bDate = row.querySelector("[name='brokerRowPaymentDate']") || row.querySelector("[name='brokerPaymentDate']");
+
+            if (!String(bName?.value || "").trim()) {
+              invalidElements.push(bName);
+              missingLabels.push(`Trucker/Broker (Row ${idx + 1})`);
+            }
+            if (!String(amtField?.value || "").trim() || amtField.validity.badInput || !Number.isFinite(Number(amtField.value)) || Number(amtField.value) <= 0 || amtField.validity.stepMismatch) {
+              invalidElements.push(amtField);
+              missingLabels.push(`Broker Amount (Row ${idx + 1}, a positive number)`);
+            }
+            if (!String(bDetails?.value || "").trim()) {
+              invalidElements.push(bDetails);
+              missingLabels.push(`Payment/Cheque/IBFT (Row ${idx + 1})`);
+            }
+            if (!String(bDate?.value || "").trim()) {
+              invalidElements.push(bDate);
+              missingLabels.push(`Broker Payment Date (Row ${idx + 1})`);
+            }
+          });
         }
-        if (amountField?.validity.badInput || !String(amountField?.value || "").trim() ||
-            !Number.isFinite(Number(amountField.value)) || Number(amountField.value) < 0 || amountField.validity.stepMismatch) {
-          invalidElements.push(amountField);
-          missingLabels.push(`Broker Amount (Row ${idx + 1})`);
-        }
-      });
+      }
 
       const containerRowElements = Array.from(containerRows.querySelectorAll("[data-container-row]"));
       if (containerRowElements.length === 0) {
@@ -4019,6 +4169,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const primaryLine = containerLines[0] || normalizeContainerLine();
       const totalContainerQuantity = containerLines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
       const totalCalculatedRate = containerLines.reduce((sum, line) => sum + (Number(line.quantity || 0) * Number(line.unitPrice || 0)), 0);
+      const brokerLines = collectBrokerLines();
+      const primaryBroker = brokerLines[0] || normalizeBrokerLine();
+      const totalBrokerAmount = brokerLines.reduce((sum, line) => sum + (line.brokerAmount != null ? Number(line.brokerAmount) : 0), 0);
+      const hasAnyBrokerAmount = brokerLines.some((line) => line.brokerAmount != null);
+      const currentReceivableVal = Number(data.receivableAmount || 0);
+      const overallProfitLoss = hasAnyBrokerAmount ? roundAmount(currentReceivableVal - totalBrokerAmount) : null;
       const normalized = {
         ...data,
         date: bookingDate,
@@ -4029,6 +4185,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         truckNo: primaryLine.truckNo,
         quantity: totalContainerQuantity || 1,
         rate: Number(totalCalculatedRate || data.rate || 0),
+        brokerLines,
+        truckerBroker: primaryBroker.truckerBroker,
+        brokerAmount: primaryBroker.brokerAmount,
+        brokerPaymentDetails: primaryBroker.brokerPaymentDetails,
+        brokerPaymentDate: primaryBroker.brokerPaymentDate,
+        brokerProfitLoss: overallProfitLoss ?? primaryBroker.brokerProfitLoss,
         gatePass: String(data.gatePass || "").trim(),
         detention: Number(data.detention || 0),
         salesTaxAmount: Number(data.salesTaxAmount || 0),
