@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Trucker/Broker Summary</title>
+  <link rel="stylesheet" href="styles.css?v=20260902-1" />
+</head>
+<body data-page="broker-summary">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Accounts Receivable</a>
+        <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="admin.html" data-page="admin">Admin</a>
+      </nav>
+      <div class="tip"></div>
+    </aside>
+
+    <main class="main">
+      <section class="hero dashboard-hero">
+        <h2>Trucker/Broker Summary</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head"><div><strong>Payment Alerts</strong><span data-notification-summary>No expired payments</span></div><button class="notification-close" type="button" data-notification-close aria-label="Close notifications">&times;</button></div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen">
+        <div class="broker-summary-notice notice" data-broker-summary-notice hidden></div>
+        <div class="broker-summary-kpis">
+          <div class="ledger-total"><span>Total Paid</span><strong data-broker-summary-paid>PKR 0</strong></div>
+          <div class="ledger-total"><span>Total Payable</span><strong data-broker-summary-payable>PKR 0</strong></div>
+          <span class="ledger-count" data-broker-summary-count>0 broker payment(s)</span>
+          <button class="btn primary broker-summary-download" type="button" data-download-broker-summary>Download Summary</button>
+        </div>
+        <div class="ledger-filter broker-summary-filter">
+          <div class="ledger-filter-control ledger-filter-search"><label for="broker-summary-search">General Filter</label><input id="broker-summary-search" type="search" placeholder="Search broker payments..." data-broker-summary-search /></div>
+          <div class="ledger-filter-control"><label for="broker-summary-status">Status</label><select id="broker-summary-status" data-broker-summary-status><option value="Payable" selected>Payable</option><option value="All">All</option></select></div>
+          <div class="ledger-filter-control"><label for="broker-summary-customer">Customer</label><select id="broker-summary-customer" data-broker-summary-customer><option value="">All Customers</option></select></div>
+          <div class="ledger-filter-control"><label for="broker-summary-start">Start Date</label><input id="broker-summary-start" type="date" data-broker-summary-start /></div>
+          <div class="ledger-filter-control"><label for="broker-summary-end">End Date</label><input id="broker-summary-end" type="date" data-broker-summary-end /></div>
+          <div class="ledger-filter-control"><label for="broker-summary-sort">Date Order</label><select id="broker-summary-sort" data-broker-summary-sort><option value="desc">Descending (Newest First)</option><option value="asc">Ascending (Oldest First)</option></select></div>
+        </div>
+        <div class="table-wrap broker-summary-table-wrap">
+          <table class="statement-table broker-summary-table">
+            <thead><tr><th>Booking No</th><th>Booking Date</th><th>Trucker/Broker</th><th>Container Ref</th><th>Payment/Cheque/IBFT</th><th>Payment Date</th><th>Broker P&amp;L</th><th>Action</th></tr></thead>
+            <tbody data-broker-summary-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js?v=20260902-1"></script>
+</body>
+</html>

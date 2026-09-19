@@ -304,6 +304,59 @@ body.page-navigating .auth-shell {
   transition: background 0.18s ease, color 0.18s ease, padding 0.22s ease;
 }
 
+.nav-dropdown {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-dropdown-toggle:hover,
+.nav-dropdown.open .nav-dropdown-toggle {
+  background: linear-gradient(135deg, rgba(197, 107, 45, 0.95), rgba(232, 179, 125, 0.45));
+  color: #1a1a1a;
+}
+
+.nav-dropdown-chevron {
+  margin-left: auto;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.18s ease;
+}
+
+.nav-dropdown-toggle .nav-label { white-space: nowrap; flex: 1 1 auto; }
+
+.nav-dropdown.open .nav-dropdown-chevron { transform: rotate(180deg); }
+
+.nav-dropdown-menu {
+  display: none;
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.nav-dropdown.open .nav-dropdown-menu { display: grid; }
+.nav-dropdown-menu a { min-height: 42px; padding: 9px 12px; font-size: 13px; }
+
+.sidebar.collapsed .nav-dropdown-toggle { justify-content: center; padding: 12px; }
+.sidebar.collapsed .nav-dropdown-toggle .nav-label,
+.sidebar.collapsed .nav-dropdown-chevron { display: none; }
+.sidebar.collapsed .nav-dropdown-menu { padding-left: 0; }
+
 .nav a[hidden] {
   display: none !important;
 }
@@ -1987,18 +2040,115 @@ th {
   flex-wrap: wrap;
 }
 
-.booking-broker-fields {
+.broker-block {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.5);
+  overflow-x: auto;
+}
+
+.booking-summary-download { white-space: nowrap; }
+
+.broker-table-head,
+.broker-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(150px, 1.2fr) minmax(130px, 0.85fr) minmax(100px, 0.75fr) minmax(170px, 1.25fr) minmax(135px, 0.85fr) minmax(115px, 0.75fr) minmax(105px, 0.75fr) minmax(80px, auto);
+  gap: 12px;
+  align-items: end;
+}
+
+.broker-table-head {
+  min-width: 1120px;
+  padding: 0 4px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.broker-rows {
+  min-width: 1120px;
+  display: grid;
+  gap: 10px;
+}
+
+.broker-row {
+  padding: 14px;
+  border: 1px solid rgba(213, 184, 150, 0.75);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 8px 22px rgba(31, 43, 68, 0.04);
+}
+
+.broker-row .field-lite { min-width: 0; }
+.broker-row .field-lite label { display: none; }
+.broker-row .row-action { display: flex; align-items: center; justify-content: center; min-height: 100%; }
+
+.broker-footer {
+  min-width: 1120px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 14px;
 }
 
-@media (max-width: 1000px) {
-  .booking-broker-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.broker-summary {
+  display: flex;
+  gap: 18px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffaf5;
+  color: var(--muted);
+  font-size: 12px;
 }
 
-@media (max-width: 600px) {
-  .booking-broker-fields { grid-template-columns: minmax(0, 1fr); }
+.broker-summary strong { color: var(--nav); }
+.broker-summary strong.positive { color: var(--green); }
+.broker-summary strong.negative { color: var(--red); }
+
+.broker-summary-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.broker-summary-kpis .ledger-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffaf5;
+}
+
+.broker-summary-download { align-self: center; white-space: nowrap; }
+
+.broker-summary-notice { margin-bottom: 14px; }
+.broker-summary-table-wrap { margin-top: 16px; }
+.broker-summary-table { min-width: 1280px; }
+.broker-summary-table th, .broker-summary-table td { white-space: nowrap; }
+.muted-cell { color: var(--muted); font-size: 12px; }
+
+@media (max-width: 1000px) {
+  .broker-summary-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .broker-table-head { display: none; }
+  .broker-rows, .broker-footer { min-width: 0; }
+  .broker-row { grid-template-columns: 1fr; }
+  .broker-row .field-lite label { display: block; }
+  .broker-row .row-action { justify-content: flex-start; }
+  .broker-footer { align-items: stretch; flex-direction: column; }
+  .broker-summary { justify-content: space-between; flex-wrap: wrap; }
+  .broker-summary-kpis { grid-template-columns: 1fr; }
 }
 
 .ledger-filter-control {

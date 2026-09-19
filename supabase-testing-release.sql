@@ -5,6 +5,21 @@ alter table public.truck_jobs add column if not exists image_path text;
 alter table public.equipment_fleet add column if not exists original_documents_path text;
 alter table public.employees add column if not exists image_path text;
 
+grant select, insert, update, delete on table public.equipment_fleet to authenticated;
+grant select, insert, update, delete on table public.maintenance_jobs to authenticated;
+
+drop policy if exists "equipment_fleet_module_access" on public.equipment_fleet;
+create policy "equipment_fleet_module_access" on public.equipment_fleet
+for all to authenticated
+using (public.is_active_user() and (public.has_module_access('equipment') or public.has_module_access('maintenance')))
+with check (public.is_active_user() and (public.has_module_access('equipment') or public.has_module_access('maintenance')));
+
+drop policy if exists "maintenance_jobs_module_access" on public.maintenance_jobs;
+create policy "maintenance_jobs_module_access" on public.maintenance_jobs
+for all to authenticated
+using (public.is_active_user() and public.has_module_access('maintenance'))
+with check (public.is_active_user() and public.has_module_access('maintenance'));
+
 create or replace function public.prune_old_activity_logs()
 returns trigger
 language plpgsql

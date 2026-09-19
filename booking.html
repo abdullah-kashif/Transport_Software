@@ -103,6 +103,8 @@
               <option>Transport</option>
               <option>Transport Custom Clearance</option>
               <option>Sea Freight</option>
+              <option>LCL</option>
+              <option>FCL</option>
               <option>Cross Stuff</option>
               <option selected>Inter City Transport</option>
               <option>Crane Lifter Services</option>
@@ -183,17 +185,27 @@
               <button class="btn" type="button" data-add-container-row>Add Container Row</button>
             </div>
           </div>
-          <div class="field full booking-broker-fields">
-            <div><label for="booking-trucker-broker">Trucker/Broker</label><input id="booking-trucker-broker"
-                name="truckerBroker" placeholder="Trucker or broker name" /></div>
-            <div><label for="booking-broker-amount">Amount</label><input id="booking-broker-amount"
-                name="brokerAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" /></div>
-            <div><label for="booking-broker-payment">Payment/Cheque/IBFT</label><input id="booking-broker-payment"
-                name="brokerPaymentDetails" placeholder="Payment / cheque / IBFT reference" /></div>
-            <div><label for="booking-broker-payment-date">Payment Date</label><input id="booking-broker-payment-date"
-                name="brokerPaymentDate" type="date" /></div>
-            <div><label for="booking-broker-profit-loss">P&amp;L</label><input id="booking-broker-profit-loss"
-                name="brokerProfitLoss" type="text" readonly placeholder="Receivable Amount - Amount" /></div>
+          <div class="field full">
+            <div class="broker-block">
+              <div class="broker-table-head" aria-hidden="true">
+                <span>Trucker/Broker</span>
+                <span>Container Ref</span>
+                <span>Amount</span>
+                <span>Payment/Cheque/IBFT</span>
+                <span>Payment Date</span>
+                <span>Payment Status</span>
+                <span>Broker P&amp;L</span>
+                <span>Action</span>
+              </div>
+              <div data-broker-rows class="broker-rows"></div>
+              <div class="broker-footer">
+                <button class="btn" type="button" data-add-broker-row>Add Broker Row</button>
+                <div class="broker-summary" aria-live="polite">
+                  <span>Total Broker Amount: <strong data-total-broker-amount>PKR 0</strong></span>
+                  <span>Net P&amp;L: <strong data-booking-net-profit-loss>-</strong></span>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="field full"><label>Remarks</label><textarea
               name="remarks" placeholder="Enter booking remarks..." required></textarea></div>
@@ -237,6 +249,7 @@
                 <option value="asc">Ascending (Oldest First)</option>
               </select>
             </div>
+            <button class="btn primary booking-summary-download" type="button" data-download-booking-summary disabled>Download Summary</button>
             <div class="ledger-total" aria-live="polite">
               <span>Total Amount</span>
               <strong data-booking-total>PKR 0</strong>
@@ -261,25 +274,35 @@
                 <th>Destination</th>
                 <th>Category</th>
                 <th>Goods Type</th>
-                <th>Quantity</th>
                 <th>Road Haulage Charges</th>
                 <th>Sales Tax Authority</th>
+                <th>Sales Tax Withholding</th>
                 <th>Detention</th>
                 <th>15% Sales Tax</th>
                 <th>Total Amount</th>
                 <th>Income Tax 7%</th>
-                <th>Sale Tax With Held 20%</th>
-                <th>Sale Tax 80% by us</th>
+                <th>Sales Tax Withheld</th>
+                <th>Sales Tax by Us</th>
                 <th>Receivable Amount</th>
                 <th>Payment Term</th>
                 <th>Payment Received Date</th>
                 <th>Cheque Number</th>
-                <th>Container No</th>
-                <th>Container Size</th>
-                <th>Truck No</th>
                 <th>Status</th>
                 <th>Payment Status</th>
                 <th>Bilty</th>
+                <th>Container No</th>
+                <th>Container Size</th>
+                <th>Truck No</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Trucker/Broker</th>
+                <th>Broker Container Ref</th>
+                <th>Broker Amount</th>
+                <th>Payment/Cheque/IBFT</th>
+                <th>Broker Payment Date</th>
+                <th>Broker Payment Status</th>
+                <th>Broker P&amp;L</th>
+                <th>Net P&amp;L</th>
                 <th>Remarks</th>
                 <th>Actions</th>
               </tr>
