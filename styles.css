@@ -32,7 +32,7 @@ body {
   background:
     radial-gradient(circle at top right, rgba(197, 107, 45, 0.14), transparent 22%),
     linear-gradient(135deg, #f7f1ea, #eee4d8 45%, #f5eee6);
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.2s ease-in-out;
 }
 
@@ -41,7 +41,7 @@ body.page-loaded {
 }
 
 body.page-navigating {
-  opacity: 0;
+  opacity: 0.35;
 }
 
 body.nav-open {

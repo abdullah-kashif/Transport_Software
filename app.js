@@ -508,16 +508,26 @@
   const SUPABASE_DOCUMENT_BUCKET = "gtls-private-documents";
 
   function mapBookingRowFromSupabase(row = {}) {
-    const containerLines = (row.booking_containers || [])
+    const bookingRate = Number(row.road_haulage_charges || 0);
+    const rawContainers = (row.booking_containers || [])
       .slice()
-      .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
-      .map((line) => normalizeContainerLine({
-        containerNo: line.container_no,
-        size: line.container_size,
-        truckNo: line.truck_no,
-        quantity: line.quantity,
-        unitPrice: line.unit_price
-      }));
+      .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0));
+    const hasAnyPrice = rawContainers.some((line) => line.unit_price != null && Number(line.unit_price) > 0);
+    const totalRawQty = rawContainers.reduce((sum, line) => {
+      const q = Number(line.quantity || 0);
+      return sum + (q > 0 ? q : 1);
+    }, 0);
+    const derivedUnitPrice = (!hasAnyPrice && bookingRate > 0 && totalRawQty > 0)
+      ? roundAmount(bookingRate / totalRawQty)
+      : null;
+
+    const containerLines = rawContainers.map((line) => normalizeContainerLine({
+      containerNo: line.container_no,
+      size: line.container_size,
+      truckNo: line.truck_no,
+      quantity: line.quantity != null && Number(line.quantity) > 0 ? line.quantity : 1,
+      unitPrice: line.unit_price != null ? line.unit_price : (derivedUnitPrice != null ? derivedUnitPrice : undefined)
+    }));
     const primaryLine = containerLines[0] || normalizeContainerLine();
     const brokerLinesFromRelational = Array.isArray(row.booking_brokers) && row.booking_brokers.length > 0
       ? row.booking_brokers
@@ -573,7 +583,7 @@
       biltyImage: "",
       remarks: row.remarks,
       containerPricingAvailable: (row.booking_containers || []).length > 0 &&
-        row.booking_containers.every((line) => line.quantity != null && line.unit_price != null),
+        (hasAnyPrice || derivedUnitPrice != null || row.booking_containers.every((line) => line.quantity != null && line.unit_price != null)),
       containerLines,
       containerNo: primaryLine.containerNo,
       size: primaryLine.size,
@@ -778,7 +788,16 @@ async function uploadBookingBilty(booking) {
     }));
   if (lines.length) {
     const { error: linesError } = await client.from("booking_containers").insert(lines);
-    if (linesError) throw linesError;
+    if (linesError) {
+      if (linesError.message && (linesError.message.includes("quantity") || linesError.message.includes("unit_price") || linesError.code === "PGRST204" || linesError.code === "42703")) {
+        console.warn("booking_containers missing quantity/unit_price columns; retrying insert without pricing. Run supabase-container-pricing.sql in Supabase SQL editor.", linesError.message);
+        const fallbackLines = lines.map(({ quantity, unit_price, ...rest }) => rest);
+        const { error: retryError } = await client.from("booking_containers").insert(fallbackLines);
+        if (retryError) throw retryError;
+      } else {
+        throw linesError;
+      }
+    }
   }
 
   try {
@@ -2008,14 +2027,32 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
 
   function getBookingContainerLines(booking = {}) {
+    const bookingRate = Number(booking.rate || 0);
     if (Array.isArray(booking.containerLines) && booking.containerLines.length > 0) {
-      return booking.containerLines.map((line) => normalizeContainerLine(line));
+      const lines = booking.containerLines.map((line) => normalizeContainerLine(line));
+      const hasAnyPrice = lines.some((line) => Number(line.unitPrice || 0) > 0);
+      if (!hasAnyPrice && bookingRate > 0) {
+        const totalQty = lines.reduce((sum, line) => sum + Number(line.quantity || 1), 0);
+        const derivedUnitPrice = totalQty > 0 ? roundAmount(bookingRate / totalQty) : 0;
+        return lines.map((line) => {
+          const qty = Number(line.quantity || 1);
+          return {
+            ...line,
+            quantity: qty,
+            unitPrice: derivedUnitPrice,
+            rate: qty * derivedUnitPrice
+          };
+        });
+      }
+      return lines;
     }
 
     const fallback = normalizeContainerLine({
       containerNo: booking.containerNo,
       size: booking.size,
       truckNo: booking.truckNo,
+      quantity: booking.quantity || 1,
+      unitPrice: booking.unitPrice != null ? booking.unitPrice : (bookingRate > 0 ? bookingRate : undefined),
       rate: booking.rate,
       gatePass: booking.gatePass,
       detention: booking.detention
@@ -3422,7 +3459,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     function createContainerRowMarkup(line = {}, index = 0) {
       const item = normalizeContainerLine(line);
       const qtyVal = line.quantity !== undefined && line.quantity !== null && line.quantity !== "" ? line.quantity : (item.quantity || "1");
-      const priceVal = line.unitPrice !== undefined && line.unitPrice !== null && line.unitPrice !== "" ? line.unitPrice : (item.unitPrice ? item.unitPrice : (item.rate || ""));
+      const hasExplicitPrice = line.unitPrice !== undefined && line.unitPrice !== null && line.unitPrice !== "";
+      const priceVal = hasExplicitPrice
+        ? line.unitPrice
+        : (item.unitPrice && Number(item.unitPrice) > 0 ? item.unitPrice : (item.rate && Number(item.rate) > 0 ? item.rate : ""));
+      const displayPrice = (priceVal !== "" && priceVal !== null && priceVal !== undefined && (Number(priceVal) > 0 || hasExplicitPrice))
+        ? String(priceVal)
+        : "";
       return `
         <div class="container-row" data-container-row="${index}">
           <div class="field-lite">
@@ -3447,7 +3490,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </div>
           <div class="field-lite">
             <label>Unit Price</label>
-            <input name="unitPrice" type="number" min="0" step="any" value="${escapeHtml(String(priceVal))}" placeholder="Unit Price" required />
+            <input name="unitPrice" type="number" min="0" step="any" value="${escapeHtml(displayPrice)}" placeholder="Unit Price" required />
           </div>
           <div class="row-action">
             <button class="btn small danger" type="button" data-remove-container-row="${index}">Remove</button>
@@ -3850,6 +3893,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         else if (form.elements[key]) form.elements[key].value = item[key];
       });
       const lines = getBookingContainerLines(item);
+      const totalRateVal = Number(item.rate || 0);
+      const hasAnyPrice = lines.some((line) => Number(line.unitPrice || 0) > 0);
+      if (!hasAnyPrice && totalRateVal > 0) {
+        const totalQty = lines.reduce((sum, line) => sum + Number(line.quantity || 1), 0);
+        const derivedUnitPrice = totalQty > 0 ? roundAmount(totalRateVal / totalQty) : 0;
+        lines.forEach((line) => {
+          line.quantity = Number(line.quantity || 1);
+          line.unitPrice = derivedUnitPrice;
+          line.rate = line.quantity * derivedUnitPrice;
+        });
+      }
       renderContainerRows(lines);
       updateContainerSummary(lines);
       renderBrokerRows(getBookingBrokerEntries(item, receivableAmountField.value));
@@ -3884,20 +3938,33 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
     });
 
-    datePickerField.addEventListener("change", () => {
-      if (datePickerField.value) syncBookingDate(datePickerField.value);
+    dateTextField.addEventListener("blur", () => {
+      if (!dateTextField.value) {
+        datePickerField.value = "";
+        return;
+      }
+      syncBookingDate(dateTextField.value);
     });
 
-    dateTextField.addEventListener("blur", () => {
-      const isoValue = formatIsoDate(dateTextField.value);
-      if (!isoValue) return;
-      syncBookingDate(isoValue);
+    datePickerField.addEventListener("change", (event) => {
+      syncBookingDate(event.target.value);
     });
 
     rateField.addEventListener("input", syncTotalAmount);
     detentionField.addEventListener("input", syncTotalAmount);
     salesTaxAuthorityField.addEventListener("change", syncTotalAmount);
-    salesTaxWithholdingField?.addEventListener("change", syncTotalAmount);
+    if (salesTaxWithholdingField) salesTaxWithholdingField.addEventListener("change", syncTotalAmount);
+
+    customerFilter.addEventListener("change", render);
+    if (dateSort) dateSort.addEventListener("change", render);
+
+    addContainerRowButton.addEventListener("click", () => {
+      const lines = collectContainerLines();
+      const existingPrice = lines.find((l) => Number(l.unitPrice || 0) > 0)?.unitPrice;
+      lines.push(normalizeContainerLine({ unitPrice: existingPrice || "" }));
+      renderContainerRows(lines);
+      refreshBrokerContainerDropdowns();
+    });
 
     biltyInput.addEventListener("change", () => {
       const file = biltyInput.files && biltyInput.files[0];
@@ -3925,16 +3992,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       biltyImagePromise = Promise.resolve("");
       biltyStoragePath = "";
       setBiltyPreview("");
-    });
-
-    customerFilter.addEventListener("change", render);
-    if (dateSort) dateSort.addEventListener("change", render);
-
-    addContainerRowButton.addEventListener("click", () => {
-      const lines = collectContainerLines();
-      lines.push(normalizeContainerLine());
-      renderContainerRows(lines);
-      refreshBrokerContainerDropdowns();
     });
 
     containerRows.addEventListener("click", (event) => {
@@ -7776,22 +7833,27 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       window.refreshPaymentNotifications = bindPaymentNotifications(() => store.bookings);
     }
 
-    if (page === "signin") softwareLoginPage(store);
-    if (page === "dashboard") dashboardPage(store);
-    if (page === "booking") bookingPage(store);
-    if (page === "ledger") ledgerPage(store);
-    if (page === "broker-summary") brokerSummaryPage(store);
-    if (page === "truck") truckPage(store);
-    if (page === "truck-summary" || page === "completed-truck-summary") truckSummaryPage(store);
-    if (page === "equipment") equipmentPage(store);
-    if (page === "maintenance") maintenancePage(store);
-    if (page === "employee") employeePage(store);
-    if (page === "admin-login") adminLoginPage(store);
-    if (page === "admin") adminPage(store);
-    if (page === "activity-logs") activityLogsPage(store);
-    if (page === "khata" || page === "accounts-payable") khataPage(store);
-    enhanceFileInputs();
-    markPageReady();
+    try {
+      if (page === "signin") softwareLoginPage(store);
+      if (page === "dashboard") dashboardPage(store);
+      if (page === "booking") bookingPage(store);
+      if (page === "ledger") ledgerPage(store);
+      if (page === "broker-summary") brokerSummaryPage(store);
+      if (page === "truck") truckPage(store);
+      if (page === "truck-summary" || page === "completed-truck-summary") truckSummaryPage(store);
+      if (page === "equipment") equipmentPage(store);
+      if (page === "maintenance") maintenancePage(store);
+      if (page === "employee") employeePage(store);
+      if (page === "admin-login") adminLoginPage(store);
+      if (page === "admin") adminPage(store);
+      if (page === "activity-logs") activityLogsPage(store);
+      if (page === "khata" || page === "accounts-payable") khataPage(store);
+      enhanceFileInputs();
+    } catch (err) {
+      console.error(`Error initializing page "${page}":`, err);
+    } finally {
+      markPageReady();
+    }
 
     const hydrationPromises = [];
     if (["dashboard", "booking", "ledger", "broker-summary", "khata"].includes(page)) {

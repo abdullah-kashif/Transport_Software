@@ -6,6 +6,9 @@
 alter table public.truck_jobs add column if not exists image_path text;
 alter table public.equipment_fleet add column if not exists original_documents_path text;
 alter table public.employees add column if not exists image_path text;
+alter table public.booking_containers add column if not exists quantity numeric;
+alter table public.booking_containers add column if not exists unit_price numeric;
+alter table public.booking_brokers add column if not exists container_ref text default 'all';
 
 -- Allow authenticated users with the matching module access to persist and
 -- reload Equipment & Handling Fleet and Fleet Maintenance records.
