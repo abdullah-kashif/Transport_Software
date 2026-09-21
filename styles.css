@@ -2053,13 +2053,13 @@ th {
 .broker-table-head,
 .broker-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) minmax(130px, 0.85fr) minmax(100px, 0.75fr) minmax(170px, 1.25fr) minmax(135px, 0.85fr) minmax(115px, 0.75fr) minmax(105px, 0.75fr) minmax(80px, auto);
-  gap: 12px;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(130px, 0.9fr) minmax(120px, 0.85fr) minmax(110px, 0.8fr) minmax(100px, 0.75fr) minmax(160px, 1.15fr) minmax(130px, 0.85fr) minmax(110px, 0.75fr) minmax(100px, 0.75fr) minmax(75px, auto);
+  gap: 10px;
   align-items: end;
 }
 
 .broker-table-head {
-  min-width: 1120px;
+  min-width: 1280px;
   padding: 0 4px 10px;
   color: var(--muted);
   font-size: 12px;
@@ -2069,7 +2069,7 @@ th {
 }
 
 .broker-rows {
-  min-width: 1120px;
+  min-width: 1280px;
   display: grid;
   gap: 10px;
 }
@@ -2087,7 +2087,7 @@ th {
 .broker-row .row-action { display: flex; align-items: center; justify-content: center; min-height: 100%; }
 
 .broker-footer {
-  min-width: 1120px;
+  min-width: 1280px;
   margin-top: 14px;
   display: flex;
   align-items: center;

@@ -190,11 +190,13 @@
               <div class="broker-table-head" aria-hidden="true">
                 <span>Trucker/Broker</span>
                 <span>Container Ref</span>
+                <span>Truck No</span>
+                <span>Container Size</span>
                 <span>Amount</span>
                 <span>Payment/Cheque/IBFT</span>
                 <span>Payment Date</span>
                 <span>Payment Status</span>
-                <span>Broker P&amp;L</span>
+                <span>P&amp;L</span>
                 <span>Action</span>
               </div>
               <div data-broker-rows class="broker-rows"></div>
@@ -254,6 +256,10 @@
               <span>Total Amount</span>
               <strong data-booking-total>PKR 0</strong>
             </div>
+            <div class="ledger-total" aria-live="polite">
+              <span>Total P&amp;L</span>
+              <strong data-booking-total-pnl>PKR 0</strong>
+            </div>
             <span class="ledger-count" data-booking-count>0 record(s)</span>
           </div>
         </div>
@@ -302,7 +308,7 @@
                 <th>Payment/Cheque/IBFT</th>
                 <th>Broker Payment Date</th>
                 <th>Broker Payment Status</th>
-                <th>Broker P&amp;L</th>
+                <th>P&amp;L</th>
                 <th>Net P&amp;L</th>
                 <th>Remarks</th>
                 <th>Actions</th>

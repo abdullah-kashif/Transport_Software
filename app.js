@@ -538,7 +538,9 @@
             brokerAmount: line.broker_amount,
             brokerPaymentDetails: line.broker_payment_details,
             brokerPaymentDate: formatShortDate(line.broker_payment_date),
-            containerRef: line.container_ref || "all"
+            containerRef: line.container_ref || "all",
+            truckNo: line.truck_no || "All Trucks",
+            containerSize: line.container_size || "All Sizes"
           }))
       : null;
     return normalizeBookingContainers({
@@ -631,6 +633,8 @@
       broker_entries: brokerEntries.map((entry) => ({
         truckerBroker: entry.truckerBroker,
         containerRef: entry.containerRef,
+        truckNo: entry.truckNo,
+        containerSize: entry.containerSize,
         amount: entry.amount,
         paymentDetails: entry.paymentDetails,
         paymentDate: entry.paymentDate,
@@ -639,6 +643,8 @@
       broker_lines: brokerEntries.map((entry) => ({
         truckerBroker: entry.truckerBroker,
         containerRef: entry.containerRef,
+        truckNo: entry.truckNo,
+        containerSize: entry.containerSize,
         brokerAmount: entry.amount,
         brokerPaymentDetails: entry.paymentDetails,
         brokerPaymentDate: entry.paymentDate,
@@ -753,25 +759,40 @@ async function uploadBookingBilty(booking) {
     const biltyPath = await uploadBookingBilty(booking);
     const payload = mapBookingForSupabase({ ...booking, biltyPath });
     let saved;
-    const { data: savedData, error } = await client.from("bookings")
-      .upsert(payload, { onConflict: "job_no" })
-      .select("id,bilty_path")
-      .single();
-    if (error) {
-      if (payload.broker_lines && error.message && error.message.includes("broker_lines")) {
-        delete payload.broker_lines;
-        const retryRes = await client.from("bookings")
-          .upsert(payload, { onConflict: "job_no" })
-          .select("id,bilty_path")
-          .single();
-        if (retryRes.error) throw retryRes.error;
-        saved = retryRes.data;
-      } else {
-        throw error;
+    let lastError = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: savedData, error } = await client.from("bookings")
+        .upsert(payload, { onConflict: "job_no" })
+        .select("id,bilty_path")
+        .single();
+      if (!error) {
+        saved = savedData;
+        lastError = null;
+        break;
       }
-    } else {
-      saved = savedData;
+      lastError = error;
+      const msg = String(error.message || "");
+      const missingColMatch = msg.match(/Could not find the '([^']+)' column of 'bookings'/i) ||
+        msg.match(/column "?([^"'\s]+)"? of relation "?bookings"? does not exist/i);
+      if (missingColMatch && missingColMatch[1] && payload.hasOwnProperty(missingColMatch[1])) {
+        console.warn(`Supabase bookings table missing '${missingColMatch[1]}' column; retrying without it:`, msg);
+        delete payload[missingColMatch[1]];
+        continue;
+      }
+      if (payload.sales_tax_withholding && (error.code === "PGRST204" || error.code === "42703" || msg.includes("sales_tax_withholding"))) {
+        console.warn("Retrying bookings upsert without sales_tax_withholding column.");
+        delete payload.sales_tax_withholding;
+        continue;
+      }
+      if ((payload.broker_entries || payload.broker_lines) && (error.code === "PGRST204" || error.code === "42703" || msg.includes("broker_entries") || msg.includes("broker_lines"))) {
+        console.warn("Retrying bookings upsert without broker_entries / broker_lines columns.");
+        delete payload.broker_entries;
+        delete payload.broker_lines;
+        continue;
+      }
+      throw error;
     }
+    if (lastError) throw lastError;
 
     const { error: deleteError } = await client.from("booking_containers")
       .delete()
@@ -814,12 +835,20 @@ async function uploadBookingBilty(booking) {
           broker_payment_details: line.brokerPaymentDetails || null,
           broker_payment_date: formatIsoDate(line.brokerPaymentDate) || null,
           container_ref: line.containerRef || "all",
+          truck_no: line.truckNo || null,
+          container_size: line.containerSize || null,
           sort_order: index
         }));
       if (brokerLines.length) {
         const { error: insertBrokersError } = await client.from("booking_brokers").insert(brokerLines);
         if (insertBrokersError) {
-          console.warn("Supabase booking_brokers insert warning:", insertBrokersError.message);
+          if (insertBrokersError.message && (insertBrokersError.message.includes("truck_no") || insertBrokersError.message.includes("container_size") || insertBrokersError.code === "PGRST204" || insertBrokersError.code === "42703")) {
+            console.warn("booking_brokers missing truck_no/container_size columns; retrying insert without them:", insertBrokersError.message);
+            const fallbackBrokers = brokerLines.map(({ truck_no, container_size, ...rest }) => rest);
+            await client.from("booking_brokers").insert(fallbackBrokers);
+          } else {
+            console.warn("Supabase booking_brokers insert warning:", insertBrokersError.message);
+          }
         }
       }
     }
@@ -1299,55 +1328,239 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     ]);
     if (hydrationVersion !== operationalMutationVersion) return;
     if (Array.isArray(trucks)) {
-      const mappedTrucks = trucks.map((r) => ({
-        id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
-        date: r.import_date, customer: r.customer || "", origin: r.import_origin || "", destination: r.import_destination || "", size: r.import_size || "",
-        weight: r.import_weight || "", cargoDescription: r.cargo_description || "", mtyBoxFreight: Number(r.mty_box_freight || 0), mtyBroker: r.mty_broker || "",
-        importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
-        importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
-        importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
-        importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "", exportBroker: r.export_broker || "",
-        exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
-        exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
-        exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
-        exportPaymentStatus: r.export_payment_status, exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-        roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
-        image: getCachedSignedUrl(r.image_path)
-      }));
-      replaceArrayContents(store.truckExpenses, mappedTrucks);
+      const remoteMap = new Map();
+      trucks.forEach((r) => {
+        const key = String(r.job_no || "").trim().toUpperCase();
+        if (key) remoteMap.set(key, r);
+      });
+      const mergedTrucks = [];
+      const seenTrucks = new Set();
+      (store.truckExpenses || []).forEach((local) => {
+        const key = String(local.jobNo || local.id || "").trim().toUpperCase();
+        if (!key) return;
+        seenTrucks.add(key);
+        const r = remoteMap.get(key);
+        if (r) {
+          mergedTrucks.push({
+            id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
+            date: r.import_date, customer: r.customer || "", origin: r.import_origin || "", destination: r.import_destination || "", size: r.import_size || "",
+            weight: r.import_weight || "", cargoDescription: r.cargo_description || "", mtyBoxFreight: Number(r.mty_box_freight || 0), mtyBroker: r.mty_broker || "",
+            importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
+            importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
+            importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
+            importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "", exportBroker: r.export_broker || "",
+            exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
+            exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
+            exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
+            exportPaymentStatus: r.export_payment_status, exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
+            roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || local.imagePath || "",
+            image: local.image || getCachedSignedUrl(r.image_path)
+          });
+        } else {
+          mergedTrucks.push(local);
+        }
+      });
+      trucks.forEach((r) => {
+        const key = String(r.job_no || "").trim().toUpperCase();
+        if (key && !seenTrucks.has(key)) {
+          seenTrucks.add(key);
+          mergedTrucks.push({
+            id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
+            date: r.import_date, customer: r.customer || "", origin: r.import_origin || "", destination: r.import_destination || "", size: r.import_size || "",
+            weight: r.import_weight || "", cargoDescription: r.cargo_description || "", mtyBoxFreight: Number(r.mty_box_freight || 0), mtyBroker: r.mty_broker || "",
+            importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
+            importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
+            importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
+            importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "", exportBroker: r.export_broker || "",
+            exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
+            exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
+            exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
+            exportPaymentStatus: r.export_payment_status, exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
+            roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
+            image: getCachedSignedUrl(r.image_path)
+          });
+        }
+      });
+      replaceArrayContents(store.truckExpenses, mergedTrucks);
     }
 
-    // Keep local records when a newly saved row is not visible in a temporary
-    // empty remote response during background hydration.
-    if (Array.isArray(equipment) && (equipment.length || !store.equipmentFleet.length)) {
-      const mappedEquip = equipment.map((r) => ({
-        id: r.truck_no, truckNo: r.truck_no, typeOfBody: r.type_of_body || "", chassisNo: r.chassis_no,
-        engineNo: r.engine_no, make: r.make, model: r.model, mra: r.mra || "", banker: r.banker || "", fitnessExpiry: r.fitness_expiry || "",
-        balochistanPermitExpiry: r.balochistan_permit_expiry || "", sindhPermitExpiry: r.sindh_permit_expiry || "", kpkPermitExpiry: r.kpk_permit_expiry || "",
-        punjabPermitExpiry: r.punjab_permit_expiry || "", taxPaidUpTo: r.tax_paid_up_to || "", originalDocs: r.original_documents || "",
-        documentName: r.original_documents || "", documentPath: r.original_documents_path || "",
-        documentData: getCachedSignedUrl(r.original_documents_path)
-      }));
-      replaceArrayContents(store.equipmentFleet, mappedEquip);
+    if (Array.isArray(equipment)) {
+      const remoteMap = new Map();
+      equipment.forEach((r) => {
+        const key = String(r.truck_no || "").trim().toUpperCase();
+        if (key) remoteMap.set(key, r);
+      });
+      const mergedEquip = [];
+      const seenEquip = new Set();
+      (store.equipmentFleet || []).forEach((local) => {
+        const key = String(local.truckNo || local.id || "").trim().toUpperCase();
+        if (!key) return;
+        seenEquip.add(key);
+        const r = remoteMap.get(key);
+        if (r) {
+          mergedEquip.push({
+            id: local.id || r.truck_no,
+            truckNo: r.truck_no || local.truckNo,
+            typeOfBody: r.type_of_body ?? local.typeOfBody ?? "",
+            chassisNo: r.chassis_no ?? local.chassisNo ?? "",
+            engineNo: r.engine_no ?? local.engineNo ?? "",
+            make: r.make ?? local.make ?? "",
+            model: r.model ?? local.model ?? "",
+            mra: r.mra ?? local.mra ?? "",
+            banker: r.banker ?? local.banker ?? "",
+            fitnessExpiry: r.fitness_expiry ?? local.fitnessExpiry ?? "",
+            balochistanPermitExpiry: r.balochistan_permit_expiry ?? local.balochistanPermitExpiry ?? "",
+            sindhPermitExpiry: r.sindh_permit_expiry ?? local.sindhPermitExpiry ?? "",
+            kpkPermitExpiry: r.kpk_permit_expiry ?? local.kpkPermitExpiry ?? "",
+            punjabPermitExpiry: r.punjab_permit_expiry ?? local.punjabPermitExpiry ?? "",
+            taxPaidUpTo: r.tax_paid_up_to ?? local.taxPaidUpTo ?? "",
+            originalDocs: r.original_documents || local.originalDocs || "",
+            documentName: r.original_documents || local.documentName || "",
+            documentPath: r.original_documents_path || local.documentPath || "",
+            documentData: local.documentData || getCachedSignedUrl(r.original_documents_path)
+          });
+        } else {
+          mergedEquip.push(local);
+        }
+      });
+      equipment.forEach((r) => {
+        const key = String(r.truck_no || "").trim().toUpperCase();
+        if (key && !seenEquip.has(key)) {
+          seenEquip.add(key);
+          mergedEquip.push({
+            id: r.truck_no,
+            truckNo: r.truck_no,
+            typeOfBody: r.type_of_body || "",
+            chassisNo: r.chassis_no,
+            engineNo: r.engine_no,
+            make: r.make,
+            model: r.model,
+            mra: r.mra || "",
+            banker: r.banker || "",
+            fitnessExpiry: r.fitness_expiry || "",
+            balochistanPermitExpiry: r.balochistan_permit_expiry || "",
+            sindhPermitExpiry: r.sindh_permit_expiry || "",
+            kpkPermitExpiry: r.kpk_permit_expiry || "",
+            punjabPermitExpiry: r.punjab_permit_expiry || "",
+            taxPaidUpTo: r.tax_paid_up_to || "",
+            originalDocs: r.original_documents || "",
+            documentName: r.original_documents || "",
+            documentPath: r.original_documents_path || "",
+            documentData: getCachedSignedUrl(r.original_documents_path)
+          });
+        }
+      });
+      replaceArrayContents(store.equipmentFleet, mergedEquip);
     }
 
-    if (Array.isArray(maintenance) && (maintenance.length || !store.maintenanceJobs.length)) {
-      const mappedMaint = maintenance.map((r) => ({
-        id: r.maintenance_job_no, truckNo: r.truck_no,
-        complaintDate: r.complaint_date, repairDate: r.repair_date, partName: r.part_name, oldSerialNumber: r.old_serial_number || "", newSerialNumber: r.new_serial_number,
-        partCost: Number(r.part_cost || 0), warrantyPeriod: r.warranty_period || "", warrantyExpiry: r.warranty_expiry || "", driverName: r.driver_name,
-        approvedBy: r.approved_by, imagePath: r.image_path || "", image: getCachedSignedUrl(r.image_path)
-      }));
-      replaceArrayContents(store.maintenanceJobs, mappedMaint);
+    if (Array.isArray(maintenance)) {
+      const remoteMap = new Map();
+      maintenance.forEach((r) => {
+        const key = String(r.maintenance_job_no || "").trim().toUpperCase();
+        if (key) remoteMap.set(key, r);
+      });
+      const mergedMaint = [];
+      const seenMaint = new Set();
+      (store.maintenanceJobs || []).forEach((local) => {
+        const key = String(local.id || "").trim().toUpperCase();
+        if (!key) return;
+        seenMaint.add(key);
+        const r = remoteMap.get(key);
+        if (r) {
+          mergedMaint.push({
+            id: r.maintenance_job_no || local.id,
+            truckNo: r.truck_no || local.truckNo,
+            complaintDate: r.complaint_date || local.complaintDate,
+            repairDate: r.repair_date || local.repairDate,
+            partName: r.part_name || local.partName,
+            oldSerialNumber: r.old_serial_number ?? local.oldSerialNumber ?? "",
+            newSerialNumber: r.new_serial_number || local.newSerialNumber,
+            partCost: Number(r.part_cost ?? local.partCost ?? 0),
+            warrantyPeriod: r.warranty_period ?? local.warrantyPeriod ?? "",
+            warrantyExpiry: r.warranty_expiry ?? local.warrantyExpiry ?? "",
+            driverName: r.driver_name || local.driverName,
+            approvedBy: r.approved_by || local.approvedBy,
+            imagePath: r.image_path || local.imagePath || "",
+            image: local.image || getCachedSignedUrl(r.image_path)
+          });
+        } else {
+          mergedMaint.push(local);
+        }
+      });
+      maintenance.forEach((r) => {
+        const key = String(r.maintenance_job_no || "").trim().toUpperCase();
+        if (key && !seenMaint.has(key)) {
+          seenMaint.add(key);
+          mergedMaint.push({
+            id: r.maintenance_job_no,
+            truckNo: r.truck_no,
+            complaintDate: r.complaint_date,
+            repairDate: r.repair_date,
+            partName: r.part_name,
+            oldSerialNumber: r.old_serial_number || "",
+            newSerialNumber: r.new_serial_number,
+            partCost: Number(r.part_cost || 0),
+            warrantyPeriod: r.warranty_period || "",
+            warrantyExpiry: r.warranty_expiry || "",
+            driverName: r.driver_name,
+            approvedBy: r.approved_by,
+            imagePath: r.image_path || "",
+            image: getCachedSignedUrl(r.image_path)
+          });
+        }
+      });
+      replaceArrayContents(store.maintenanceJobs, mergedMaint);
     }
 
     if (Array.isArray(employees)) {
-      const mappedEmp = employees.map((r) => ({
-        id: r.employee_no, name: r.name, designation: r.designation,
-        department: r.department || "", salary: Number(r.salary || 0), joiningDate: r.joining_date, status: r.status, phone: r.phone || "",
-        imagePath: r.image_path || "", image: getCachedSignedUrl(r.image_path)
-      }));
-      replaceArrayContents(store.employees, mappedEmp);
+      const remoteMap = new Map();
+      employees.forEach((r) => {
+        const key = String(r.employee_no || "").trim().toUpperCase();
+        if (key) remoteMap.set(key, r);
+      });
+      const mergedEmp = [];
+      const seenEmp = new Set();
+      (store.employees || []).forEach((local) => {
+        const key = String(local.id || "").trim().toUpperCase();
+        if (!key) return;
+        seenEmp.add(key);
+        const r = remoteMap.get(key);
+        if (r) {
+          mergedEmp.push({
+            id: r.employee_no || local.id,
+            name: r.name || local.name,
+            designation: r.designation || local.designation,
+            department: r.department ?? local.department ?? "",
+            salary: Number(r.salary ?? local.salary ?? 0),
+            joiningDate: r.joining_date || local.joiningDate,
+            status: r.status || local.status,
+            phone: r.phone ?? local.phone ?? "",
+            imagePath: r.image_path || local.imagePath || "",
+            image: local.image || getCachedSignedUrl(r.image_path)
+          });
+        } else {
+          mergedEmp.push(local);
+        }
+      });
+      employees.forEach((r) => {
+        const key = String(r.employee_no || "").trim().toUpperCase();
+        if (key && !seenEmp.has(key)) {
+          seenEmp.add(key);
+          mergedEmp.push({
+            id: r.employee_no,
+            name: r.name,
+            designation: r.designation,
+            department: r.department || "",
+            salary: Number(r.salary || 0),
+            joiningDate: r.joining_date,
+            status: r.status,
+            phone: r.phone || "",
+            imagePath: r.image_path || "",
+            image: getCachedSignedUrl(r.image_path)
+          });
+        }
+      });
+      replaceArrayContents(store.employees, mergedEmp);
     }
 
     if (Array.isArray(accounts)) {
@@ -2100,9 +2313,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       : (entry.container_ref !== undefined && entry.container_ref !== null && String(entry.container_ref).trim() !== ""
         ? String(entry.container_ref).trim()
         : "All Containers");
+    const rawTruck = entry.truckNo !== undefined && entry.truckNo !== null && String(entry.truckNo).trim() !== ""
+      ? String(entry.truckNo).trim()
+      : (entry.truck_no !== undefined && entry.truck_no !== null && String(entry.truck_no).trim() !== ""
+        ? String(entry.truck_no).trim()
+        : "All Trucks");
+    const rawSize = entry.containerSize !== undefined && entry.containerSize !== null && String(entry.containerSize).trim() !== ""
+      ? String(entry.containerSize).trim()
+      : (entry.container_size !== undefined && entry.container_size !== null && String(entry.container_size).trim() !== ""
+        ? String(entry.container_size).trim()
+        : "All Sizes");
     return {
       truckerBroker: String(entry.truckerBroker || entry.broker || "").trim(),
       containerRef: rawRef === "all" ? "All Containers" : rawRef,
+      truckNo: rawTruck === "all" ? "All Trucks" : rawTruck,
+      containerSize: rawSize === "all" ? "All Sizes" : rawSize,
       amount,
       paymentDetails: String(entry.paymentDetails ?? entry.brokerPaymentDetails ?? "").trim(),
       paymentDate: String(entry.paymentDate ?? entry.brokerPaymentDate ?? "").trim(),
@@ -2125,6 +2350,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (hasLegacyBroker) entries = [{
         truckerBroker: booking.truckerBroker,
         containerRef: booking.brokerContainerRef || booking.containerRef || "All Containers",
+        truckNo: booking.truckNo || "All Trucks",
+        containerSize: booking.size || "All Sizes",
         amount: booking.brokerAmount,
         paymentDetails: booking.brokerPaymentDetails,
         paymentDate: booking.brokerPaymentDate,
@@ -2143,6 +2370,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       brokerPaymentDate: entry.paymentDate,
       brokerProfitLoss: entry.profitLoss,
       containerRef: entry.containerRef === "All Containers" ? "all" : entry.containerRef,
+      truckNo: entry.truckNo === "All Trucks" ? "all" : (entry.truckNo || null),
+      containerSize: entry.containerSize === "All Sizes" ? "all" : (entry.containerSize || null),
       paymentStatus: entry.paymentStatus
     }));
   }
@@ -2712,11 +2941,16 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
     const totals = bookings.reduce((summary, item) => {
       const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+      const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
+      const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
       summary.roadHaulage += Number(item.rate || 0);
       summary.salesTax += Number(item.salesTaxAmount || tax.salesTaxAmount || 0);
       summary.totalAmount += Number(item.totalAmount || tax.totalAmount || 0);
+      if (netProfitLoss != null && Number.isFinite(netProfitLoss)) {
+        summary.totalPnL += netProfitLoss;
+      }
       return summary;
-    }, { roadHaulage: 0, salesTax: 0, totalAmount: 0 });
+    }, { roadHaulage: 0, salesTax: 0, totalAmount: 0, totalPnL: 0 });
     if (letterheadHeader) {
       const headerWidth = 520;
       const headerHeight = 124;
@@ -2732,37 +2966,41 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       startY: 184,
       theme: "grid",
       showFoot: "lastPage",
-      head: [["S.No", "Date", "Booking No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
+      head: [["S.No", "Date", "Booking No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "P&L", "Remarks"]],
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+        const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
+        const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
         return [
-        String(index + 1),
-        formatShortDate(item.date),
-        text(item.bookingNo || item.id),
-        text(item.invoiceNo || "-"),
-        text(item.customer || customer || "-"),
-        formatContainerSizeSummary(item),
-        money(item.rate),
-        money(item.salesTaxAmount || tax.salesTaxAmount),
-        money(item.totalAmount || tax.totalAmount),
-        text(item.remarks || "-")
-      ];
+          String(index + 1),
+          formatShortDate(item.date),
+          text(item.bookingNo || item.id),
+          text(item.invoiceNo || "-"),
+          text(item.customer || customer || "-"),
+          formatContainerSizeSummary(item),
+          money(item.rate),
+          money(item.salesTaxAmount || tax.salesTaxAmount),
+          money(item.totalAmount || tax.totalAmount),
+          netProfitLoss == null ? "-" : money(netProfitLoss),
+          text(item.remarks || "-")
+        ];
       }),
-      foot: [["", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
+      foot: [["", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), money(totals.totalPnL), ""]],
       styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
       headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
       footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 58 },
-        2: { cellWidth: 72 },
-        3: { cellWidth: 72 },
-        4: { cellWidth: 92 },
-        5: { cellWidth: 58 },
-        6: { cellWidth: 88 },
-        7: { cellWidth: 72 },
-        8: { cellWidth: 78 },
-        9: { cellWidth: 106 }
+        0: { cellWidth: 26 },
+        1: { cellWidth: 54 },
+        2: { cellWidth: 68 },
+        3: { cellWidth: 68 },
+        4: { cellWidth: 84 },
+        5: { cellWidth: 54 },
+        6: { cellWidth: 78, halign: "right" },
+        7: { cellWidth: 68, halign: "right" },
+        8: { cellWidth: 72, halign: "right" },
+        9: { cellWidth: 68, halign: "right" },
+        10: { cellWidth: 92 }
       }
     });
     pdf.setFillColor(255, 255, 255);
@@ -2789,6 +3027,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
       return sum + Number(item.salesTaxAmount || tax.salesTaxAmount || 0);
     }, 0);
+    const totalNetPnL = bookings.reduce((sum, item) => {
+      const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
+      const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
+      return sum + (netProfitLoss != null ? Number(netProfitLoss) : 0);
+    }, 0);
     if (letterheadHeader) {
       pdf.addImage(letterheadHeader, "JPEG", 20, 10, 520, 124);
     }
@@ -2804,9 +3047,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       margin: { left: 28, right: 28 },
       theme: "grid",
       showFoot: "lastPage",
-      head: [["S.No", "Date", "NTN", "Customer / Payer", "Invoice", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
+      head: [["S.No", "Date", "NTN", "Customer / Payer", "Invoice", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "P&L", "Remarks"]],
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
+        const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
+        const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
         return [
           String(index + 1),
           formatShortDate(item.date),
@@ -2816,17 +3061,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           money(item.rate),
           money(item.salesTaxAmount || tax.salesTaxAmount),
           money(item.totalAmount),
+          netProfitLoss == null ? "-" : money(netProfitLoss),
           text(item.remarks)
         ];
       }),
-      foot: [["", "", "", "", "", "Total", money(totalSalesTax), money(totalAmount), ""]],
+      foot: [["", "", "", "", "", "Total", money(totalSalesTax), money(totalAmount), money(totalNetPnL), ""]],
       styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
       headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
       footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 34 }, 1: { cellWidth: 62 }, 2: { cellWidth: 72 }, 3: { cellWidth: 130 },
-        4: { cellWidth: 78 }, 5: { cellWidth: 100, halign: "right" }, 6: { cellWidth: 96, halign: "right" },
-        7: { cellWidth: 92, halign: "right" }, 8: { cellWidth: 140 }
+        0: { cellWidth: 30 }, 1: { cellWidth: 58 }, 2: { cellWidth: 66 }, 3: { cellWidth: 120 },
+        4: { cellWidth: 72 }, 5: { cellWidth: 90, halign: "right" }, 6: { cellWidth: 84, halign: "right" },
+        7: { cellWidth: 84, halign: "right" }, 8: { cellWidth: 76, halign: "right" }, 9: { cellWidth: 110 }
       }
     });
     pdf.setFont("helvetica", "normal");
@@ -3364,6 +3610,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const dateSort = document.querySelector("[data-booking-date-sort]");
     const bookingCount = document.querySelector("[data-booking-count]");
     const bookingTotal = document.querySelector("[data-booking-total]");
+    const bookingTotalPnl = document.querySelector("[data-booking-total-pnl]");
     const downloadSummaryButton = document.querySelector("[data-download-booking-summary]");
     let currentFilteredBookings = [];
     const statusField = form.querySelector("[name='status']");
@@ -3478,6 +3725,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               <option value="20 FT" ${item.size === "20 FT" ? "selected" : ""}>20 FT</option>
               <option value="40 FT" ${item.size === "40 FT" ? "selected" : ""}>40 FT</option>
               <option value="45 FT" ${item.size === "45 FT" ? "selected" : ""}>45 FT</option>
+              <option value="LCL" ${item.size === "LCL" ? "selected" : ""}>LCL</option>
             </select>
           </div>
           <div class="field-lite">
@@ -3537,12 +3785,34 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         .filter(Boolean))];
     }
 
+    function getBrokerTruckReferences() {
+      return [...new Set(collectContainerLines()
+        .map((line) => String(line.truckNo || "").trim())
+        .filter(Boolean))];
+    }
+
+    function getBrokerSizeReferences() {
+      return [...new Set(collectContainerLines()
+        .map((line) => String(line.size || "").trim())
+        .filter(Boolean))];
+    }
+
     function createBrokerRowMarkup(entry = {}, index = 0) {
       const item = normalizeBookingBrokerEntry(entry, receivableAmountField.value);
       const containerReferences = getBrokerContainerReferences();
       const availableReferences = item.containerRef !== "All Containers" && !containerReferences.includes(item.containerRef)
         ? [...containerReferences, item.containerRef]
         : containerReferences;
+      const truckReferences = getBrokerTruckReferences();
+      const availableTrucks = item.truckNo && item.truckNo !== "All Trucks" && !truckReferences.includes(item.truckNo)
+        ? [...truckReferences, item.truckNo]
+        : truckReferences;
+      const standardSizes = ["20 FT", "40 FT", "45 FT", "LCL"];
+      const customSizes = getBrokerSizeReferences().filter((s) => !standardSizes.includes(s));
+      const allSizes = [...standardSizes, ...customSizes];
+      if (item.containerSize && item.containerSize !== "All Sizes" && !allSizes.includes(item.containerSize)) {
+        allSizes.push(item.containerSize);
+      }
       return `
         <div class="broker-row" data-broker-row="${index}">
           <div class="field-lite"><label>Trucker/Broker</label><input name="brokerTrucker" value="${escapeHtml(item.truckerBroker)}" placeholder="Trucker or broker name" /></div>
@@ -3550,11 +3820,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <option value="All Containers" ${item.containerRef === "All Containers" ? "selected" : ""}>All Containers</option>
             ${availableReferences.map((containerNo) => `<option value="${escapeHtml(containerNo)}" ${item.containerRef === containerNo ? "selected" : ""}>${escapeHtml(containerNo)}</option>`).join("")}
           </select></div>
+          <div class="field-lite"><label>Truck No</label><select name="brokerTruckNo">
+            <option value="All Trucks" ${item.truckNo === "All Trucks" || !item.truckNo ? "selected" : ""}>All Trucks</option>
+            ${availableTrucks.map((truckNo) => `<option value="${escapeHtml(truckNo)}" ${item.truckNo === truckNo ? "selected" : ""}>${escapeHtml(truckNo)}</option>`).join("")}
+          </select></div>
+          <div class="field-lite"><label>Container Size</label><select name="brokerContainerSize">
+            <option value="All Sizes" ${item.containerSize === "All Sizes" || !item.containerSize ? "selected" : ""}>All Sizes</option>
+            ${allSizes.map((size) => `<option value="${escapeHtml(size)}" ${item.containerSize === size ? "selected" : ""}>${escapeHtml(size)}</option>`).join("")}
+          </select></div>
           <div class="field-lite"><label>Amount</label><input name="brokerRowAmount" type="number" min="0" step="0.01" inputmode="decimal" value="${item.amount == null ? "" : escapeHtml(String(item.amount))}" placeholder="Amount" /></div>
           <div class="field-lite"><label>Payment/Cheque/IBFT</label><input name="brokerRowPaymentDetails" value="${escapeHtml(item.paymentDetails)}" placeholder="Payment / cheque / IBFT reference" /></div>
           <div class="field-lite"><label>Payment Date</label><input name="brokerRowPaymentDate" type="date" value="${escapeHtml(formatIsoDate(item.paymentDate) || "")}" /></div>
           <div class="field-lite"><label>Payment Status</label><select name="brokerRowPaymentStatus"><option value="Payable" ${item.paymentStatus !== "Paid" ? "selected" : ""}>Payable</option><option value="Paid" ${item.paymentStatus === "Paid" ? "selected" : ""}>Paid</option></select></div>
-          <div class="field-lite"><label>Broker P&amp;L</label><input name="brokerRowProfitLoss" type="text" value="${item.profitLoss == null ? "" : escapeHtml(String(item.profitLoss))}" readonly /></div>
+          <div class="field-lite"><label>P&amp;L</label><input name="brokerRowProfitLoss" type="text" value="${item.profitLoss == null ? "" : escapeHtml(String(item.profitLoss))}" readonly /></div>
           <div class="row-action"><button class="btn small danger" type="button" data-remove-broker-row="${index}">Remove</button></div>
         </div>
       `;
@@ -3571,6 +3849,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         .map((row) => normalizeBookingBrokerEntry({
           truckerBroker: row.querySelector("[name='brokerTrucker']")?.value,
           containerRef: row.querySelector("[name='brokerContainerRef']")?.value,
+          truckNo: row.querySelector("[name='brokerTruckNo']")?.value,
+          containerSize: row.querySelector("[name='brokerContainerSize']")?.value,
           amount: row.querySelector("[name='brokerRowAmount']")?.value,
           paymentDetails: row.querySelector("[name='brokerRowPaymentDetails']")?.value,
           paymentDate: row.querySelector("[name='brokerRowPaymentDate']")?.value,
@@ -3583,13 +3863,36 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function syncBrokerContainerReferences() {
       const references = getBrokerContainerReferences();
-      brokerRows.querySelectorAll("[name='brokerContainerRef']").forEach((select) => {
-        const currentValue = select.value || "All Containers";
-        const values = currentValue !== "All Containers" && !references.includes(currentValue)
-          ? [...references, currentValue]
-          : references;
-        select.innerHTML = `<option value="All Containers">All Containers</option>${values.map((containerNo) => `<option value="${escapeHtml(containerNo)}">${escapeHtml(containerNo)}</option>`).join("")}`;
-        select.value = currentValue;
+      const trucks = getBrokerTruckReferences();
+      const standardSizes = ["20 FT", "40 FT", "45 FT", "LCL"];
+      const customSizes = getBrokerSizeReferences().filter((s) => !standardSizes.includes(s));
+      const sizes = [...standardSizes, ...customSizes];
+
+      brokerRows.querySelectorAll("[data-broker-row]").forEach((row) => {
+        const refSelect = row.querySelector("[name='brokerContainerRef']");
+        const truckSelect = row.querySelector("[name='brokerTruckNo']");
+        const sizeSelect = row.querySelector("[name='brokerContainerSize']");
+
+        if (refSelect) {
+          const curRef = refSelect.value || "All Containers";
+          const allRefs = curRef !== "All Containers" && !references.includes(curRef) ? [...references, curRef] : references;
+          refSelect.innerHTML = `<option value="All Containers">All Containers</option>${allRefs.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}`;
+          refSelect.value = curRef;
+        }
+
+        if (truckSelect) {
+          const curTruck = truckSelect.value || "All Trucks";
+          const allTrucks = curTruck !== "All Trucks" && !trucks.includes(curTruck) ? [...trucks, curTruck] : trucks;
+          truckSelect.innerHTML = `<option value="All Trucks">All Trucks</option>${allTrucks.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("")}`;
+          truckSelect.value = curTruck;
+        }
+
+        if (sizeSelect) {
+          const curSize = sizeSelect.value || "All Sizes";
+          const allSizesList = curSize !== "All Sizes" && !sizes.includes(curSize) ? [...sizes, curSize] : sizes;
+          sizeSelect.innerHTML = `<option value="All Sizes">All Sizes</option>${allSizesList.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}`;
+          sizeSelect.value = curSize;
+        }
       });
     }
 
@@ -3771,6 +4074,16 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return total + amount;
       }, 0);
       bookingTotal.textContent = `PKR ${money(filteredTotalAmount)}`;
+      const filteredTotalPnL = bookings.reduce((total, item) => {
+        const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
+        const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
+        return total + (netProfitLoss != null ? Number(netProfitLoss) : 0);
+      }, 0);
+      if (bookingTotalPnl) {
+        bookingTotalPnl.textContent = `PKR ${money(filteredTotalPnL)}`;
+        bookingTotalPnl.classList.toggle("positive", filteredTotalPnL >= 0);
+        bookingTotalPnl.classList.toggle("negative", filteredTotalPnL < 0);
+      }
 
       if (!bookings.length) {
         body.innerHTML = `
@@ -4029,7 +4342,37 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       });
 
       brokerRows.addEventListener("input", updateBrokerSummary);
-      brokerRows.addEventListener("change", updateBrokerSummary);
+      brokerRows.addEventListener("change", (event) => {
+        if (event.target && event.target.name === "brokerContainerRef") {
+          const row = event.target.closest("[data-broker-row]");
+          if (row) {
+            const selectedRef = event.target.value;
+            const truckSelect = row.querySelector("[name='brokerTruckNo']");
+            const sizeSelect = row.querySelector("[name='brokerContainerSize']");
+            if (selectedRef && selectedRef !== "All Containers") {
+              const matchedLine = collectContainerLines().find((l) => String(l.containerNo || "").trim() === selectedRef);
+              if (matchedLine) {
+                if (truckSelect && matchedLine.truckNo) {
+                  if (!Array.from(truckSelect.options).some((o) => o.value === matchedLine.truckNo)) {
+                    truckSelect.add(new Option(matchedLine.truckNo, matchedLine.truckNo));
+                  }
+                  truckSelect.value = matchedLine.truckNo;
+                }
+                if (sizeSelect && matchedLine.size) {
+                  if (!Array.from(sizeSelect.options).some((o) => o.value === matchedLine.size)) {
+                    sizeSelect.add(new Option(matchedLine.size, matchedLine.size));
+                  }
+                  sizeSelect.value = matchedLine.size;
+                }
+              }
+            } else if (selectedRef === "All Containers") {
+              if (truckSelect) truckSelect.value = "All Trucks";
+              if (sizeSelect) sizeSelect.value = "All Sizes";
+            }
+          }
+        }
+        updateBrokerSummary();
+      });
     }
 
     form.addEventListener("input", (event) => {
@@ -4598,19 +4941,26 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       debitBookings.forEach((item) => {
         const customer = String(item.customer || "").trim() || "Unknown Customer";
         const pendingAmount = Number(item.receivableAmount || calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority).receivableAmount || 0);
+        const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
+        const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
         if (!grouped.has(customer)) {
           grouped.set(customer, {
             customer,
             bookings: [],
-            totalReceivable: 0
+            totalReceivable: 0,
+            totalPnL: 0
           });
         }
         const entry = grouped.get(customer);
         entry.bookings.push({
           ...item,
-          computedReceivable: pendingAmount
+          computedReceivable: pendingAmount,
+          netProfitLoss
         });
         entry.totalReceivable += (Number.isFinite(pendingAmount) ? pendingAmount : 0);
+        if (netProfitLoss != null && Number.isFinite(netProfitLoss)) {
+          entry.totalPnL += netProfitLoss;
+        }
       });
 
       const customerGroups = [...grouped.values()];
@@ -4628,10 +4978,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       });
 
       const grandTotal = customerGroups.reduce((sum, g) => sum + g.totalReceivable, 0);
+      const grandTotalPnL = customerGroups.reduce((sum, g) => sum + g.totalPnL, 0);
       const totalBookingsCount = customerGroups.reduce((sum, g) => sum + g.bookings.length, 0);
 
       if (totalElement) {
         totalElement.textContent = `PKR ${money(grandTotal)}`;
+      }
+      const totalPnLElement = document.querySelector("[data-summary-total-pl]");
+      if (totalPnLElement) {
+        totalPnLElement.textContent = `PKR ${money(grandTotalPnL)}`;
+        totalPnLElement.classList.toggle("positive", grandTotalPnL >= 0);
+        totalPnLElement.classList.toggle("negative", grandTotalPnL < 0);
       }
       countElement.textContent = `${customerGroups.length} customer(s) • ${totalBookingsCount} booking(s)`;
 
@@ -4660,6 +5017,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <td>${money(salesTaxVal)}</td>
             <td>${money(item.totalAmount || tax.totalAmount)}</td>
             <td>${money(item.computedReceivable)}</td>
+            <td>${item.netProfitLoss == null ? "-" : `<span class="badge ${item.netProfitLoss < 0 ? "bad" : "good"}">${money(item.netProfitLoss)}</span>`}</td>
           </tr>
         `;
         }).join("");
@@ -4702,6 +5060,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                     <th>15% Sales Tax</th>
                     <th>Total Amount</th>
                     <th>Receivable Amount</th>
+                    <th>P&amp;L</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4711,6 +5070,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                   <tr class="customer-box-foot">
                     <td colspan="7" class="foot-label">Total Receivable:</td>
                     <td class="foot-value">PKR ${money(group.totalReceivable)}</td>
+                    <td class="foot-value" style="font-weight:700;color:${group.totalPnL < 0 ? 'var(--red, #b91c1c)' : 'var(--green, #15803d)'};">P&amp;L: PKR ${money(group.totalPnL)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -5826,18 +6186,24 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       normalized.originalDocs = equipmentDocument.name;
 
       if (!editingId) {
-        normalized.id = getNextSequentialId(store.equipmentFleet, "EQP");
+        normalized.id = normalized.truckNo || getNextSequentialId(store.equipmentFleet, "EQP");
         store.equipmentFleet.unshift(normalized);
         setNotice(`${normalized.truckNo} added to the equipment register.`);
       } else {
-        const index = store.equipmentFleet.findIndex((item) => item.id === editingId);
+        const index = store.equipmentFleet.findIndex((item) => item.id === editingId || item.truckNo === editingId);
         if (index === -1) return;
         normalized.id = editingId;
         store.equipmentFleet[index] = normalized;
         setNotice(`${normalized.truckNo} equipment record updated.`);
       }
 
-      saveStore(store);
+      if (search) search.value = "";
+      try {
+        saveStore(store);
+      } catch (error) {
+        setNotice("Document is too large for browser storage. Please select a smaller file.", true);
+        return;
+      }
       resetForm();
       render();
     });
@@ -5847,7 +6213,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const viewDocumentId = event.target.closest("[data-view-equipment-document]")?.dataset.viewEquipmentDocument;
       const editId = event.target.getAttribute("data-edit-equipment");
       if (downloadId) {
-        const item = store.equipmentFleet.find((entry) => entry.id === downloadId);
+        const item = store.equipmentFleet.find((entry) => entry.id === downloadId || entry.truckNo === downloadId);
         if (item) {
           try {
             await createRegisterPdf(
@@ -5863,11 +6229,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return;
       }
       if (viewDocumentId) {
-        const item = store.equipmentFleet.find((entry) => entry.id === viewDocumentId);
+        const item = store.equipmentFleet.find((entry) => entry.id === viewDocumentId || entry.truckNo === viewDocumentId);
         if (item?.documentData) openDocumentModal(item.documentData);
         return;
       }
-      if (editId) fillForm(store.equipmentFleet.find((item) => item.id === editId));
+      if (editId) fillForm(store.equipmentFleet.find((item) => item.id === editId || item.truckNo === editId));
     });
 
     closeDocumentModalButton?.addEventListener("click", closeDocumentModal);
@@ -5878,7 +6244,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (event.key === "Escape" && documentModal && !documentModal.hidden) closeDocumentModal();
     });
 
-    document.querySelector("[data-reset-equipment-form]").addEventListener("click", resetForm);
+    document.querySelector("[data-reset-equipment-form]").addEventListener("click", () => {
+      if (search) search.value = "";
+      resetForm();
+      render();
+    });
     if (search) search.addEventListener("input", render);
     resetForm();
     window.activePageRender = render;
@@ -5933,13 +6303,20 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       return [...numbers].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
     }
 
+    function getTrucksWithMaintenance() {
+      const numbers = new Set();
+      (store.maintenanceJobs || []).forEach((item) => numbers.add(String(item.truckNo || "").trim()));
+      return [...numbers].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+    }
+
     function populateTruckControls() {
       const selectedTruck = truckFilter?.value || "";
-      const options = getTruckNumbers();
-      if (truckOptions) truckOptions.innerHTML = options.map((truckNo) => `<option value="${escapeHtml(truckNo)}"></option>`).join("");
+      const formOptions = getTruckNumbers();
+      const filterOptions = getTrucksWithMaintenance();
+      if (truckOptions) truckOptions.innerHTML = formOptions.map((truckNo) => `<option value="${escapeHtml(truckNo)}"></option>`).join("");
       if (truckFilter) {
-        truckFilter.innerHTML = `<option value="">All Trucks</option>${options.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${escapeHtml(truckNo)}</option>`).join("")}`;
-        truckFilter.value = options.includes(selectedTruck) ? selectedTruck : "";
+        truckFilter.innerHTML = `<option value="">All Trucks</option>${filterOptions.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${escapeHtml(truckNo)}</option>`).join("")}`;
+        truckFilter.value = filterOptions.includes(selectedTruck) ? selectedTruck : "";
       }
     }
 
@@ -6170,6 +6547,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return;
       }
       const savedId = normalized.id;
+      if (truckFilter) truckFilter.value = "";
       resetForm();
       render();
       setNotice(`${savedId} saved successfully.`);
@@ -6202,7 +6580,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     truckFilter?.addEventListener("change", render);
     dateOrder?.addEventListener("change", render);
-    document.querySelector("[data-reset-maintenance-form]").addEventListener("click", resetForm);
+    document.querySelector("[data-reset-maintenance-form]").addEventListener("click", () => {
+      if (truckFilter) truckFilter.value = "";
+      resetForm();
+      render();
+    });
     closeImageModalButton.addEventListener("click", closeImageModal);
     imageModal.addEventListener("click", (event) => { if (event.target === imageModal) closeImageModal(); });
     addPageDocumentListener("keydown", (event) => { if (event.key === "Escape" && !imageModal.hidden) closeImageModal(); });

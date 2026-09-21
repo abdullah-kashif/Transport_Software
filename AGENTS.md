@@ -20,34 +20,34 @@
 
 | Module / Page | HTML File | `data-page` Attribute | Handler in `app.js` |
 | :--- | :--- | :--- | :--- |
-| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 1702) |
-| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 2876) |
-| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3053) |
-| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 3817) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 4296) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 4553) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 4553) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 4841) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 5125) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 5452) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 5678) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 5708) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 5956) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 6108) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 6108) |
+| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2014) |
+| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3414) |
+| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3591) |
+| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 4898) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5408) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 5665) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 5665) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 5953) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 6247) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 6586) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 6812) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 6842) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 7090) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 7242) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 7242) |
 
 ---
 
 ## 3. Core Engine Functions in `app.js`
 
-- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 143) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`.
-- **State Store**: `loadStore()` (~Line 153) & `saveStore(store, options)` (~Line 353).
-- **Audit Logging**: `collectAuditChanges()` (~Line 311), `appendAuditLog()` (~Line 293), `pruneActivityLogs()` (~Line 236).
-- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 447), `signInWithSupabase()` (~Line 478), `enforceSoftwareAccess(page)` (~Line 1731).
-- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2060), `calculateKhataSummary(account)` (~Line 2103).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 2331), `buildSummaryRecordPdf()` (~Line 2494), `createRegisterPdf()` (~Line 2273).
-- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 797), `syncOperationalStore()` (~Line 1148), `hydrateOperationalStore()` (~Line 1169).
-- **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 847) & `getPrivateDocumentUrl()` (~Line 616) to bucket `gtls-private-documents`.
+- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 144) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`.
+- **State Store**: `loadStore()` (~Line 154) & `saveStore(store, options)` (~Line 354).
+- **Audit Logging**: `collectAuditChanges()` (~Line 312), `appendAuditLog()` (~Line 294), `pruneActivityLogs()` (~Line 237).
+- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 448), `signInWithSupabase()` (~Line 479), `enforceSoftwareAccess(page)` (~Line 2043).
+- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2372), `calculateKhataSummary(account)` (~Line 2415).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 2643), `buildSummaryRecordPdf()` (~Line 2806), `createRegisterPdf()` (~Line 2585).
+- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 923), `syncOperationalStore()` (~Line 1274), `hydrateOperationalStore()` (~Line 1295).
+- **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 973) & `getPrivateDocumentUrl()` (~Line 673) to bucket `gtls-private-documents`.
 
 ---
 
@@ -60,6 +60,14 @@
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
 
 ## 5. Changelog
+
+- **2026-09-22**: Fixed Fleet Maintenance and Equipment record persistence and filter population:
+  1. Fleet Maintenance History filter dropdown (`[data-maintenance-truck-filter]`) now strictly populates only with truck numbers that actually have maintenance records (`getTrucksWithMaintenance()`), preventing empty-truck filter choices. The create/update form datalist (`#maintenance-trucks`) continues to suggest all fleet trucks (`getTruckNumbers()`).
+  2. Fixed transient record disappearance on save in Fleet Maintenance and Equipment & Handling Fleet: implemented non-destructive key-based merging in `hydrateOperationalStore` for `equipmentFleet`, `maintenanceJobs`, `truckExpenses`, and `employees` so background Supabase hydration never clears unsynced local records or image previews.
+  3. Form submit and clear form handlers in Fleet Maintenance automatically reset `truckFilter` to "All Trucks", ensuring newly submitted and existing records immediately display in the table.
+  4. Form submit and clear form handlers in Equipment automatically reset active search filtering and support flexible record matching by `id` or `truckNo`.
+
+- **2026-09-22**: Added `LCL` option to Container Size dropdown in Booking Form. Added dynamic `Truck No` and `Container Size` dropdowns to each Trucker/Broker row in `.broker-block` with automatic pre-selection of truck and size when a specific container reference is selected, and updated broker grid to 10 columns (min-width 1280px). Renamed `Broker P&L` column header to `P&L` in Booking Ledger table (`booking.html`) and broker form header. Added `Total P&L` to the summary bar in Booking Ledger (`booking.html`) and included `P&L` column in the filtered summary PDF export. In `ledger.html` (Booking Summary customer cards), added `P&L` column to the table, customer `Total P&L` to card footer, and grand total `Total P&L` to screen header. Resolved Supabase sync error (`Could not find the 'broker_entries' column of 'bookings' in the schema cache`) with defensive fallback in `saveBookingToSupabase` stripping `broker_entries`/`broker_lines` on retry, added `truck_no` and `container_size` to relational `booking_brokers` saves with defensive fallback, updated `MASTER_SUPABASE_SETUP.sql`, and provided migration script `supabase-booking-brokers-truck-size.sql`.
 
 - **2026-09-21**: Automatically derived container `unitPrice` from `road_haulage_charges / totalQuantity` when editing or loading bookings where container unit pricing was unpopulated or zero in the database. Container rows now populate with their exact proportional unit price upon edit instead of displaying 0 or blank, preventing form validation rejection and preserving Road Haulage Charges and tax calculations. Newly added container rows auto-suggest any shared existing unit price. Added defensive save fallback in `saveBookingToSupabase` for `booking_containers` if DB columns are missing, and updated `MASTER_SUPABASE_SETUP.sql` with `quantity` and `unit_price` columns.
 

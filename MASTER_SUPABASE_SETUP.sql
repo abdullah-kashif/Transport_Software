@@ -9,6 +9,9 @@ alter table public.employees add column if not exists image_path text;
 alter table public.booking_containers add column if not exists quantity numeric;
 alter table public.booking_containers add column if not exists unit_price numeric;
 alter table public.booking_brokers add column if not exists container_ref text default 'all';
+alter table public.booking_brokers add column if not exists truck_no text;
+alter table public.booking_brokers add column if not exists container_size text;
+alter table public.bookings add column if not exists broker_entries jsonb default '[]'::jsonb;
 
 -- Allow authenticated users with the matching module access to persist and
 -- reload Equipment & Handling Fleet and Fleet Maintenance records.
