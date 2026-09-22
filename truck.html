@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Truck Details</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="alternate icon" href="favicon.ico" />
   <link rel="stylesheet" href="styles.css?v=20260902-1" />
 </head>
 <body data-page="truck">
@@ -45,7 +47,7 @@
         <form data-truck-trip-form class="form-grid">
           <div class="field full"><h3>Import Details</h3></div>
           <div class="field quarter"><label>Import Truck Registration No</label><input name="truckNo" placeholder="Example: JW-5477" required /></div>
-          <div class="field quarter"><label>Date</label><input name="date" type="date" required /></div>
+          <div class="field quarter"><label>Import Load Date</label><input name="date" type="date" required /></div>
           <div class="field quarter"><label>Customer / Payer</label><input name="customer" placeholder="Customer Name" required /></div>
           <div class="field quarter"><label>Origin</label><input name="origin" placeholder="Origin" /></div>
           <div class="field quarter"><label>Destination</label><input name="destination" placeholder="Destination" /></div>
@@ -64,21 +66,29 @@
           <div class="field quarter"><label>MTY Payment Received Date</label><input name="mtyPaymentDate" type="date" /></div>
           <div class="field quarter"><label>MTY Payment Status</label><select name="mtyPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
           <div class="field full"><label>Import Remarks</label><textarea name="importRemarks" placeholder="Import remarks..."></textarea></div>
+
           <div class="field full"><h3>Export Details</h3></div>
-          <div class="field quarter"><label>Export Load Date</label><input name="exportLoadDate" type="date" /></div>
           <div class="field quarter"><label>Export Truck Registration No</label><input name="exportTruckNo" placeholder="Example: JW-5477" /></div>
-          <div class="field quarter"><label>Export - Broker</label><input name="exportBroker" placeholder="Broker / Contact" /></div>
-          <div class="field quarter"><label>Export Freight</label><input name="exportFreight" type="number" placeholder="0" /></div>
-          <div class="field quarter"><label>Broker Commission</label><input name="exportBrokerCommission" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>Export Load Date</label><input name="exportLoadDate" type="date" /></div>
+          <div class="field quarter"><label>Customer / Payer</label><input name="exportCustomer" placeholder="Customer Name" /></div>
           <div class="field quarter"><label>Origin</label><input name="exportOrigin" placeholder="Origin" /></div>
           <div class="field quarter"><label>Destination</label><input name="exportDestination" placeholder="Destination" /></div>
           <div class="field quarter"><label>Size</label><input name="exportSize" placeholder="1x40 / 1x20" /></div>
           <div class="field quarter"><label>Weight</label><input name="exportWeight" placeholder="Weight" /></div>
+          <div class="field quarter"><label>Cargo Description</label><input name="exportCargoDescription" placeholder="Description" /></div>
+          <div class="field quarter"><label>MTY Box Freight</label><input name="exportMtyBoxFreight" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>MTY Broker</label><input name="exportMtyBroker" placeholder="Broker / Contact" /></div>
+          <div class="field quarter"><label>Export Freight</label><input name="exportFreight" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>Broker Commission</label><input name="exportBrokerCommission" type="number" placeholder="0" /></div>
+          <div class="field quarter"><label>Export - Broker</label><input name="exportBroker" placeholder="Broker / Contact" /></div>
           <div class="field quarter"><label>Export Receivable Amount</label><input name="exportReceivedAmount" type="text" readonly /></div>
-          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="exportChequeDetails" placeholder="Instrument Details" /></div>
+          <div class="field quarter"><label>Cheque / Instrument Details</label><input name="exportChequeDetails" placeholder="IBFT / Cheque No" /></div>
           <div class="field quarter"><label>Payment Received Date</label><input name="exportPaymentDate" type="date" /></div>
           <div class="field quarter"><label>Payment Status</label><select name="exportPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
+          <div class="field quarter"><label>MTY Payment Received Date</label><input name="exportMtyPaymentDate" type="date" /></div>
+          <div class="field quarter"><label>MTY Payment Status</label><select name="exportMtyPaymentStatus"><option selected>Awaited</option><option>Credit</option></select></div>
           <div class="field full"><label>Export Remarks</label><textarea name="exportRemarks" placeholder="Export remarks..."></textarea></div>
+
           <div class="field quarter"><label>Truck Details Image</label><div class="maintenance-image-field"><input name="tripImageFile" type="file" accept="image/*" data-truck-image-input /><button class="maintenance-image-remove" type="button" data-remove-truck-image hidden aria-label="Remove selected image" title="Remove image">&times;</button></div><div class="maintenance-image-preview" data-truck-image-preview hidden></div></div>
           <div class="field quarter"><label>Grand Total</label><input name="grandTotal" type="text" readonly /></div>
           <div class="field quarter"><label>Round Trip Expense</label><input name="roundTripExpense" type="number" value="0" min="0" /></div>
@@ -90,7 +100,7 @@
       <section class="screen">
         <div class="screen-head"><div><h3>Truck Trip Ledger</h3></div><div class="ledger-filter"><div class="ledger-total" aria-live="polite"><span>P&amp;L</span><strong data-truck-ledger-profit-loss>PKR 0</strong></div><div class="ledger-filter-control"><label for="truck-customer-filter">Truck No</label><select id="truck-customer-filter" data-truck-customer-filter><option value="">All Trucks</option></select></div><div class="ledger-filter-control"><label for="truck-job-sort">Job Order</label><select id="truck-job-sort" data-truck-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div><span class="ledger-count" data-truck-trip-count>0 record(s)</span></div></div>
         <div class="table-wrap"><table class="ledger-table truck-trip-table"><thead><tr>
-          <th>S.No</th><th>Job No</th><th>Date</th><th>Import Truck Registration No</th><th>Origin</th><th>Destination</th><th>Customer/Payer</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Import Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export - Broker</th><th>Export Freight</th><th>Broker Commission</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Export Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Export Payment Status</th><th>Export Remarks</th><th>Grand Total</th><th>Round Trip Expense</th><th>P&amp;L</th><th>Image</th><th>Actions</th>
+          <th>S.No</th><th>Job No</th><th>Import Load Date</th><th>Import Truck Registration No</th><th>Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Import Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Export Freight</th><th>Broker Commission</th><th>Export - Broker</th><th>Export Receivable Amount</th><th>Cheque / Instrument Details</th><th>Payment Received Date</th><th>Export Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Export Remarks</th><th>Grand Total</th><th>Round Trip Expense</th><th>P&amp;L</th><th>Image</th><th>Actions</th>
         </tr></thead><tbody data-truck-trip-rows></tbody></table></div>
       </section>
     </main>
@@ -106,4 +116,3 @@
 <script src="app.js?v=20260902-1"></script>
 </body>
 </html>
-

@@ -61,6 +61,15 @@
 
 ## 5. Changelog
 
+- **2026-09-22**: Truck Details Symmetrical Export Fields & Auto-Registration Sync:
+  1. Achieved 1-to-1 parity between Import Details and Export Details in `truck.html` and `app.js`. Renamed Import Date to `Import Load Date` in matching symmetry with `Export Load Date` across the form and table headers. Added the missing 6 Export fields (`exportCustomer`, `exportCargoDescription`, `exportMtyBoxFreight`, `exportMtyBroker`, `exportMtyPaymentDate`, `exportMtyPaymentStatus`) in identical matching sequence.
+  2. Implemented real-time auto-population from `Import Truck Registration No` (`truckNo`) to `Export Truck Registration No` (`exportTruckNo`), preserving manual overrides if the user changes export truck registration.
+  3. Updated `calculateTruckTripFinancials`, `calculateTrip`, and `numberFields` to integrate `exportMtyBoxFreight` ($\text{Grand Total} = \text{Import Receivable} + \text{Export Receivable} + \text{Import MTY} + \text{Export MTY}$).
+  4. Updated Supabase sync (`syncTruckJobs`) to persist all 6 new fields into `public.truck_jobs` with automated defensive fallback stripping new columns on schema cache error, updated `hydrateOperationalStore` with safe fallbacks, and expanded `truck.html` table header and body rendering to 47 symmetrical columns.
+  5. Guaranteed 100% backward compatibility for all historical records in `fillForm` with safe fallbacks when editing older trips. Provided SQL migration `supabase-truck-jobs-export-fields.sql` and updated `MASTER_SUPABASE_SETUP.sql`.
+
+- **2026-09-22**: Designed and added custom GTLS Transport brand favicons (`favicon.svg` and `favicon.ico`) featuring a sleek, modern commercial freight truck & cargo container in GTLS navy (`#18304d`) and amber copper (`#c56b2d`). Linked across all 16 HTML pages to replace the browser's default world/globe icon in browser tabs.
+
 - **2026-09-22**: Enforced mandatory validation for `Payment Received Date *` and `Cheque Number *` in the main Booking Form (`booking.html` / `app.js`). In Trucker/Broker rows, strictly kept `Amount`, `Payment/Cheque/IBFT`, and `Payment Date` (along with `Bilty`) as optional inputs, while `Trucker/Broker *` name, `Payment Received Date *`, and `Cheque Number *` are strictly required with `.required-star` visual indicators and automated validation highlighting.
 
 - **2026-09-22**: Booking Ledger layout & sorting redesign:

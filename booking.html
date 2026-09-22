@@ -5,6 +5,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Booking Form</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="alternate icon" href="favicon.ico" />
   <link rel="stylesheet" href="styles.css?v=20260922-3" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
@@ -86,16 +88,20 @@
               </button>
             </div>
           </div>
-          <div class="field quarter"><label>BL No <span class="required-star">*</span></label><input name="blNo" placeholder="Example: ONEYSINE22550700" required /></div>
-          <div class="field quarter"><label>NTN <span class="required-star">*</span></label><input name="gatePass" type="text"
-              placeholder="Example: 1234567-8" required /></div>
-          <div class="field quarter"><label>Customer / Payer <span class="required-star">*</span></label><input name="customer" placeholder="Customer Name"
-              required /></div>
-          <div class="field quarter"><label>Consignee Address <span class="required-star">*</span></label><input name="consignee"
-              placeholder="Consignee Address" required /></div>
-          <div class="field quarter"><label>Route <span class="required-star">*</span></label><input name="route" placeholder="Example: Karachi to Lahore" required /></div>
-          <div class="field quarter"><label>Origin <span class="required-star">*</span></label><input name="origin" placeholder="Origin Location" required /></div>
-          <div class="field quarter"><label>Destination <span class="required-star">*</span></label><input name="destination" placeholder="Destination Location" required />
+          <div class="field quarter"><label>BL No <span class="required-star">*</span></label><input name="blNo"
+              placeholder="Example: ONEYSINE22550700" required /></div>
+          <div class="field quarter"><label>NTN <span class="required-star">*</span></label><input name="gatePass"
+              type="text" placeholder="Example: 1234567-8" required /></div>
+          <div class="field quarter"><label>Customer / Payer <span class="required-star">*</span></label><input
+              name="customer" placeholder="Customer Name" required /></div>
+          <div class="field quarter"><label>Consignee Address <span class="required-star">*</span></label><input
+              name="consignee" placeholder="Consignee Address" required /></div>
+          <div class="field quarter"><label>Route <span class="required-star">*</span></label><input name="route"
+              placeholder="Example: Karachi to Lahore" required /></div>
+          <div class="field quarter"><label>Origin <span class="required-star">*</span></label><input name="origin"
+              placeholder="Origin Location" required /></div>
+          <div class="field quarter"><label>Destination <span class="required-star">*</span></label><input
+              name="destination" placeholder="Destination Location" required />
           </div>
           <div class="field quarter">
             <label>Category <span class="required-star">*</span></label>
@@ -110,9 +116,10 @@
               <option>Crane Lifter Services</option>
             </select>
           </div>
-          <div class="field half"><label>Goods Type <span class="required-star">*</span></label><input name="goodsType" placeholder="Goods Description" required /></div>
-          <div class="field quarter"><label>Road Haulage Charges</label><input name="rate" type="number"
-              placeholder="0" required min="1" readonly /></div>
+          <div class="field half"><label>Goods Type <span class="required-star">*</span></label><input name="goodsType"
+              placeholder="Goods Description" required /></div>
+          <div class="field quarter"><label>Road Haulage Charges</label><input name="rate" type="number" placeholder="0"
+              required min="1" readonly /></div>
           <div class="field quarter">
             <label>Sales Tax Authority <span class="required-star">*</span></label>
             <select name="salesTaxAuthority" required>
@@ -132,27 +139,29 @@
               <option value="0">0% Withheld (100% by us)</option>
             </select>
           </div>
-          <div class="field quarter"><label>Detention <span class="required-star">*</span></label><input name="detention" type="number" inputmode="decimal" step="any"
-              class="manual-number-input" value="0" required /></div>
+          <div class="field quarter"><label>Detention <span class="required-star">*</span></label><input
+              name="detention" type="number" inputmode="decimal" step="any" class="manual-number-input" value="0"
+              required /></div>
           <div class="field quarter"><label>15% Sales Tax</label><input name="salesTaxAmount" type="text" value="0"
               readonly /></div>
           <div class="field quarter"><label>Total Amount</label><input name="totalAmount" type="text" value="0"
               readonly /></div>
-          <div class="field quarter"><label>Income Tax 7%</label><input name="incomeTaxAmount" type="text"
-              value="0" readonly /></div>
-          <div class="field quarter"><label data-label-st-withheld>Sale Tax With Held 20%</label><input name="salesTaxWithheldAmount"
-              type="text" value="0" readonly /></div>
-          <div class="field quarter"><label data-label-st-by-us>Sale Tax 80% by us</label><input name="salesTaxByUsAmount" type="text"
-              value="0" readonly /></div>
+          <div class="field quarter"><label>Income Tax 7%</label><input name="incomeTaxAmount" type="text" value="0"
+              readonly /></div>
+          <div class="field quarter"><label data-label-st-withheld>Sale Tax With Held 20%</label><input
+              name="salesTaxWithheldAmount" type="text" value="0" readonly /></div>
+          <div class="field quarter"><label data-label-st-by-us>Sale Tax 80% by us</label><input
+              name="salesTaxByUsAmount" type="text" value="0" readonly /></div>
           <div class="field quarter"><label>Receivable Amount</label><input name="receivableAmount" type="text"
               value="0" readonly /></div>
-          <div class="field quarter"><label>Payment Term <span class="required-star">*</span></label><input name="paymentTerm" value="30 Days"
-              placeholder="Example: 30 Days" required /></div>
-          <div class="field quarter"><label>Payment Received Date <span class="required-star">*</span></label><input name="paymentReceivedDate"
-              type="date" required /></div>
-          <div class="field quarter"><label>Cheque Number <span class="required-star">*</span></label><input name="chequeNumber"
-              placeholder="Example: 1005782261" required /></div>
-          <div class="field quarter"><label>Status <span class="required-star">*</span></label><select name="status" required>
+          <div class="field quarter"><label>Payment Term <span class="required-star">*</span></label><input
+              name="paymentTerm" value="30 Days" placeholder="Example: 30 Days" required /></div>
+          <div class="field quarter"><label>Payment Received Date <span class="required-star">*</span></label><input
+              name="paymentReceivedDate" type="date" required /></div>
+          <div class="field quarter"><label>Cheque Number <span class="required-star">*</span></label><input
+              name="chequeNumber" placeholder="Example: 1005782261" required /></div>
+          <div class="field quarter"><label>Status <span class="required-star">*</span></label><select name="status"
+              required>
               <option>Delivered</option>
               <option>In Transit</option>
             </select></div>
@@ -203,14 +212,15 @@
               <div class="broker-footer">
                 <button class="btn" type="button" data-add-broker-row>Add Broker Row</button>
                 <div class="broker-summary" aria-live="polite">
-                  <span>Total Broker Amount: <strong data-total-broker-amount data-broker-total-amount>PKR 0</strong></span>
+                  <span>Total Broker Amount: <strong data-total-broker-amount data-broker-total-amount>PKR
+                      0</strong></span>
                   <span>Net P&amp;L: <strong data-booking-net-profit-loss data-broker-total-pl>-</strong></span>
                 </div>
               </div>
             </div>
           </div>
-          <div class="field full"><label>Remarks <span class="required-star">*</span></label><textarea
-              name="remarks" placeholder="Enter booking remarks..." required></textarea></div>
+          <div class="field full"><label>Remarks <span class="required-star">*</span></label><textarea name="remarks"
+              placeholder="Enter booking remarks..." required></textarea></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Booking</button>
             <button class="btn" type="button" data-reset-form>Clear Form</button>
@@ -264,7 +274,8 @@
               <strong data-booking-total-pnl>PKR 0</strong>
             </div>
             <span class="ledger-count" data-booking-count>0 record(s)</span>
-            <button class="btn primary booking-summary-download" type="button" data-download-booking-summary disabled>Download Summary</button>
+            <button class="btn primary booking-summary-download" type="button" data-download-booking-summary
+              disabled>Download Summary</button>
           </div>
         </div>
         <div class="table-wrap">

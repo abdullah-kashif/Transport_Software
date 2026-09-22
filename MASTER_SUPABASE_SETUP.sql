@@ -4,6 +4,12 @@
 -- Never paste a service-role key into this file or into frontend code.
 
 alter table public.truck_jobs add column if not exists image_path text;
+alter table public.truck_jobs add column if not exists export_customer text;
+alter table public.truck_jobs add column if not exists export_cargo_description text;
+alter table public.truck_jobs add column if not exists export_mty_box_freight numeric default 0;
+alter table public.truck_jobs add column if not exists export_mty_broker text;
+alter table public.truck_jobs add column if not exists export_mty_payment_date date;
+alter table public.truck_jobs add column if not exists export_mty_payment_status text default 'Awaited';
 alter table public.equipment_fleet add column if not exists original_documents_path text;
 alter table public.employees add column if not exists image_path text;
 alter table public.booking_containers add column if not exists quantity numeric;

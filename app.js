@@ -1118,18 +1118,45 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         import_payment_status: item.importPaymentStatus === "Credit" ? "Credit" : "Awaited",
         mty_payment_date: formatIsoDate(item.mtyPaymentDate) || null, mty_payment_status: item.mtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
         import_remarks: item.importRemarks || null, export_load_date: formatIsoDate(item.exportLoadDate) || null,
-        export_truck_no: item.exportTruckNo || null, export_broker: item.exportBroker || null,
+        export_truck_no: item.exportTruckNo || null,
+        export_customer: item.exportCustomer || null,
+        export_cargo_description: item.exportCargoDescription || null,
+        export_mty_box_freight: Number(item.exportMtyBoxFreight || 0),
+        export_mty_broker: item.exportMtyBroker || null,
+        export_broker: item.exportBroker || null,
         export_freight: Number(item.exportFreight || 0), export_broker_commission: Number(item.exportBrokerCommission || 0),
         export_origin: item.exportOrigin || null, export_destination: item.exportDestination || null,
         export_size: item.exportSize || null, export_weight: item.exportWeight || null,
         export_receivable_amount: Number(item.exportReceivedAmount || 0), export_cheque_details: item.exportChequeDetails || null,
         export_payment_date: formatIsoDate(item.exportPaymentDate) || null, export_payment_status: item.exportPaymentStatus === "Credit" ? "Credit" : "Awaited",
+        export_mty_payment_date: formatIsoDate(item.exportMtyPaymentDate) || null,
+        export_mty_payment_status: item.exportMtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
         export_remarks: item.exportRemarks || null, grand_total: Number(item.grandTotal || 0),
         round_trip_expense: Number(item.roundTripExpense || 0), profit_loss: Number(item.profitLoss || 0), image_path: imagePath || null,
         updated_at: new Date().toISOString()
       });
     }
-    await syncRows("truck_jobs", "job_no", rows);
+    try {
+      await syncRows("truck_jobs", "job_no", rows);
+    } catch (error) {
+      const msg = String(error?.message || error?.details || "");
+      if (msg.includes("export_customer") || msg.includes("export_mty") || msg.includes("export_cargo_description") || error?.code === "PGRST204" || error?.code === "42703") {
+        console.warn("Retrying syncTruckJobs without new export columns because schema cache / columns are not yet updated:", error.message);
+        const fallbackRows = rows.map((r) => {
+          const copy = { ...r };
+          delete copy.export_customer;
+          delete copy.export_cargo_description;
+          delete copy.export_mty_box_freight;
+          delete copy.export_mty_broker;
+          delete copy.export_mty_payment_date;
+          delete copy.export_mty_payment_status;
+          return copy;
+        });
+        await syncRows("truck_jobs", "job_no", fallbackRows);
+      } else {
+        throw error;
+      }
+    }
   }
 
   async function syncEquipment(records) {
@@ -1348,11 +1375,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
             importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
             importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
-            importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "", exportBroker: r.export_broker || "",
+            importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "",
+            exportCustomer: r.export_customer || local.exportCustomer || "",
+            exportCargoDescription: r.export_cargo_description || local.exportCargoDescription || "",
+            exportMtyBoxFreight: Number(r.export_mty_box_freight !== undefined && r.export_mty_box_freight !== null ? r.export_mty_box_freight : (local.exportMtyBoxFreight || 0)),
+            exportMtyBroker: r.export_mty_broker || local.exportMtyBroker || "",
+            exportBroker: r.export_broker || "",
             exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
             exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
             exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
-            exportPaymentStatus: r.export_payment_status, exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
+            exportPaymentStatus: r.export_payment_status,
+            exportMtyPaymentDate: r.export_mty_payment_date || local.exportMtyPaymentDate || "",
+            exportMtyPaymentStatus: r.export_mty_payment_status || local.exportMtyPaymentStatus || "Awaited",
+            exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
             roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || local.imagePath || "",
             image: local.image || getCachedSignedUrl(r.image_path)
           });
@@ -1371,11 +1406,19 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
             importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
             importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
-            importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "", exportBroker: r.export_broker || "",
+            importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "",
+            exportCustomer: r.export_customer || "",
+            exportCargoDescription: r.export_cargo_description || "",
+            exportMtyBoxFreight: Number(r.export_mty_box_freight || 0),
+            exportMtyBroker: r.export_mty_broker || "",
+            exportBroker: r.export_broker || "",
             exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
             exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
             exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
-            exportPaymentStatus: r.export_payment_status, exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
+            exportPaymentStatus: r.export_payment_status,
+            exportMtyPaymentDate: r.export_mty_payment_date || "",
+            exportMtyPaymentStatus: r.export_mty_payment_status || "Awaited",
+            exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
             roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
             image: getCachedSignedUrl(r.image_path)
           });
@@ -5332,10 +5375,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const details = isImport ? {
       date: trip.date,
       truckNo: trip.truckNo,
+      customer: trip.customer,
       origin: trip.origin,
       destination: trip.destination,
       size: trip.size,
       weight: trip.weight,
+      cargoDescription: trip.cargoDescription,
+      mtyBoxFreight: trip.mtyBoxFreight,
+      mtyBroker: trip.mtyBroker,
       freight: trip.importFreight,
       broker: trip.importBroker,
       commission: trip.importBrokerCommission,
@@ -5344,10 +5391,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     } : {
       date: trip.exportLoadDate,
       truckNo: trip.exportTruckNo || trip.truckNo,
+      customer: trip.exportCustomer || trip.customer,
       origin: trip.exportOrigin,
       destination: trip.exportDestination,
       size: trip.exportSize,
       weight: trip.exportWeight,
+      cargoDescription: trip.exportCargoDescription || trip.cargoDescription,
+      mtyBoxFreight: trip.exportMtyBoxFreight,
+      mtyBroker: trip.exportMtyBroker,
       freight: trip.exportFreight,
       broker: trip.exportBroker,
       commission: trip.exportBrokerCommission,
@@ -5370,11 +5421,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       startY: 226,
       theme: "grid",
       body: [
-        ["Date", details.date ? formatShortDate(details.date) : "-"],
+        [isImport ? "Import Load Date" : "Export Load Date", details.date ? formatShortDate(details.date) : "-"],
         ["Truck Registration No", text(details.truckNo || "-")],
+        ["Customer / Payer", text(details.customer || "-")],
         ["Route", `${text(details.origin || "-")} to ${text(details.destination || "-")}`],
         ["Size / Weight", `${text(details.size || "-")} / ${text(details.weight || "-")}`],
-        ["Cargo Description", text(trip.cargoDescription || "-")],
+        ["Cargo Description", text(details.cargoDescription || "-")],
         ["Broker", text(details.broker || "-")],
         ["Freight", money(details.freight)],
         ["Broker Commission", money(details.commission)],
@@ -5405,14 +5457,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
 
     const safeJobNo = safePdfFileName(trip.jobNo || "truck");
-    const clientName = safePdfFileName(trip.customer || trip.importBroker || trip.exportBroker || "client");
+    const clientName = safePdfFileName(details.customer || details.broker || "client");
     pdf.save(`${clientName}_${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
   }
 
   function calculateTruckTripFinancials(trip = {}) {
     const importReceivable = Number(trip.importFreight || 0) - Number(trip.importBrokerCommission || 0);
     const exportReceivable = Number(trip.exportFreight || 0) - Number(trip.exportBrokerCommission || 0);
-    const grandTotal = importReceivable + exportReceivable + Number(trip.mtyBoxFreight || 0);
+    const grandTotal = importReceivable + exportReceivable + Number(trip.mtyBoxFreight || 0) + Number(trip.exportMtyBoxFreight || 0);
     const roundTripExpense = Number(trip.roundTripExpense || 0);
     return {
       grandTotal,
@@ -5440,23 +5492,24 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     let tripImageData = "";
     let tripImagePromise = Promise.resolve("");
 
-    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount", "grandTotal", "roundTripExpense", "profitLoss"];
+    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "profitLoss"];
 
     function calculateTrip() {
-      const importReceived = Number(form.elements.importFreight.value || 0) - Number(form.elements.importBrokerCommission.value || 0);
-      const exportReceived = Number(form.elements.exportFreight.value || 0) - Number(form.elements.exportBrokerCommission.value || 0);
+      const importReceived = Number(form.elements.importFreight?.value || 0) - Number(form.elements.importBrokerCommission?.value || 0);
+      const exportReceived = Number(form.elements.exportFreight?.value || 0) - Number(form.elements.exportBrokerCommission?.value || 0);
       const financials = calculateTruckTripFinancials({
-        importFreight: form.elements.importFreight.value,
-        importBrokerCommission: form.elements.importBrokerCommission.value,
-        exportFreight: form.elements.exportFreight.value,
-        exportBrokerCommission: form.elements.exportBrokerCommission.value,
-        mtyBoxFreight: form.elements.mtyBoxFreight.value,
-        roundTripExpense: form.elements.roundTripExpense.value
+        importFreight: form.elements.importFreight?.value,
+        importBrokerCommission: form.elements.importBrokerCommission?.value,
+        exportFreight: form.elements.exportFreight?.value,
+        exportBrokerCommission: form.elements.exportBrokerCommission?.value,
+        mtyBoxFreight: form.elements.mtyBoxFreight?.value,
+        exportMtyBoxFreight: form.elements.exportMtyBoxFreight?.value,
+        roundTripExpense: form.elements.roundTripExpense?.value
       });
-      form.elements.importReceivedAmount.value = String(importReceived);
-      form.elements.exportReceivedAmount.value = String(exportReceived);
-      form.elements.grandTotal.value = String(financials.grandTotal);
-      form.elements.profitLoss.value = String(financials.profitLoss);
+      if (form.elements.importReceivedAmount) form.elements.importReceivedAmount.value = String(importReceived);
+      if (form.elements.exportReceivedAmount) form.elements.exportReceivedAmount.value = String(exportReceived);
+      if (form.elements.grandTotal) form.elements.grandTotal.value = String(financials.grandTotal);
+      if (form.elements.profitLoss) form.elements.profitLoss.value = String(financials.profitLoss);
     }
 
     function getNextTruckJobNo() {
@@ -5467,17 +5520,34 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       return `Job-${highestJobNumber + 1}`;
     }
 
+    let exportTruckTouchedManually = false;
+    form.elements.exportTruckNo?.addEventListener("input", () => {
+      exportTruckTouchedManually = Boolean(form.elements.exportTruckNo.value.trim());
+    });
+    form.elements.truckNo?.addEventListener("input", () => {
+      if (!exportTruckTouchedManually && form.elements.exportTruckNo) {
+        form.elements.exportTruckNo.value = form.elements.truckNo.value;
+      }
+    });
+
     function resetForm() {
       form.reset();
       form.elements.date.value = getTodayIsoDate();
       if (form.elements.truckNo) form.elements.truckNo.value = "";
       if (form.elements.exportTruckNo) form.elements.exportTruckNo.value = "";
       if (form.elements.customer) form.elements.customer.value = "";
+      if (form.elements.exportCustomer) form.elements.exportCustomer.value = "";
+      if (form.elements.cargoDescription) form.elements.cargoDescription.value = "";
+      if (form.elements.exportCargoDescription) form.elements.exportCargoDescription.value = "";
+      if (form.elements.mtyBroker) form.elements.mtyBroker.value = "";
+      if (form.elements.exportMtyBroker) form.elements.exportMtyBroker.value = "";
       if (form.elements.importRemarks) form.elements.importRemarks.value = "";
       if (form.elements.exportRemarks) form.elements.exportRemarks.value = "";
       if (form.elements.importPaymentStatus) form.elements.importPaymentStatus.value = "Awaited";
       if (form.elements.mtyPaymentStatus) form.elements.mtyPaymentStatus.value = "Awaited";
       if (form.elements.exportPaymentStatus) form.elements.exportPaymentStatus.value = "Awaited";
+      if (form.elements.exportMtyPaymentStatus) form.elements.exportMtyPaymentStatus.value = "Awaited";
+      exportTruckTouchedManually = false;
       calculateTrip();
       if (imageInput) imageInput.value = "";
       setTripImage("");
@@ -5529,7 +5599,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="41">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="47">No truck trip records available yet.</td></tr>`;
         return;
       }
       body.innerHTML = rows.map((item, index) => {
@@ -5537,10 +5607,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         return `
         <tr>
           <td>${index + 1}</td><td>${text(item.jobNo)}</td><td>${formatShortDate(item.date)}</td><td>${text(item.truckNo)}</td>
-          <td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.customer)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
+          <td>${text(item.customer)}</td><td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
           <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
           <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.importRemarks || item.remarks || "-")}</td>
-          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
+          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportCustomer || item.customer || "-")}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${text(item.exportCargoDescription || item.cargoDescription || "-")}</td>
+          <td>${money(item.exportMtyBoxFreight || 0)}</td><td>${text(item.exportMtyBroker || "-")}</td>
+          <td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
           <td>${item.image ? `
             <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image">
               <img src="${escapeHtml(item.image)}" alt="Truck details attachment" />
@@ -5574,9 +5646,32 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     function fillForm(item) {
+      if (!item) return;
       Object.keys(item).forEach((key) => {
-        if (form.elements[key]) form.elements[key].value = item[key];
+        if (form.elements[key]) form.elements[key].value = item[key] !== null && item[key] !== undefined ? item[key] : "";
       });
+      if (form.elements.exportCustomer && !form.elements.exportCustomer.value) {
+        form.elements.exportCustomer.value = item.exportCustomer || item.customer || "";
+      }
+      if (form.elements.exportCargoDescription && !form.elements.exportCargoDescription.value) {
+        form.elements.exportCargoDescription.value = item.exportCargoDescription || item.cargoDescription || "";
+      }
+      if (form.elements.exportTruckNo && !form.elements.exportTruckNo.value) {
+        form.elements.exportTruckNo.value = item.exportTruckNo || item.truckNo || "";
+      }
+      if (form.elements.exportMtyBoxFreight && !form.elements.exportMtyBoxFreight.value) {
+        form.elements.exportMtyBoxFreight.value = item.exportMtyBoxFreight ? String(item.exportMtyBoxFreight) : "0";
+      }
+      if (form.elements.exportMtyBroker && !form.elements.exportMtyBroker.value) {
+        form.elements.exportMtyBroker.value = item.exportMtyBroker || "";
+      }
+      if (form.elements.exportMtyPaymentDate && !form.elements.exportMtyPaymentDate.value) {
+        form.elements.exportMtyPaymentDate.value = item.exportMtyPaymentDate || "";
+      }
+      if (form.elements.exportMtyPaymentStatus && !form.elements.exportMtyPaymentStatus.value) {
+        form.elements.exportMtyPaymentStatus.value = item.exportMtyPaymentStatus || "Awaited";
+      }
+      exportTruckTouchedManually = Boolean(item.exportTruckNo && item.exportTruckNo !== item.truckNo);
       calculateTrip();
       setTripImage(item.image || "");
       tripImagePromise = Promise.resolve(tripImageData);
@@ -5584,8 +5679,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       form.querySelector("[data-submit-label]").textContent = "Update Trip";
     }
 
-    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission", "roundTripExpense"].forEach((name) => {
-      form.elements[name].addEventListener("input", calculateTrip);
+    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission", "exportMtyBoxFreight", "roundTripExpense"].forEach((name) => {
+      form.elements[name]?.addEventListener("input", calculateTrip);
     });
 
     imageInput?.addEventListener("change", () => {
@@ -5705,9 +5800,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const importStatus = String(item.importPaymentStatus || "Awaited").trim().toLowerCase();
       const exportStatus = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase();
       const mtyStatus = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase();
+      const exportMtyStatus = String(item.exportMtyPaymentStatus || "Awaited").trim().toLowerCase();
       return importStatus === "credit"
         && exportStatus === "credit"
-        && mtyStatus === "credit";
+        && mtyStatus === "credit"
+        && (Number(item.exportMtyBoxFreight || 0) === 0 || exportMtyStatus === "credit");
     }
 
     function render() {
@@ -5726,7 +5823,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
       const impBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.importBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const expBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.exportBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-      const mtyBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.mtyBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const mtyBrokers = [...new Set(candidateTripsForBrokers.flatMap((item) => [
+        String(item.mtyBroker || "").trim(),
+        String(item.exportMtyBroker || "").trim()
+      ]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
       const prevImp = String(importBrokerFilter?.value || "").trim();
       const prevExp = String(exportBrokerFilter?.value || "").trim();
@@ -5774,7 +5874,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           if (!hasSpecificBroker) return true;
           const matchesImp = activeImpBroker && String(item.importBroker || "").trim() === activeImpBroker;
           const matchesExp = activeExpBroker && String(item.exportBroker || "").trim() === activeExpBroker;
-          const matchesMty = activeMtyBroker && String(item.mtyBroker || "").trim() === activeMtyBroker;
+          const matchesMty = activeMtyBroker && (
+            String(item.mtyBroker || "").trim() === activeMtyBroker ||
+            String(item.exportMtyBroker || "").trim() === activeMtyBroker
+          );
           return Boolean(matchesImp || matchesExp || matchesMty);
         })
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
@@ -5796,19 +5899,22 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         const rawExportReceivable = Number.isFinite(storedExportReceivable)
           ? storedExportReceivable
           : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
-        const rawMtyReceivable = Number(item.mtyBoxFreight || 0);
 
         const isImportCredit = String(item.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
         const isExportCredit = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-        const isMtyCredit = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+        const isImportMtyCredit = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+        const isExportMtyCredit = String(item.exportMtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
 
         const incImport = shouldIncludeLeg("Import", item.importBroker);
         const incExport = shouldIncludeLeg("Export", item.exportBroker);
-        const incMty = shouldIncludeLeg("MTY", item.mtyBroker);
+        const incImportMty = shouldIncludeLeg("MTY", item.mtyBroker);
+        const incExportMty = shouldIncludeLeg("MTY", item.exportMtyBroker);
 
         const importReceivable = incImport ? (isCompletedSummary ? rawImportReceivable : (isImportCredit ? 0 : rawImportReceivable)) : 0;
         const exportReceivable = incExport ? (isCompletedSummary ? rawExportReceivable : (isExportCredit ? 0 : rawExportReceivable)) : 0;
-        const mtyReceivable = incMty ? (isCompletedSummary ? rawMtyReceivable : (isMtyCredit ? 0 : rawMtyReceivable)) : 0;
+        const importMty = incImportMty ? (isCompletedSummary ? Number(item.mtyBoxFreight || 0) : (isImportMtyCredit ? 0 : Number(item.mtyBoxFreight || 0))) : 0;
+        const exportMty = incExportMty ? (isCompletedSummary ? Number(item.exportMtyBoxFreight || 0) : (isExportMtyCredit ? 0 : Number(item.exportMtyBoxFreight || 0))) : 0;
+        const mtyReceivable = importMty + exportMty;
 
         const financials = calculateTruckTripFinancials(item);
         const grandTotal = isCompletedSummary ? financials.grandTotal : (importReceivable + exportReceivable + mtyReceivable);
