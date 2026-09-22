@@ -61,15 +61,15 @@
         </div>
         <div class="ledger-filter broker-summary-filter">
           <div class="ledger-filter-control ledger-filter-search"><label for="broker-summary-search">General Filter</label><input id="broker-summary-search" type="search" placeholder="Search broker payments..." data-broker-summary-search /></div>
-          <div class="ledger-filter-control"><label for="broker-summary-status">Status</label><select id="broker-summary-status" data-broker-summary-status><option value="Payable" selected>Payable</option><option value="All">All</option></select></div>
-          <div class="ledger-filter-control"><label for="broker-summary-customer">Customer</label><select id="broker-summary-customer" data-broker-summary-customer><option value="">All Customers</option></select></div>
+          <div class="ledger-filter-control"><label for="broker-summary-status">Status</label><select id="broker-summary-status" data-broker-summary-status><option value="Payable" selected>Payable</option><option value="Paid">Paid</option><option value="All">All</option></select></div>
+          <div class="ledger-filter-control"><label for="broker-summary-broker">Trucker/Broker</label><select id="broker-summary-broker" data-broker-summary-broker data-broker-summary-customer><option value="">All Truckers/Brokers</option></select></div>
           <div class="ledger-filter-control"><label for="broker-summary-start">Start Date</label><input id="broker-summary-start" type="date" data-broker-summary-start /></div>
           <div class="ledger-filter-control"><label for="broker-summary-end">End Date</label><input id="broker-summary-end" type="date" data-broker-summary-end /></div>
           <div class="ledger-filter-control"><label for="broker-summary-sort">Date Order</label><select id="broker-summary-sort" data-broker-summary-sort><option value="desc">Descending (Newest First)</option><option value="asc">Ascending (Oldest First)</option></select></div>
         </div>
         <div class="table-wrap broker-summary-table-wrap">
           <table class="statement-table broker-summary-table">
-            <thead><tr><th>Booking No</th><th>Booking Date</th><th>Trucker/Broker</th><th>Container Ref</th><th>Payment/Cheque/IBFT</th><th>Payment Date</th><th>Broker P&amp;L</th><th>Action</th></tr></thead>
+            <thead><tr><th>Booking No</th><th>Booking Date</th><th>Trucker/Broker</th><th>Container No</th><th>Payment/Cheque/IBFT</th><th>Payment Date</th><th>Amount</th><th>Action</th></tr></thead>
             <tbody data-broker-summary-rows></tbody>
           </table>
         </div>

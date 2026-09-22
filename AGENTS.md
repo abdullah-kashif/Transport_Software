@@ -20,34 +20,34 @@
 
 | Module / Page | HTML File | `data-page` Attribute | Handler in `app.js` |
 | :--- | :--- | :--- | :--- |
-| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2014) |
-| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3414) |
-| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3591) |
-| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 4898) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5408) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 5665) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 5665) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 5953) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 6247) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 6586) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 6812) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 6842) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 7090) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 7242) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 7242) |
+| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2134) |
+| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3552) |
+| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3729) |
+| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5046) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5580) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 5912) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 5912) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 6211) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 6505) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 6844) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 7070) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 7100) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 7348) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 7500) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 7500) |
 
 ---
 
 ## 3. Core Engine Functions in `app.js`
 
-- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 144) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`.
-- **State Store**: `loadStore()` (~Line 154) & `saveStore(store, options)` (~Line 354).
-- **Audit Logging**: `collectAuditChanges()` (~Line 312), `appendAuditLog()` (~Line 294), `pruneActivityLogs()` (~Line 237).
-- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 448), `signInWithSupabase()` (~Line 479), `enforceSoftwareAccess(page)` (~Line 2043).
-- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2372), `calculateKhataSummary(account)` (~Line 2415).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 2643), `buildSummaryRecordPdf()` (~Line 2806), `createRegisterPdf()` (~Line 2585).
-- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 923), `syncOperationalStore()` (~Line 1274), `hydrateOperationalStore()` (~Line 1295).
-- **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 973) & `getPrivateDocumentUrl()` (~Line 673) to bucket `gtls-private-documents`.
+- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 164) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`.
+- **State Store**: `loadStore()` (~Line 174) & `saveStore(store, options)` (~Line 374).
+- **Audit Logging**: `collectAuditChanges()` (~Line 332), `appendAuditLog()` (~Line 314), `pruneActivityLogs()` (~Line 257).
+- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 468), `signInWithSupabase()` (~Line 499), `enforceSoftwareAccess(page)` (~Line 2163).
+- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2609), `calculateKhataSummary(account)` (~Line 2652), `calculateTruckTripFinancials(trip)` (~Line 5568).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 2904), `buildSummaryRecordPdf()` (~Line 3068), `createRegisterPdf()` (~Line 2846), `buildTruckDetailsInvoicePdf()` (~Line 5443).
+- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 954), `syncOperationalStore()` (~Line 1358), `hydrateOperationalStore()` (~Line 1379), `syncTruckJobs()` (~Line 1120).
+- **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
 
 ---
 
@@ -60,6 +60,40 @@
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
 
 ## 5. Changelog
+
+- **2026-09-22**: Truck Details Import/Export Symmetrical Fields, Detention Freight Integration & Invoice Display:
+  1. Added 5 symmetrical operational fields to both Import Details and Export Details: `Customer Collection`, `Paid Date`, `Cheque / IBFT`, `Detention`, and `Payment Term` in the Truck Details form (`truck.html`) and data model.
+  2. Updated financial calculations in `calculateTruckTripFinancials` and live `calculateTrip`:
+     - $\text{Import Receivable} = (\text{Import Freight} + \text{Import Detention}) - \text{Import Broker Commission}$
+     - $\text{Export Receivable} = (\text{Export Freight} + \text{Export Detention}) - \text{Export Broker Commission}$
+     - $\text{Grand Total} = \text{Import Receivable} + \text{Export Receivable} + \text{Import MTY} + \text{Export MTY}$
+     - $\text{P\&L} = \text{Grand Total} - \text{Round Trip Expense}$
+  3. Expanded the Truck Trip Ledger table in `truck.html` and `render()` in `app.js` to 53 columns, displaying `Detention`, `Payment Term`, `Customer Collection`, `Cheque / IBFT`, and `Paid Date` for both legs. Updated table min-width to 6800px with column border separators at columns 25 and 48.
+  4. Updated Trip Invoice PDF Generation (`buildTruckDetailsInvoicePdf`): dynamically includes `Detention` cell, computes and displays `Total Freight = Freight + Detention`, updates `Receivable Amount = Total Freight - Broker Commission`, and formats `Payment Term`, `Customer Collection`, `Cheque / IBFT`, and `Paid Date`.
+  5. Updated Supabase sync (`syncTruckJobs`) with defensive schema retry fallback, updated hydration (`hydrateOperationalStore`), updated `MASTER_SUPABASE_SETUP.sql`, and provided standalone SQL migration [`supabase-truck-detention-fields.sql`](file:///c:/Users/M.A%20COMPUTERS/Desktop/Transport_Software/supabase-truck-detention-fields.sql).
+
+- **2026-09-22**: Defensive File Input Value Setter Shim & Form Autocomplete:
+  1. Resolved third-party browser extension error (`Uncaught (in promise) jquery.js:2 InvalidStateError: Failed to set the 'value' property on 'HTMLInputElement'`) by adding an `HTMLInputElement.prototype.value` setter shim in `app.js` that intercepts and silently suppresses non-empty string assignments on `type="file"` inputs while allowing standard empty resets.
+  2. Added `autocomplete="off"` to forms and file inputs across `equipment.html` and `maintenance.html` to prevent rogue autofill extensions and scrapers from attempting programmatic population.
+
+- **2026-09-22**: Equipment & Handling Fleet Database Persistence & Schema Sync:
+  1. Resolved `HTTP 400 Bad Request` on `equipment_fleet` upsert by adding defensive fallback in `syncEquipment` in `app.js` to strip `type_of_body` and retry if the column is absent from the Supabase schema cache.
+  2. Added `alter table public.equipment_fleet add column if not exists type_of_body text;` to `MASTER_SUPABASE_SETUP.sql` and created standalone migration `supabase-equipment-type-of-body.sql`.
+  3. Confirmed Fleet Maintenance (`maintenance_jobs`) is saving 100% cleanly to Supabase PostgreSQL database (`Status 201 Created`).
+
+- **2026-09-22**: Booking Form Optional Payment Dates, Trucker/Broker Summary Status & PDF Layout Upgrades, and Responsive Styling:
+  1. Made `Payment Received Date` and `Cheque Number` optional in the main Booking Form (`booking.html` / `app.js`), removing strict required validation and visual asterisks.
+  2. Added `Paid` filter option to Status dropdown in Trucker/Broker Summary (`broker-summary.html` / `app.js`), enabling users to filter specifically for paid broker payments alongside `Payable` and `All`.
+  3. Replaced `Broker P&L` column with `Amount` in the Trucker/Broker Summary on-page data table to display the actual broker row amount directly.
+  4. Scoped `Total Paid` and `Total Payable` KPIs in Trucker/Broker Summary to the selected Customer so selecting a customer calculates metrics exclusively for that customer.
+  5. Refactored Trucker/Broker Summary PDF Export (`buildBrokerSummaryPdf`): moved Trucker/Broker name from table columns into the header title area (`TRUCKER / BROKER: [NAME]`), removed `Payment/Cheque/IBFT`, `Payment Date`, and `Trucker/Broker` from table columns, and formatted table to show `Booking No`, `Booking Date`, `Truck No`, `Container Size`, `Amount`, `Route`, and `Container Ref` with a total Amount row on the final page.
+  6. Fixed responsive box styling in `styles.css`: updated `.booking-ledger-toolbar` to wrap gracefully preventing stat boxes and `Download Summary` from overflowing or clipping on laptop screens, adjusted `.broker-table-head` and `.broker-row` min-width to 980px, optimized column ratios, and enforced `white-space: nowrap` on `PAYMENT STATUS` so all 10 columns fit seamlessly.
+  7. Renamed `Detention` field and column to `Detention/Other Charges` across the main Booking Form (`booking.html` label), Booking Ledger table header, Sales Tax Invoice PDF (`buildBookingInvoicePdf`), and form validation error messaging, and made it completely optional in form submission (defaults to 0 if left blank), preserving backward-compatible data persistence in `bookings.detention`.
+  8. Resolved Supabase sync permission error (`permission denied for table bookings`) by preparing SQL permissions migration `supabase-booking-permissions-fix.sql` granting schema and table-level `ALL` privileges on `public.bookings`, `public.booking_containers`, `public.booking_brokers`, and sequences to `authenticated`, `anon`, and `service_role`, establishing clean RLS policies and storage object grants. Integrated table grants directly into `MASTER_SUPABASE_SETUP.sql`.
+  9. Updated Trucker/Broker Summary filter: replaced `Customer` filter label with `Trucker/Broker` (`data-broker-summary-broker`), populated options dynamically with unique Trucker/Broker names (`renderBrokerOptions`), scoped `Total Paid` and `Total Payable` KPIs directly to the selected Trucker/Broker, and filtered summary rows accordingly.
+  10. Renamed `Container Ref` to `Container No` across the Trucker/Broker Summary table header (`broker-summary.html`), on-page data rows, and PDF export table header (`buildBrokerSummaryPdf`), using helper `getBrokerRowContainerNo` to resolve and display the exact container number.
+  11. Reordered Trucker/Broker Summary PDF Export columns (`buildBrokerSummaryPdf`): repositioned `Container No` to appear immediately after `Truck No`, followed by `Container Size`, `Amount`, and `Route`, with corresponding footer total alignment.
+  12. Updated Booking Summary (`ledger.html` / `app.js`): removed `Total P&L` card from screen head, removed `P&L` column from customer summary tables and footers, and added `BL No` column immediately after `Booking No`. In customer summary PDF downloads (`buildSummaryRecordPdf`), removed `P&L` column and footer total, and added `BL No` immediately after `Booking No`.
 
 - **2026-09-22**: Truck Details Symmetrical Export Fields & Auto-Registration Sync:
   1. Achieved 1-to-1 parity between Import Details and Export Details in `truck.html` and `app.js`. Renamed Import Date to `Import Load Date` in matching symmetry with `Export Load Date` across the form and table headers. Added the missing 6 Export fields (`exportCustomer`, `exportCargoDescription`, `exportMtyBoxFreight`, `exportMtyBroker`, `exportMtyPaymentDate`, `exportMtyPaymentStatus`) in identical matching sequence.

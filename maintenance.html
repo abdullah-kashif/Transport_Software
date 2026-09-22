@@ -68,7 +68,7 @@
 
       <section class="screen">
         <div class="screen-head"><div><h3>Create / Update Maintenance Job</h3></div></div>
-        <form class="form-grid" data-maintenance-form>
+        <form class="form-grid" data-maintenance-form autocomplete="off">
           <div class="field quarter"><label>Maintenance Job No</label><input name="id" readonly /></div>
           <div class="field quarter"><label>Truck No</label><input name="truckNo" list="maintenance-trucks" required /></div>
           <div class="field quarter"><label>Complaint Date</label><input name="complaintDate" type="date" required /></div>
@@ -87,7 +87,7 @@
           <div class="field full">
             <label>Invoice / Part Image Upload</label>
             <div class="maintenance-image-field">
-              <input name="imageFile" type="file" accept="image/*" data-maintenance-image-input />
+              <input name="imageFile" type="file" accept="image/*" data-maintenance-image-input autocomplete="off" />
               <button class="maintenance-image-remove" type="button" data-remove-maintenance-image hidden aria-label="Remove selected image" title="Remove image">&times;</button>
             </div>
             <div class="maintenance-image-preview" data-maintenance-image-preview hidden></div>

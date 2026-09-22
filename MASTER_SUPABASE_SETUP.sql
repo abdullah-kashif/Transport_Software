@@ -10,7 +10,14 @@ alter table public.truck_jobs add column if not exists export_mty_box_freight nu
 alter table public.truck_jobs add column if not exists export_mty_broker text;
 alter table public.truck_jobs add column if not exists export_mty_payment_date date;
 alter table public.truck_jobs add column if not exists export_mty_payment_status text default 'Awaited';
+alter table public.truck_jobs add column if not exists import_detention numeric default 0;
+alter table public.truck_jobs add column if not exists import_payment_term text;
+alter table public.truck_jobs add column if not exists import_customer_collection numeric default 0;
+alter table public.truck_jobs add column if not exists export_detention numeric default 0;
+alter table public.truck_jobs add column if not exists export_payment_term text;
+alter table public.truck_jobs add column if not exists export_customer_collection numeric default 0;
 alter table public.equipment_fleet add column if not exists original_documents_path text;
+alter table public.equipment_fleet add column if not exists type_of_body text;
 alter table public.employees add column if not exists image_path text;
 alter table public.booking_containers add column if not exists quantity numeric;
 alter table public.booking_containers add column if not exists unit_price numeric;
@@ -19,10 +26,15 @@ alter table public.booking_brokers add column if not exists truck_no text;
 alter table public.booking_brokers add column if not exists container_size text;
 alter table public.bookings add column if not exists broker_entries jsonb default '[]'::jsonb;
 
--- Allow authenticated users with the matching module access to persist and
--- reload Equipment & Handling Fleet and Fleet Maintenance records.
-grant select, insert, update, delete on table public.equipment_fleet to authenticated;
-grant select, insert, update, delete on table public.maintenance_jobs to authenticated;
+-- Allow authenticated and anon users to persist and
+-- reload Booking, Container, Broker, Equipment & Handling Fleet, and Fleet Maintenance records.
+grant usage on schema public to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.equipment_fleet to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.maintenance_jobs to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.bookings to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.booking_containers to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.booking_brokers to authenticated, anon, service_role;
+grant all on all sequences in schema public to authenticated, anon, service_role;
 
 drop policy if exists "equipment_fleet_module_access" on public.equipment_fleet;
 create policy "equipment_fleet_module_access" on public.equipment_fleet

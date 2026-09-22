@@ -1,4 +1,24 @@
 (function () {
+  // Prevent third-party browser extensions or autofill scripts (e.g. jquery) from throwing InvalidStateError on <input type="file">
+  try {
+    const originalInputDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    if (originalInputDescriptor?.set) {
+      Object.defineProperty(HTMLInputElement.prototype, "value", {
+        get() {
+          return originalInputDescriptor.get.call(this);
+        },
+        set(val) {
+          if (this.type === "file" && val) {
+            return;
+          }
+          return originalInputDescriptor.set.call(this, val);
+        },
+        configurable: true,
+        enumerable: true
+      });
+    }
+  } catch (_) {}
+
   const KEY = "gtls-transport-live-data-v1";
   const ADMIN_AUTH_KEY = "gtls-admin-auth-v1";
   const SIDEBAR_COLLAPSED_KEY = "gtls-sidebar-collapsed-v1";
@@ -1112,8 +1132,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         customer: item.customer || null, import_origin: item.origin || null, import_destination: item.destination || null,
         import_size: item.size || null, import_weight: item.weight || null, cargo_description: item.cargoDescription || null,
         mty_box_freight: Number(item.mtyBoxFreight || 0), mty_broker: item.mtyBroker || null,
-        import_freight: Number(item.importFreight || 0), import_broker_commission: Number(item.importBrokerCommission || 0),
+        import_freight: Number(item.importFreight || 0), import_detention: Number(item.importDetention || 0),
+        import_broker_commission: Number(item.importBrokerCommission || 0),
         import_broker: item.importBroker || null, import_receivable_amount: Number(item.importReceivedAmount || 0),
+        import_payment_term: item.importPaymentTerm || null, import_customer_collection: Number(item.importCustomerCollection || 0),
         import_cheque_details: item.importChequeDetails || null, import_payment_date: formatIsoDate(item.importPaymentDate) || null,
         import_payment_status: item.importPaymentStatus === "Credit" ? "Credit" : "Awaited",
         mty_payment_date: formatIsoDate(item.mtyPaymentDate) || null, mty_payment_status: item.mtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
@@ -1124,10 +1146,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         export_mty_box_freight: Number(item.exportMtyBoxFreight || 0),
         export_mty_broker: item.exportMtyBroker || null,
         export_broker: item.exportBroker || null,
-        export_freight: Number(item.exportFreight || 0), export_broker_commission: Number(item.exportBrokerCommission || 0),
+        export_freight: Number(item.exportFreight || 0), export_detention: Number(item.exportDetention || 0),
+        export_broker_commission: Number(item.exportBrokerCommission || 0),
         export_origin: item.exportOrigin || null, export_destination: item.exportDestination || null,
         export_size: item.exportSize || null, export_weight: item.exportWeight || null,
-        export_receivable_amount: Number(item.exportReceivedAmount || 0), export_cheque_details: item.exportChequeDetails || null,
+        export_receivable_amount: Number(item.exportReceivedAmount || 0),
+        export_payment_term: item.exportPaymentTerm || null, export_customer_collection: Number(item.exportCustomerCollection || 0),
+        export_cheque_details: item.exportChequeDetails || null,
         export_payment_date: formatIsoDate(item.exportPaymentDate) || null, export_payment_status: item.exportPaymentStatus === "Credit" ? "Credit" : "Awaited",
         export_mty_payment_date: formatIsoDate(item.exportMtyPaymentDate) || null,
         export_mty_payment_status: item.exportMtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
@@ -1140,8 +1165,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       await syncRows("truck_jobs", "job_no", rows);
     } catch (error) {
       const msg = String(error?.message || error?.details || "");
-      if (msg.includes("export_customer") || msg.includes("export_mty") || msg.includes("export_cargo_description") || error?.code === "PGRST204" || error?.code === "42703") {
-        console.warn("Retrying syncTruckJobs without new export columns because schema cache / columns are not yet updated:", error.message);
+      if (msg.includes("export_customer") || msg.includes("export_mty") || msg.includes("export_cargo_description") || msg.includes("detention") || msg.includes("payment_term") || msg.includes("customer_collection") || error?.code === "PGRST204" || error?.code === "42703") {
+        console.warn("Retrying syncTruckJobs without new columns because schema cache / columns are not yet updated:", error.message);
         const fallbackRows = rows.map((r) => {
           const copy = { ...r };
           delete copy.export_customer;
@@ -1150,6 +1175,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           delete copy.export_mty_broker;
           delete copy.export_mty_payment_date;
           delete copy.export_mty_payment_status;
+          delete copy.import_detention;
+          delete copy.import_payment_term;
+          delete copy.import_customer_collection;
+          delete copy.export_detention;
+          delete copy.export_payment_term;
+          delete copy.export_customer_collection;
           return copy;
         });
         await syncRows("truck_jobs", "job_no", fallbackRows);
@@ -1170,7 +1201,22 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         tax_paid_up_to: formatIsoDate(item.taxPaidUpTo) || null, original_documents: item.documentName || item.originalDocs || null,
         original_documents_path: path || null, updated_at: new Date().toISOString() });
     }
-    await syncRows("equipment_fleet", "truck_no", rows);
+    try {
+      await syncRows("equipment_fleet", "truck_no", rows);
+    } catch (error) {
+      const msg = String(error?.message || error?.details || "");
+      if (msg.includes("type_of_body") || error?.code === "PGRST204" || error?.code === "42703") {
+        console.warn("Retrying syncEquipment without type_of_body column because schema cache / column is not yet updated:", error.message);
+        const fallbackRows = rows.map((r) => {
+          const copy = { ...r };
+          delete copy.type_of_body;
+          return copy;
+        });
+        await syncRows("equipment_fleet", "truck_no", fallbackRows);
+      } else {
+        throw error;
+      }
+    }
   }
 
   async function syncMaintenance(records) {
@@ -1372,8 +1418,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
             date: r.import_date, customer: r.customer || "", origin: r.import_origin || "", destination: r.import_destination || "", size: r.import_size || "",
             weight: r.import_weight || "", cargoDescription: r.cargo_description || "", mtyBoxFreight: Number(r.mty_box_freight || 0), mtyBroker: r.mty_broker || "",
-            importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
-            importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
+            importFreight: Number(r.import_freight || 0),
+            importDetention: Number(r.import_detention !== undefined && r.import_detention !== null ? r.import_detention : (local.importDetention || 0)),
+            importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
+            importReceivedAmount: Number(r.import_receivable_amount || 0),
+            importPaymentTerm: r.import_payment_term || local.importPaymentTerm || "",
+            importCustomerCollection: Number(r.import_customer_collection !== undefined && r.import_customer_collection !== null ? r.import_customer_collection : (local.importCustomerCollection || 0)),
+            importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
             importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
             importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "",
             exportCustomer: r.export_customer || local.exportCustomer || "",
@@ -1381,9 +1432,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             exportMtyBoxFreight: Number(r.export_mty_box_freight !== undefined && r.export_mty_box_freight !== null ? r.export_mty_box_freight : (local.exportMtyBoxFreight || 0)),
             exportMtyBroker: r.export_mty_broker || local.exportMtyBroker || "",
             exportBroker: r.export_broker || "",
-            exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
+            exportFreight: Number(r.export_freight || 0),
+            exportDetention: Number(r.export_detention !== undefined && r.export_detention !== null ? r.export_detention : (local.exportDetention || 0)),
+            exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
             exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
-            exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
+            exportReceivedAmount: Number(r.export_receivable_amount || 0),
+            exportPaymentTerm: r.export_payment_term || local.exportPaymentTerm || "",
+            exportCustomerCollection: Number(r.export_customer_collection !== undefined && r.export_customer_collection !== null ? r.export_customer_collection : (local.exportCustomerCollection || 0)),
+            exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
             exportPaymentStatus: r.export_payment_status,
             exportMtyPaymentDate: r.export_mty_payment_date || local.exportMtyPaymentDate || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || local.exportMtyPaymentStatus || "Awaited",
@@ -1403,8 +1459,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             id: r.job_no, jobNo: r.job_no, truckNo: r.import_truck_no,
             date: r.import_date, customer: r.customer || "", origin: r.import_origin || "", destination: r.import_destination || "", size: r.import_size || "",
             weight: r.import_weight || "", cargoDescription: r.cargo_description || "", mtyBoxFreight: Number(r.mty_box_freight || 0), mtyBroker: r.mty_broker || "",
-            importFreight: Number(r.import_freight || 0), importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
-            importReceivedAmount: Number(r.import_receivable_amount || 0), importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
+            importFreight: Number(r.import_freight || 0),
+            importDetention: Number(r.import_detention || 0),
+            importBrokerCommission: Number(r.import_broker_commission || 0), importBroker: r.import_broker || "",
+            importReceivedAmount: Number(r.import_receivable_amount || 0),
+            importPaymentTerm: r.import_payment_term || "",
+            importCustomerCollection: Number(r.import_customer_collection || 0),
+            importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
             importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
             importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "",
             exportCustomer: r.export_customer || "",
@@ -1412,9 +1473,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             exportMtyBoxFreight: Number(r.export_mty_box_freight || 0),
             exportMtyBroker: r.export_mty_broker || "",
             exportBroker: r.export_broker || "",
-            exportFreight: Number(r.export_freight || 0), exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
+            exportFreight: Number(r.export_freight || 0),
+            exportDetention: Number(r.export_detention || 0),
+            exportBrokerCommission: Number(r.export_broker_commission || 0), exportOrigin: r.export_origin || "",
             exportDestination: r.export_destination || "", exportSize: r.export_size || "", exportWeight: r.export_weight || "",
-            exportReceivedAmount: Number(r.export_receivable_amount || 0), exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
+            exportReceivedAmount: Number(r.export_receivable_amount || 0),
+            exportPaymentTerm: r.export_payment_term || "",
+            exportCustomerCollection: Number(r.export_customer_collection || 0),
+            exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
             exportPaymentStatus: r.export_payment_status,
             exportMtyPaymentDate: r.export_mty_payment_date || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || "Awaited",
@@ -2849,7 +2915,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const brandImage = await loadInvoiceTemplateDataUrl();
     const tax = calculateBookingTaxBreakdown(booking.rate, booking.detention, booking.salesTaxAuthority);
     const rawDetentionAmount = Number(booking.detention ?? 0);
-    if (!Number.isFinite(rawDetentionAmount)) throw new Error("Detention must be a valid number.");
+    if (!Number.isFinite(rawDetentionAmount)) throw new Error("Detention/Other Charges must be a valid number.");
     const detentionAmount = roundAmount(rawDetentionAmount);
     const invoiceHaulageAmount = roundAmount(Number(booking.rate || 0) + detentionAmount);
     const invoiceTotalAmount = roundAmount(invoiceHaulageAmount + tax.salesTaxAmount);
@@ -2909,7 +2975,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ["Category", text(booking.category)],
         ["Quantity", quantityTotal == null ? "-" : money(quantityTotal)],
         ["Unit Price", unitPriceDisplay == null ? "-" : money(unitPriceDisplay)],
-        ...(detentionAmount !== 0 ? [["Detention", money(detentionAmount)]] : [])
+        ...(detentionAmount !== 0 ? [["Detention/Other Charges", money(detentionAmount)]] : [])
       ],
       styles: {
         font: "helvetica",
@@ -3009,16 +3075,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
     const totals = bookings.reduce((summary, item) => {
       const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
-      const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
-      const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
       summary.roadHaulage += Number(item.rate || 0);
       summary.salesTax += Number(item.salesTaxAmount || tax.salesTaxAmount || 0);
       summary.totalAmount += Number(item.totalAmount || tax.totalAmount || 0);
-      if (netProfitLoss != null && Number.isFinite(netProfitLoss)) {
-        summary.totalPnL += netProfitLoss;
-      }
       return summary;
-    }, { roadHaulage: 0, salesTax: 0, totalAmount: 0, totalPnL: 0 });
+    }, { roadHaulage: 0, salesTax: 0, totalAmount: 0 });
     if (letterheadHeader) {
       const headerWidth = 520;
       const headerHeight = 124;
@@ -3034,41 +3095,39 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       startY: 184,
       theme: "grid",
       showFoot: "lastPage",
-      head: [["S.No", "Date", "Booking No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "P&L", "Remarks"]],
+      head: [["S.No", "Date", "Booking No", "BL No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
-        const brokerEntries = getBookingBrokerEntries(item, item.receivableAmount);
-        const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
         return [
           String(index + 1),
           formatShortDate(item.date),
           text(item.bookingNo || item.id),
+          text(item.blNo || "-"),
           text(item.invoiceNo || "-"),
           text(item.customer || customer || "-"),
           formatContainerSizeSummary(item),
           money(item.rate),
           money(item.salesTaxAmount || tax.salesTaxAmount),
           money(item.totalAmount || tax.totalAmount),
-          netProfitLoss == null ? "-" : money(netProfitLoss),
           text(item.remarks || "-")
         ];
       }),
-      foot: [["", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), money(totals.totalPnL), ""]],
+      foot: [["", "", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
       styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
       headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
       footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 26 },
-        1: { cellWidth: 54 },
-        2: { cellWidth: 68 },
-        3: { cellWidth: 68 },
-        4: { cellWidth: 84 },
-        5: { cellWidth: 54 },
-        6: { cellWidth: 78, halign: "right" },
-        7: { cellWidth: 68, halign: "right" },
-        8: { cellWidth: 72, halign: "right" },
-        9: { cellWidth: 68, halign: "right" },
-        10: { cellWidth: 92 }
+        0: { cellWidth: 26, halign: "center" },
+        1: { cellWidth: 54, halign: "center" },
+        2: { cellWidth: 62, halign: "center" },
+        3: { cellWidth: 66, halign: "center" },
+        4: { cellWidth: 66, halign: "center" },
+        5: { cellWidth: 86 },
+        6: { cellWidth: 54, halign: "center" },
+        7: { cellWidth: 80, halign: "right" },
+        8: { cellWidth: 70, halign: "right" },
+        9: { cellWidth: 76, halign: "right" },
+        10: { cellWidth: 130 }
       }
     });
     pdf.setFillColor(255, 255, 255);
@@ -4518,14 +4577,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       checkRequired(rateField, "Road Haulage Charges", true);
       checkRequired(form.elements.salesTaxAuthority, "Sales Tax Authority");
       checkRequired(form.elements.salesTaxWithholding, "Sales Tax Withholding");
-      checkRequired(form.elements.detention, "Detention");
-      if (detentionField.validity.badInput || (detentionField.value !== "" && !Number.isFinite(Number(detentionField.value)))) {
+      if (detentionField.validity.badInput || (String(detentionField.value || "").trim() !== "" && !Number.isFinite(Number(detentionField.value)))) {
         invalidElements.push(detentionField);
-        missingLabels.push("Detention (a valid number)");
+        missingLabels.push("Detention/Other Charges (a valid number)");
       }
       checkRequired(form.elements.paymentTerm, "Payment Term");
-      checkRequired(form.elements.paymentReceivedDate, "Payment Received Date");
-      checkRequired(form.elements.chequeNumber, "Cheque Number");
       checkRequired(form.elements.status, "Status");
       checkRequired(form.elements.accountFlow, "Payment Status");
       checkRequired(form.elements.remarks, "Remarks");
@@ -4773,6 +4829,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     render();
   }
 
+  function getBrokerRowContainerNo(row) {
+    if (!row) return "-";
+    const ref = String(row.entry?.containerRef || "").trim();
+    if (ref && ref !== "All Containers" && ref !== "all") {
+      return ref;
+    }
+    if (row.booking?.containerNo) {
+      return row.booking.containerNo;
+    }
+    const lines = (row.booking?.containerLines || []).map((l) => l.containerNo).filter(Boolean);
+    if (lines.length === 1) return lines[0];
+    if (lines.length > 1) return lines.join(", ");
+    return ref || "-";
+  }
+
   async function buildBrokerSummaryPdf(rows, statusLabel = "Payable", fileName = "") {
     if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
     const { jsPDF } = window.jspdf;
@@ -4786,28 +4857,42 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
-    pdf.text("TRUCKER / BROKER SUMMARY", 36, 150);
+    const truckerNames = [...new Set(rows.map((row) => String(row.entry.truckerBroker || "").trim()).filter(Boolean))];
+    const truckerTitle = truckerNames.length === 1
+      ? `TRUCKER / BROKER: ${truckerNames[0].toUpperCase()}`
+      : (truckerNames.length > 1 ? `TRUCKER / BROKER: ${truckerNames.join(", ").toUpperCase()}` : "TRUCKER / BROKER SUMMARY");
+    pdf.text(truckerTitle, 36, 150);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
     pdf.text(`Status: ${statusLabel} | Generated: ${formatShortDate(new Date())}`, 36, 170);
+    const totalAmount = rows.reduce((sum, r) => sum + Number(r.entry.amount || 0), 0);
     pdf.autoTable({
       startY: 184,
       margin: { left: 28, right: 28 },
       theme: "grid",
-      head: [["Booking No", "Booking Date", "Trucker/Broker", "Container Ref", "Payment/Cheque/IBFT", "Payment Date"]],
+      head: [["Booking No", "Booking Date", "Truck No", "Container No", "Container Size", "Amount", "Route"]],
       body: rows.map((row) => [
         text(row.booking.bookingNo || row.booking.id),
         formatShortDate(row.booking.date),
-        text(row.entry.truckerBroker),
-        text(row.entry.containerRef),
-        text(row.entry.paymentDetails),
-        row.entry.paymentDate ? formatShortDate(row.entry.paymentDate) : "-"
+        text(row.entry.truckNo && row.entry.truckNo !== "All Trucks" ? row.entry.truckNo : (row.booking.truckNo || "-")),
+        text(getBrokerRowContainerNo(row)),
+        text(row.entry.containerSize && row.entry.containerSize !== "All Sizes" ? row.entry.containerSize : (row.booking.containerSize || "-")),
+        row.entry.amount != null ? `PKR ${money(row.entry.amount)}` : "-",
+        text(row.booking.route || "-")
       ]),
-      styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
+      foot: [["Total", "", "", "", "", `PKR ${money(totalAmount)}`, ""]],
+      showFoot: "lastPage",
+      styles: { fontSize: 8, cellPadding: 5, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
       headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
+      footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 92 }, 1: { cellWidth: 78 }, 2: { cellWidth: 130 }, 3: { cellWidth: 94 },
-        4: { cellWidth: 220 }, 5: { cellWidth: 84 }
+        0: { cellWidth: 85 },
+        1: { cellWidth: 80 },
+        2: { cellWidth: 95 },
+        3: { cellWidth: 105 },
+        4: { cellWidth: 85 },
+        5: { cellWidth: 110, halign: "right" },
+        6: { cellWidth: 190 }
       }
     });
     pdf.setFont("helvetica", "normal");
@@ -4824,7 +4909,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const paidElement = document.querySelector("[data-broker-summary-paid]");
     const payableElement = document.querySelector("[data-broker-summary-payable]");
     const statusFilter = document.querySelector("[data-broker-summary-status]");
-    const customerFilter = document.querySelector("[data-broker-summary-customer]");
+    const brokerFilter = document.querySelector("[data-broker-summary-broker]") || document.querySelector("[data-broker-summary-customer]");
     const searchFilter = document.querySelector("[data-broker-summary-search]");
     const startDateFilter = document.querySelector("[data-broker-summary-start]");
     const endDateFilter = document.querySelector("[data-broker-summary-end]");
@@ -4844,25 +4929,25 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         })));
     }
 
-    function renderCustomerOptions() {
-      if (!customerFilter) return;
-      const selected = customerFilter.value;
-      const customers = [...new Set(getBrokerRows().map((row) => String(row.booking.customer || "").trim()).filter(Boolean))]
+    function renderBrokerOptions() {
+      if (!brokerFilter) return;
+      const selected = brokerFilter.value;
+      const brokers = [...new Set(getBrokerRows().map((row) => String(row.entry.truckerBroker || "").trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b));
-      customerFilter.innerHTML = `<option value="">All Customers</option>${customers
-        .map((customer) => `<option value="${escapeHtml(customer)}">${text(customer)}</option>`).join("")}`;
-      customerFilter.value = customers.includes(selected) ? selected : "";
+      brokerFilter.innerHTML = `<option value="">All Truckers/Brokers</option>${brokers
+        .map((broker) => `<option value="${escapeHtml(broker)}">${text(broker)}</option>`).join("")}`;
+      brokerFilter.value = brokers.includes(selected) ? selected : "";
     }
 
     function getFilteredRows() {
       const selectedStatus = String(statusFilter?.value || "Payable");
-      const selectedCustomer = String(customerFilter?.value || "").trim();
+      const selectedBroker = String(brokerFilter?.value || "").trim();
       const startDate = String(startDateFilter?.value || "");
       const endDate = String(endDateFilter?.value || "");
       const terms = String(searchFilter?.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
       return getBrokerRows()
         .filter((row) => !selectedStatus || selectedStatus === "All" || row.entry.paymentStatus === selectedStatus)
-        .filter((row) => !selectedCustomer || String(row.booking.customer || "").trim() === selectedCustomer)
+        .filter((row) => !selectedBroker || String(row.entry.truckerBroker || "").trim().toLowerCase() === selectedBroker.toLowerCase())
         .filter((row) => {
           const date = formatIsoDate(row.date);
           return (!startDate || (date && date >= startDate)) && (!endDate || (date && date <= endDate));
@@ -4881,9 +4966,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     function render() {
       const rows = getFilteredRows();
       const allRows = getBrokerRows();
-      const paidTotal = allRows.filter((row) => row.entry.paymentStatus === "Paid")
+      const selectedBroker = String(brokerFilter?.value || "").trim();
+      const scopedBrokerRows = selectedBroker
+        ? allRows.filter((row) => String(row.entry.truckerBroker || "").trim().toLowerCase() === selectedBroker.toLowerCase())
+        : allRows;
+      const paidTotal = scopedBrokerRows.filter((row) => row.entry.paymentStatus === "Paid")
         .reduce((sum, row) => sum + Number(row.entry.amount || 0), 0);
-      const payableTotal = allRows.filter((row) => row.entry.paymentStatus === "Payable")
+      const payableTotal = scopedBrokerRows.filter((row) => row.entry.paymentStatus === "Payable")
         .reduce((sum, row) => sum + Number(row.entry.amount || 0), 0);
       if (paidElement) paidElement.textContent = `PKR ${money(paidTotal)}`;
       if (payableElement) payableElement.textContent = `PKR ${money(payableTotal)}`;
@@ -4899,16 +4988,16 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${text(row.booking.bookingNo || row.booking.id)}</td>
           <td>${formatShortDate(row.booking.date)}</td>
           <td>${text(row.entry.truckerBroker)}</td>
-          <td>${text(row.entry.containerRef)}</td>
+          <td>${text(getBrokerRowContainerNo(row))}</td>
           <td>${text(row.entry.paymentDetails)}</td>
           <td>${row.entry.paymentDate ? formatShortDate(row.entry.paymentDate) : "-"}</td>
-          <td>${money(row.brokerProfitLoss)}</td>
+          <td>${row.entry.amount != null ? money(row.entry.amount) : "-"}</td>
           <td><button class="btn small" type="button" data-download-broker-row data-booking-id="${escapeHtml(row.booking.id)}" data-broker-index="${row.brokerIndex}">Download</button></td>
         </tr>
       `).join("");
     }
 
-    [statusFilter, customerFilter, searchFilter, startDateFilter, endDateFilter, dateSort]
+    [statusFilter, brokerFilter, searchFilter, startDateFilter, endDateFilter, dateSort]
       .filter(Boolean)
       .forEach((control) => control.addEventListener(control === searchFilter ? "input" : "change", render));
     downloadButton?.addEventListener("click", () => {
@@ -4949,7 +5038,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         }
       });
     });
-    renderCustomerOptions();
+    renderBrokerOptions();
     window.activePageRender = render;
     render();
   }
@@ -5026,17 +5115,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       });
 
       const grandTotal = customerGroups.reduce((sum, g) => sum + g.totalReceivable, 0);
-      const grandTotalPnL = customerGroups.reduce((sum, g) => sum + g.totalPnL, 0);
       const totalBookingsCount = customerGroups.reduce((sum, g) => sum + g.bookings.length, 0);
 
       if (totalElement) {
         totalElement.textContent = `PKR ${money(grandTotal)}`;
-      }
-      const totalPnLElement = document.querySelector("[data-summary-total-pl]");
-      if (totalPnLElement) {
-        totalPnLElement.textContent = `PKR ${money(grandTotalPnL)}`;
-        totalPnLElement.classList.toggle("positive", grandTotalPnL >= 0);
-        totalPnLElement.classList.toggle("negative", grandTotalPnL < 0);
       }
       countElement.textContent = `${customerGroups.length} customer(s) • ${totalBookingsCount} booking(s)`;
 
@@ -5059,13 +5141,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <tr>
             <td>${formatShortDate(item.date)}</td>
             <td><strong>${text(item.bookingNo || item.id || "-")}</strong></td>
+            <td>${text(item.blNo || "-")}</td>
             <td>${text(item.invoiceNo || "-")}</td>
             <td>${text(formatContainerSizeSummary(item))}</td>
             <td>${money(item.rate)}</td>
             <td>${money(salesTaxVal)}</td>
             <td>${money(item.totalAmount || tax.totalAmount)}</td>
             <td>${money(item.computedReceivable)}</td>
-            <td>${item.netProfitLoss == null ? "-" : `<span class="badge ${item.netProfitLoss < 0 ? "bad" : "good"}">${money(item.netProfitLoss)}</span>`}</td>
           </tr>
         `;
         }).join("");
@@ -5102,13 +5184,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                   <tr>
                     <th>Date</th>
                     <th>Booking No</th>
+                    <th>BL No</th>
                     <th>Invoice No</th>
                     <th>Container</th>
                     <th>Road Haulage Charges</th>
                     <th>15% Sales Tax</th>
                     <th>Total Amount</th>
                     <th>Receivable Amount</th>
-                    <th>P&amp;L</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -5116,9 +5198,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                 </tbody>
                 <tfoot>
                   <tr class="customer-box-foot">
-                    <td colspan="7" class="foot-label">Total Receivable:</td>
+                    <td colspan="8" class="foot-label">Total Receivable:</td>
                     <td class="foot-value">PKR ${money(group.totalReceivable)}</td>
-                    <td class="foot-value" style="font-weight:700;color:${group.totalPnL < 0 ? 'var(--red, #b91c1c)' : 'var(--green, #15803d)'};">P&amp;L: PKR ${money(group.totalPnL)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -5198,11 +5279,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const storedImport = Number(trip.importReceivedAmount);
       const rawImport = Number.isFinite(storedImport)
         ? storedImport
-        : Number(trip.importFreight || 0) - Number(trip.importBrokerCommission || 0);
+        : (Number(trip.importFreight || 0) + Number(trip.importDetention || 0)) - Number(trip.importBrokerCommission || 0);
       const storedExport = Number(trip.exportReceivedAmount);
       const rawExport = Number.isFinite(storedExport)
         ? storedExport
-        : Number(trip.exportFreight || 0) - Number(trip.exportBrokerCommission || 0);
+        : (Number(trip.exportFreight || 0) + Number(trip.exportDetention || 0)) - Number(trip.exportBrokerCommission || 0);
       const rawMty = Number(trip.mtyBoxFreight || 0);
 
       const isImportCredit = String(trip.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
@@ -5384,8 +5465,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       mtyBoxFreight: trip.mtyBoxFreight,
       mtyBroker: trip.mtyBroker,
       freight: trip.importFreight,
+      detention: trip.importDetention,
       broker: trip.importBroker,
       commission: trip.importBrokerCommission,
+      paymentTerm: trip.importPaymentTerm,
+      customerCollection: trip.importCustomerCollection,
+      chequeDetails: trip.importChequeDetails,
+      paidDate: trip.importPaymentDate,
       paymentStatus: trip.importPaymentStatus,
       remarks: trip.importRemarks || trip.remarks
     } : {
@@ -5400,8 +5486,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       mtyBoxFreight: trip.exportMtyBoxFreight,
       mtyBroker: trip.exportMtyBroker,
       freight: trip.exportFreight,
+      detention: trip.exportDetention,
       broker: trip.exportBroker,
       commission: trip.exportBrokerCommission,
+      paymentTerm: trip.exportPaymentTerm,
+      customerCollection: trip.exportCustomerCollection,
+      chequeDetails: trip.exportChequeDetails,
+      paidDate: trip.exportPaymentDate,
       paymentStatus: trip.exportPaymentStatus,
       remarks: trip.exportRemarks || trip.remarks
     };
@@ -5417,6 +5508,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       198
     );
 
+    const baseFreight = Number(details.freight || 0);
+    const detentionAmt = Number(details.detention || 0);
+    const totalFreight = baseFreight + detentionAmt;
+    const commissionAmt = Number(details.commission || 0);
+    const receivableAmt = totalFreight - commissionAmt;
+
     pdf.autoTable({
       startY: 226,
       theme: "grid",
@@ -5428,8 +5525,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ["Size / Weight", `${text(details.size || "-")} / ${text(details.weight || "-")}`],
         ["Cargo Description", text(details.cargoDescription || "-")],
         ["Broker", text(details.broker || "-")],
-        ["Freight", money(details.freight)],
-        ["Broker Commission", money(details.commission)],
+        ["Freight", money(baseFreight)],
+        ["Detention", money(detentionAmt)],
+        ["Total Freight", money(totalFreight)],
+        ["Broker Commission", money(commissionAmt)],
+        ["Receivable Amount", money(receivableAmt)],
+        ...(details.paymentTerm ? [["Payment Term", text(details.paymentTerm)]] : []),
+        ...(Number(details.customerCollection || 0) > 0 ? [["Customer Collection", money(details.customerCollection)]] : []),
+        ...(details.chequeDetails ? [["Cheque / IBFT", text(details.chequeDetails)]] : []),
+        ...(details.paidDate ? [["Paid Date", formatShortDate(details.paidDate)]] : []),
         ["Payment Status", text(details.paymentStatus || "Awaited")],
         ["Remarks", text(details.remarks || "-")]
       ],
@@ -5462,8 +5566,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
 
   function calculateTruckTripFinancials(trip = {}) {
-    const importReceivable = Number(trip.importFreight || 0) - Number(trip.importBrokerCommission || 0);
-    const exportReceivable = Number(trip.exportFreight || 0) - Number(trip.exportBrokerCommission || 0);
+    const importReceivable = (Number(trip.importFreight || 0) + Number(trip.importDetention || 0)) - Number(trip.importBrokerCommission || 0);
+    const exportReceivable = (Number(trip.exportFreight || 0) + Number(trip.exportDetention || 0)) - Number(trip.exportBrokerCommission || 0);
     const grandTotal = importReceivable + exportReceivable + Number(trip.mtyBoxFreight || 0) + Number(trip.exportMtyBoxFreight || 0);
     const roundTripExpense = Number(trip.roundTripExpense || 0);
     return {
@@ -5492,15 +5596,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     let tripImageData = "";
     let tripImagePromise = Promise.resolve("");
 
-    const numberFields = ["mtyBoxFreight", "importFreight", "importBrokerCommission", "importReceivedAmount", "exportFreight", "exportBrokerCommission", "exportReceivedAmount", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "profitLoss"];
+    const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "profitLoss"];
 
     function calculateTrip() {
-      const importReceived = Number(form.elements.importFreight?.value || 0) - Number(form.elements.importBrokerCommission?.value || 0);
-      const exportReceived = Number(form.elements.exportFreight?.value || 0) - Number(form.elements.exportBrokerCommission?.value || 0);
+      const importReceived = (Number(form.elements.importFreight?.value || 0) + Number(form.elements.importDetention?.value || 0)) - Number(form.elements.importBrokerCommission?.value || 0);
+      const exportReceived = (Number(form.elements.exportFreight?.value || 0) + Number(form.elements.exportDetention?.value || 0)) - Number(form.elements.exportBrokerCommission?.value || 0);
       const financials = calculateTruckTripFinancials({
         importFreight: form.elements.importFreight?.value,
+        importDetention: form.elements.importDetention?.value,
         importBrokerCommission: form.elements.importBrokerCommission?.value,
         exportFreight: form.elements.exportFreight?.value,
+        exportDetention: form.elements.exportDetention?.value,
         exportBrokerCommission: form.elements.exportBrokerCommission?.value,
         mtyBoxFreight: form.elements.mtyBoxFreight?.value,
         exportMtyBoxFreight: form.elements.exportMtyBoxFreight?.value,
@@ -5543,8 +5649,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (form.elements.exportMtyBroker) form.elements.exportMtyBroker.value = "";
       if (form.elements.importRemarks) form.elements.importRemarks.value = "";
       if (form.elements.exportRemarks) form.elements.exportRemarks.value = "";
+      if (form.elements.importPaymentTerm) form.elements.importPaymentTerm.value = "";
+      if (form.elements.importDetention) form.elements.importDetention.value = "0";
+      if (form.elements.importCustomerCollection) form.elements.importCustomerCollection.value = "0";
+      if (form.elements.importChequeDetails) form.elements.importChequeDetails.value = "";
+      if (form.elements.importPaymentDate) form.elements.importPaymentDate.value = "";
       if (form.elements.importPaymentStatus) form.elements.importPaymentStatus.value = "Awaited";
       if (form.elements.mtyPaymentStatus) form.elements.mtyPaymentStatus.value = "Awaited";
+      if (form.elements.exportPaymentTerm) form.elements.exportPaymentTerm.value = "";
+      if (form.elements.exportDetention) form.elements.exportDetention.value = "0";
+      if (form.elements.exportCustomerCollection) form.elements.exportCustomerCollection.value = "0";
+      if (form.elements.exportChequeDetails) form.elements.exportChequeDetails.value = "";
+      if (form.elements.exportPaymentDate) form.elements.exportPaymentDate.value = "";
       if (form.elements.exportPaymentStatus) form.elements.exportPaymentStatus.value = "Awaited";
       if (form.elements.exportMtyPaymentStatus) form.elements.exportMtyPaymentStatus.value = "Awaited";
       exportTruckTouchedManually = false;
@@ -5599,7 +5715,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="47">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="53">No truck trip records available yet.</td></tr>`;
         return;
       }
       body.innerHTML = rows.map((item, index) => {
@@ -5609,10 +5725,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${index + 1}</td><td>${text(item.jobNo)}</td><td>${formatShortDate(item.date)}</td><td>${text(item.truckNo)}</td>
           <td>${text(item.customer)}</td><td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
           <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
-          <td>${money(item.importFreight)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.importRemarks || item.remarks || "-")}</td>
+          <td>${money(item.importFreight)}</td><td>${money(item.importDetention || 0)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td>
+          <td>${text(item.importPaymentTerm || "-")}</td><td>${money(item.importCustomerCollection || 0)}</td><td>${text(item.importChequeDetails)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.importRemarks || item.remarks || "-")}</td>
           <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportCustomer || item.customer || "-")}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${text(item.exportCargoDescription || item.cargoDescription || "-")}</td>
           <td>${money(item.exportMtyBoxFreight || 0)}</td><td>${text(item.exportMtyBroker || "-")}</td>
-          <td>${money(item.exportFreight)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportReceivedAmount)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
+          <td>${money(item.exportFreight)}</td><td>${money(item.exportDetention || 0)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportReceivedAmount)}</td>
+          <td>${text(item.exportPaymentTerm || "-")}</td><td>${money(item.exportCustomerCollection || 0)}</td><td>${text(item.exportChequeDetails)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
           <td>${item.image ? `
             <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image">
               <img src="${escapeHtml(item.image)}" alt="Truck details attachment" />
@@ -5650,6 +5768,24 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       Object.keys(item).forEach((key) => {
         if (form.elements[key]) form.elements[key].value = item[key] !== null && item[key] !== undefined ? item[key] : "";
       });
+      if (form.elements.importDetention) {
+        form.elements.importDetention.value = item.importDetention !== undefined && item.importDetention !== null ? String(item.importDetention) : "0";
+      }
+      if (form.elements.importPaymentTerm) {
+        form.elements.importPaymentTerm.value = item.importPaymentTerm || "";
+      }
+      if (form.elements.importCustomerCollection) {
+        form.elements.importCustomerCollection.value = item.importCustomerCollection !== undefined && item.importCustomerCollection !== null ? String(item.importCustomerCollection) : "0";
+      }
+      if (form.elements.exportDetention) {
+        form.elements.exportDetention.value = item.exportDetention !== undefined && item.exportDetention !== null ? String(item.exportDetention) : "0";
+      }
+      if (form.elements.exportPaymentTerm) {
+        form.elements.exportPaymentTerm.value = item.exportPaymentTerm || "";
+      }
+      if (form.elements.exportCustomerCollection) {
+        form.elements.exportCustomerCollection.value = item.exportCustomerCollection !== undefined && item.exportCustomerCollection !== null ? String(item.exportCustomerCollection) : "0";
+      }
       if (form.elements.exportCustomer && !form.elements.exportCustomer.value) {
         form.elements.exportCustomer.value = item.exportCustomer || item.customer || "";
       }
@@ -5679,7 +5815,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       form.querySelector("[data-submit-label]").textContent = "Update Trip";
     }
 
-    ["mtyBoxFreight", "importFreight", "importBrokerCommission", "exportFreight", "exportBrokerCommission", "exportMtyBoxFreight", "roundTripExpense"].forEach((name) => {
+    ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "exportFreight", "exportDetention", "exportBrokerCommission", "exportMtyBoxFreight", "roundTripExpense"].forEach((name) => {
       form.elements[name]?.addEventListener("input", calculateTrip);
     });
 
