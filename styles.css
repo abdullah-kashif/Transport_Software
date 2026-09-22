@@ -3474,10 +3474,10 @@ body[data-page="truck"] .truck-trip-table td {
   vertical-align: top;
 }
 
-body[data-page="truck"] .truck-trip-table th:nth-child(25),
-body[data-page="truck"] .truck-trip-table td:nth-child(25),
-body[data-page="truck"] .truck-trip-table th:nth-child(48),
-body[data-page="truck"] .truck-trip-table td:nth-child(48) {
+body[data-page="truck"] .truck-trip-table th:nth-child(26),
+body[data-page="truck"] .truck-trip-table td:nth-child(26),
+body[data-page="truck"] .truck-trip-table th:nth-child(50),
+body[data-page="truck"] .truck-trip-table td:nth-child(50) {
   border-right: 2px solid #b18462;
 }
 
