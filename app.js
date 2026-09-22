@@ -2598,6 +2598,30 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     return direction === "asc" ? difference : -difference;
   }
 
+  function compareBookingInvoiceOrder(left, right, direction = "asc") {
+    const leftText = String(left?.invoiceNo || "").trim();
+    const rightText = String(right?.invoiceNo || "").trim();
+    if (!leftText && !rightText) return compareDateValues(left?.date, right?.date, direction);
+    if (!leftText) return 1;
+    if (!rightText) return -1;
+
+    const leftNums = leftText.match(/\d+/g);
+    const rightNums = rightText.match(/\d+/g);
+    let diff = 0;
+    if (leftNums && rightNums) {
+      const leftLast = Number(leftNums[leftNums.length - 1]);
+      const rightLast = Number(rightNums[rightNums.length - 1]);
+      if (leftLast !== rightLast) diff = leftLast - rightLast;
+    }
+    if (!diff) {
+      diff = leftText.localeCompare(rightText, undefined, { numeric: true, sensitivity: "base" });
+    }
+    if (!diff) {
+      diff = compareDateValues(left?.date, right?.date, "asc");
+    }
+    return direction === "desc" ? -diff : diff;
+  }
+
   function formatShortDate(value) {
     const date = parseDateValue(value);
     if (!date) return value ? String(value) : "-";
@@ -2791,9 +2815,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const quantityTotal = booking.containerPricingAvailable === false
       ? booking.quantity
       : lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
-    const unitPriceTotal = booking.containerPricingAvailable === false
+    const firstLineWithPrice = lines.find((line) => line.unitPrice != null && line.unitPrice !== "" && Number(line.unitPrice) > 0) || lines[0];
+    const unitPriceDisplay = booking.containerPricingAvailable === false
       ? null
-      : lines.reduce((sum, line) => sum + Number(line.unitPrice || 0), 0);
+      : (firstLineWithPrice && firstLineWithPrice.unitPrice != null && firstLineWithPrice.unitPrice !== "" ? Number(firstLineWithPrice.unitPrice) : null);
     const customerName = String(booking.customer || "").trim() || "-";
     const consigneeText = String(booking.consignee || "").trim() || "-";
     const descriptionText = [booking.goodsType, booking.quantity].filter(Boolean).join(", ") || "-";
@@ -2840,7 +2865,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ["Destination", text(booking.destination)],
         ["Category", text(booking.category)],
         ["Quantity", quantityTotal == null ? "-" : money(quantityTotal)],
-        ["Unit Price", unitPriceTotal == null ? "-" : money(unitPriceTotal)],
+        ["Unit Price", unitPriceDisplay == null ? "-" : money(unitPriceDisplay)],
         ...(detentionAmount !== 0 ? [["Detention", money(detentionAmount)]] : [])
       ],
       styles: {
@@ -3716,11 +3741,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       return `
         <div class="container-row" data-container-row="${index}">
           <div class="field-lite">
-            <label>Container No</label>
+            <label>Container No <span class="required-star">*</span></label>
             <input name="containerNo" value="${escapeHtml(item.containerNo)}" placeholder="Example: TRHU5588410" required />
           </div>
           <div class="field-lite">
-            <label>Container Size</label>
+            <label>Container Size <span class="required-star">*</span></label>
             <select name="size" required>
               <option value="20 FT" ${item.size === "20 FT" ? "selected" : ""}>20 FT</option>
               <option value="40 FT" ${item.size === "40 FT" ? "selected" : ""}>40 FT</option>
@@ -3729,15 +3754,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             </select>
           </div>
           <div class="field-lite">
-            <label>Truck No</label>
+            <label>Truck No <span class="required-star">*</span></label>
             <input name="truckNo" value="${escapeHtml(item.truckNo)}" placeholder="Example: TMT-066" required />
           </div>
           <div class="field-lite">
-            <label>Quantity</label>
+            <label>Quantity <span class="required-star">*</span></label>
             <input name="quantity" type="number" min="1" step="any" value="${escapeHtml(String(qtyVal))}" placeholder="Quantity" required />
           </div>
           <div class="field-lite">
-            <label>Unit Price</label>
+            <label>Unit Price <span class="required-star">*</span></label>
             <input name="unitPrice" type="number" min="0" step="any" value="${escapeHtml(displayPrice)}" placeholder="Unit Price" required />
           </div>
           <div class="row-action">
@@ -3815,7 +3840,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       return `
         <div class="broker-row" data-broker-row="${index}">
-          <div class="field-lite"><label>Trucker/Broker</label><input name="brokerTrucker" value="${escapeHtml(item.truckerBroker)}" placeholder="Trucker or broker name" /></div>
+          <div class="field-lite"><label>Trucker/Broker <span class="required-star">*</span></label><input name="brokerTrucker" value="${escapeHtml(item.truckerBroker)}" placeholder="Trucker or broker name" /></div>
           <div class="field-lite"><label>Container Ref</label><select name="brokerContainerRef">
             <option value="All Containers" ${item.containerRef === "All Containers" ? "selected" : ""}>All Containers</option>
             ${availableReferences.map((containerNo) => `<option value="${escapeHtml(containerNo)}" ${item.containerRef === containerNo ? "selected" : ""}>${escapeHtml(containerNo)}</option>`).join("")}
@@ -4061,7 +4086,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           if (endDate && bookingDate > endDate) return false;
           return true;
         })
-        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
+        .sort((left, right) => compareBookingInvoiceOrder(left, right, dateSort?.value || "asc"));
 
       currentFilteredBookings = bookings;
       syncBookingSummaryDownloadState();
@@ -4456,19 +4481,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         missingLabels.push("Detention (a valid number)");
       }
       checkRequired(form.elements.paymentTerm, "Payment Term");
+      checkRequired(form.elements.paymentReceivedDate, "Payment Received Date");
+      checkRequired(form.elements.chequeNumber, "Cheque Number");
       checkRequired(form.elements.status, "Status");
       checkRequired(form.elements.accountFlow, "Payment Status");
       checkRequired(form.elements.remarks, "Remarks");
-
-      const hasBilty = Boolean(
-        (biltyInput && biltyInput.files && biltyInput.files.length > 0) ||
-        biltyStoragePath ||
-        (editingId && store.bookings.find((item) => item.id === editingId)?.biltyPath)
-      );
-      if (!hasBilty) {
-        invalidElements.push(biltyInput);
-        missingLabels.push("Bilty");
-      }
 
       if (brokerRows) {
         const brokerRowElements = Array.from(brokerRows.querySelectorAll("[data-broker-row]"));
@@ -4478,24 +4495,16 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           brokerRowElements.forEach((row, idx) => {
             const bName = row.querySelector("[name='brokerTrucker']") || row.querySelector("[name='truckerBroker']");
             const amtField = row.querySelector("[name='brokerRowAmount']") || row.querySelector("[name='brokerAmount']");
-            const bDetails = row.querySelector("[name='brokerRowPaymentDetails']") || row.querySelector("[name='brokerPaymentDetails']");
-            const bDate = row.querySelector("[name='brokerRowPaymentDate']") || row.querySelector("[name='brokerPaymentDate']");
 
             if (!String(bName?.value || "").trim()) {
               invalidElements.push(bName);
               missingLabels.push(`Trucker/Broker (Row ${idx + 1})`);
             }
-            if (!String(amtField?.value || "").trim() || amtField.validity.badInput || !Number.isFinite(Number(amtField.value)) || Number(amtField.value) <= 0 || amtField.validity.stepMismatch) {
-              invalidElements.push(amtField);
-              missingLabels.push(`Broker Amount (Row ${idx + 1}, a positive number)`);
-            }
-            if (!String(bDetails?.value || "").trim()) {
-              invalidElements.push(bDetails);
-              missingLabels.push(`Payment/Cheque/IBFT (Row ${idx + 1})`);
-            }
-            if (!String(bDate?.value || "").trim()) {
-              invalidElements.push(bDate);
-              missingLabels.push(`Broker Payment Date (Row ${idx + 1})`);
+            if (amtField && String(amtField.value || "").trim() !== "") {
+              if (amtField.validity.badInput || !Number.isFinite(Number(amtField.value)) || Number(amtField.value) < 0 || amtField.validity.stepMismatch) {
+                invalidElements.push(amtField);
+                missingLabels.push(`Broker Amount (Row ${idx + 1}, a valid number)`);
+              }
             }
           });
         }
@@ -4529,10 +4538,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         });
       }
 
-      if (form.elements.accountFlow?.value === "Credit") {
-        checkRequired(form.elements.paymentReceivedDate, "Payment Received Date");
-        checkRequired(form.elements.chequeNumber, "Cheque Number");
-      }
 
       if (invalidElements.length > 0) {
         invalidElements.forEach((el) => {

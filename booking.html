@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GTLS Transport - Booking Form</title>
-  <link rel="stylesheet" href="styles.css?v=20260902-1" />
+  <link rel="stylesheet" href="styles.css?v=20260922-3" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -68,10 +68,10 @@
           </div>
         </div>
         <form data-booking-form class="form-grid" novalidate>
-          <div class="field quarter"><label>Invoice</label><input name="invoiceNo"
+          <div class="field quarter"><label>Invoice <span class="required-star">*</span></label><input name="invoiceNo"
               placeholder="Example: INV-24061" required /></div>
           <div class="field quarter">
-            <label>Booking Date</label>
+            <label>Booking Date <span class="required-star">*</span></label>
             <div class="date-input-group">
               <input name="date" type="text" placeholder="10 Jun 2026" autocomplete="off" required />
               <input name="datePicker" type="date" class="native-date-picker" tabindex="-1" aria-hidden="true" />
@@ -86,19 +86,19 @@
               </button>
             </div>
           </div>
-          <div class="field quarter"><label>BL No</label><input name="blNo" placeholder="Example: ONEYSINE22550700" required /></div>
-          <div class="field quarter"><label>NTN</label><input name="gatePass" type="text"
+          <div class="field quarter"><label>BL No <span class="required-star">*</span></label><input name="blNo" placeholder="Example: ONEYSINE22550700" required /></div>
+          <div class="field quarter"><label>NTN <span class="required-star">*</span></label><input name="gatePass" type="text"
               placeholder="Example: 1234567-8" required /></div>
-          <div class="field quarter"><label>Customer / Payer</label><input name="customer" placeholder="Customer Name"
+          <div class="field quarter"><label>Customer / Payer <span class="required-star">*</span></label><input name="customer" placeholder="Customer Name"
               required /></div>
-          <div class="field quarter"><label>Consignee Address</label><input name="consignee"
+          <div class="field quarter"><label>Consignee Address <span class="required-star">*</span></label><input name="consignee"
               placeholder="Consignee Address" required /></div>
-          <div class="field quarter"><label>Route</label><input name="route" placeholder="Example: Karachi to Lahore" required /></div>
-          <div class="field quarter"><label>Origin</label><input name="origin" placeholder="Origin Location" required /></div>
-          <div class="field quarter"><label>Destination</label><input name="destination" placeholder="Destination Location" required />
+          <div class="field quarter"><label>Route <span class="required-star">*</span></label><input name="route" placeholder="Example: Karachi to Lahore" required /></div>
+          <div class="field quarter"><label>Origin <span class="required-star">*</span></label><input name="origin" placeholder="Origin Location" required /></div>
+          <div class="field quarter"><label>Destination <span class="required-star">*</span></label><input name="destination" placeholder="Destination Location" required />
           </div>
           <div class="field quarter">
-            <label>Category</label>
+            <label>Category <span class="required-star">*</span></label>
             <select name="category" required>
               <option>Transport</option>
               <option>Transport Custom Clearance</option>
@@ -110,11 +110,11 @@
               <option>Crane Lifter Services</option>
             </select>
           </div>
-          <div class="field half"><label>Goods Type</label><input name="goodsType" placeholder="Goods Description" required /></div>
+          <div class="field half"><label>Goods Type <span class="required-star">*</span></label><input name="goodsType" placeholder="Goods Description" required /></div>
           <div class="field quarter"><label>Road Haulage Charges</label><input name="rate" type="number"
               placeholder="0" required min="1" readonly /></div>
           <div class="field quarter">
-            <label>Sales Tax Authority</label>
+            <label>Sales Tax Authority <span class="required-star">*</span></label>
             <select name="salesTaxAuthority" required>
               <option value="Sindh Revenue Board" selected>Sindh Revenue Board (15%)</option>
               <option value="Punjab Revenue Authority">Punjab Revenue Authority (15%)</option>
@@ -125,14 +125,14 @@
             </select>
           </div>
           <div class="field quarter">
-            <label>Sales Tax Withholding</label>
+            <label>Sales Tax Withholding <span class="required-star">*</span></label>
             <select name="salesTaxWithholding" required>
               <option value="20" selected>20% Withheld (80% by us)</option>
               <option value="100">100% Withheld (0% by us)</option>
               <option value="0">0% Withheld (100% by us)</option>
             </select>
           </div>
-          <div class="field quarter"><label>Detention</label><input name="detention" type="number" inputmode="decimal" step="any"
+          <div class="field quarter"><label>Detention <span class="required-star">*</span></label><input name="detention" type="number" inputmode="decimal" step="any"
               class="manual-number-input" value="0" required /></div>
           <div class="field quarter"><label>15% Sales Tax</label><input name="salesTaxAmount" type="text" value="0"
               readonly /></div>
@@ -146,18 +146,18 @@
               value="0" readonly /></div>
           <div class="field quarter"><label>Receivable Amount</label><input name="receivableAmount" type="text"
               value="0" readonly /></div>
-          <div class="field quarter"><label>Payment Term</label><input name="paymentTerm" value="30 Days"
+          <div class="field quarter"><label>Payment Term <span class="required-star">*</span></label><input name="paymentTerm" value="30 Days"
               placeholder="Example: 30 Days" required /></div>
-          <div class="field quarter"><label>Payment Received Date</label><input name="paymentReceivedDate"
-              type="date" /></div>
-          <div class="field quarter"><label>Cheque Number</label><input name="chequeNumber"
-              placeholder="Example: 1005782261" /></div>
-          <div class="field quarter"><label>Status</label><select name="status" required>
+          <div class="field quarter"><label>Payment Received Date <span class="required-star">*</span></label><input name="paymentReceivedDate"
+              type="date" required /></div>
+          <div class="field quarter"><label>Cheque Number <span class="required-star">*</span></label><input name="chequeNumber"
+              placeholder="Example: 1005782261" required /></div>
+          <div class="field quarter"><label>Status <span class="required-star">*</span></label><select name="status" required>
               <option>Delivered</option>
               <option>In Transit</option>
             </select></div>
           <div class="field quarter">
-            <label>Payment Status</label>
+            <label>Payment Status <span class="required-star">*</span></label>
             <select name="accountFlow" required>
               <option selected>Awaited</option>
               <option>Credit</option>
@@ -174,11 +174,11 @@
           <div class="field full">
             <div class="container-block">
               <div class="container-table-head" aria-hidden="true">
-                <span>Container No</span>
-                <span>Container Size</span>
-                <span>Truck No</span>
-                <span>Quantity</span>
-                <span>Unit Price</span>
+                <span>Container No <span class="required-star">*</span></span>
+                <span>Container Size <span class="required-star">*</span></span>
+                <span>Truck No <span class="required-star">*</span></span>
+                <span>Quantity <span class="required-star">*</span></span>
+                <span>Unit Price <span class="required-star">*</span></span>
                 <span>Action</span>
               </div>
               <div data-container-rows class="container-rows"></div>
@@ -188,7 +188,7 @@
           <div class="field full">
             <div class="broker-block">
               <div class="broker-table-head" aria-hidden="true">
-                <span>Trucker/Broker</span>
+                <span>Trucker/Broker <span class="required-star">*</span></span>
                 <span>Container Ref</span>
                 <span>Truck No</span>
                 <span>Container Size</span>
@@ -209,7 +209,7 @@
               </div>
             </div>
           </div>
-          <div class="field full"><label>Remarks</label><textarea
+          <div class="field full"><label>Remarks <span class="required-star">*</span></label><textarea
               name="remarks" placeholder="Enter booking remarks..." required></textarea></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Booking</button>
@@ -220,11 +220,13 @@
       </section>
 
       <section class="screen">
-        <div class="screen-head">
+        <div class="screen-head booking-ledger-screen-head">
           <div>
             <h3>Booking Ledger</h3>
           </div>
-          <div class="ledger-filter">
+        </div>
+        <div class="booking-ledger-toolbar">
+          <div class="booking-ledger-filters">
             <div class="ledger-filter-control">
               <label for="booking-search-filter">General Filter</label>
               <input id="booking-search-filter" type="search" data-booking-search-filter
@@ -247,11 +249,12 @@
             <div class="ledger-filter-control">
               <label for="booking-date-sort">Date Order</label>
               <select id="booking-date-sort" data-booking-date-sort>
-                <option value="desc">Descending (Newest First)</option>
-                <option value="asc">Ascending (Oldest First)</option>
+                <option value="asc" selected>Ascend</option>
+                <option value="desc">Descend</option>
               </select>
             </div>
-            <button class="btn primary booking-summary-download" type="button" data-download-booking-summary disabled>Download Summary</button>
+          </div>
+          <div class="booking-ledger-stats">
             <div class="ledger-total" aria-live="polite">
               <span>Total Amount</span>
               <strong data-booking-total>PKR 0</strong>
@@ -261,6 +264,7 @@
               <strong data-booking-total-pnl>PKR 0</strong>
             </div>
             <span class="ledger-count" data-booking-count>0 record(s)</span>
+            <button class="btn primary booking-summary-download" type="button" data-download-booking-summary disabled>Download Summary</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -327,7 +331,7 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="app.js?v=20260902-1"></script>
+  <script src="app.js?v=20260922-3"></script>
 </body>
 
 </html>

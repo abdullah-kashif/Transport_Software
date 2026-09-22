@@ -61,6 +61,16 @@
 
 ## 5. Changelog
 
+- **2026-09-22**: Enforced mandatory validation for `Payment Received Date *` and `Cheque Number *` in the main Booking Form (`booking.html` / `app.js`). In Trucker/Broker rows, strictly kept `Amount`, `Payment/Cheque/IBFT`, and `Payment Date` (along with `Bilty`) as optional inputs, while `Trucker/Broker *` name, `Payment Received Date *`, and `Cheque Number *` are strictly required with `.required-star` visual indicators and automated validation highlighting.
+
+- **2026-09-22**: Booking Ledger layout & sorting redesign:
+  1. Unified all controls into a single unified row (`.booking-ledger-toolbar`) directly under `<h3>Booking Ledger</h3>`: Left side houses `General Filter`, `Customer`, `Start Date`, `End Date`, and `Date Order`; Right side houses `Total Amount`, `Total P&L`, record count badge (`0 record(s)`), and `Download Summary`.
+  2. Updated `Date Order` sorting logic (`compareBookingInvoiceOrder`) to sort bookings by Invoice number (natural numeric sort) with `Ascend` set as the default option across all customers or for any selected customer, with switchable `Descend` option.
+
+- **2026-09-22**: Repositioned `Download Summary` button to the end of the Booking Ledger filter/summary toolbar in `booking.html`, placed right after `ledger-count` (`0 record(s)`). Enhanced `.booking-summary-download` in `styles.css` with aligned `38px` height and flex centering for seamless visual integration with the ledger stats.
+
+- **2026-09-22**: Updated Booking Sales Tax Invoice (`buildBookingInvoicePdf`) so `Unit Price` is no longer summed across container rows when multiple containers exist. The invoice now displays the direct container unit price while keeping `Quantity` summed across rows, preserving the correct relation $\text{Road Haulage Charges} = \text{Total Quantity} \times \text{Unit Price}$.
+
 - **2026-09-22**: Fixed Fleet Maintenance and Equipment record persistence and filter population:
   1. Fleet Maintenance History filter dropdown (`[data-maintenance-truck-filter]`) now strictly populates only with truck numbers that actually have maintenance records (`getTrucksWithMaintenance()`), preventing empty-truck filter choices. The create/update form datalist (`#maintenance-trucks`) continues to suggest all fleet trucks (`getTruckNumbers()`).
   2. Fixed transient record disappearance on save in Fleet Maintenance and Equipment & Handling Fleet: implemented non-destructive key-based merging in `hydrateOperationalStore` for `equipmentFleet`, `maintenanceJobs`, `truckExpenses`, and `employees` so background Supabase hydration never clears unsynced local records or image previews.

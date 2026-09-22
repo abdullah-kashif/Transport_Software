@@ -1305,6 +1305,14 @@ label {
   font-size: 14px;
 }
 
+.required-star {
+  color: var(--red);
+  font-weight: 700;
+  margin-left: 2px;
+  display: inline-block;
+  line-height: 1;
+}
+
 input,
 select,
 textarea {
@@ -2040,6 +2048,43 @@ th {
   flex-wrap: wrap;
 }
 
+.booking-ledger-screen-head {
+  margin-bottom: 12px;
+}
+
+.booking-ledger-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: nowrap;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.booking-ledger-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.booking-ledger-stats {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1280px) {
+  .booking-ledger-toolbar {
+    flex-wrap: wrap;
+  }
+}
+
 .broker-block {
   padding: 16px;
   border: 1px solid var(--line);
@@ -2048,7 +2093,14 @@ th {
   overflow-x: auto;
 }
 
-.booking-summary-download { white-space: nowrap; }
+.booking-summary-download {
+  white-space: nowrap;
+  min-height: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .broker-table-head,
 .broker-row {
