@@ -1074,7 +1074,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     employees: { col: "image_path", folder: "employees" }
   };
 
-  async function syncRows(table, key, rows) {
+  async function syncRows(table, key, rows, options = {}) {
     const client = getSupabaseClient();
     const imgInfo = TABLE_IMAGE_COLUMNS[table];
     const selectFields = imgInfo ? `${key},${imgInfo.col}` : key;
@@ -1084,6 +1084,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const { error } = await client.from(table).upsert(rows, { onConflict: key });
       if (error) throw error;
     }
+    if (!options.pruneMissing) return;
     const keep = new Set(rows.map((row) => String(row[key])));
     const removedRows = (existing || []).filter((row) => !keep.has(String(row[key])));
     if (removedRows.length) {
@@ -1198,7 +1199,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const rows = [];
     for (const item of records || []) {
       const path = await uploadPrivateDataUrl(item.documentData, item.documentPath, "equipment", item.truckNo || item.id, { replaceFolder: true });
-      rows.push({ truck_no: item.truckNo, type_of_body: item.typeOfBody || null, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make, model: item.model,
+      rows.push({ truck_no: item.truckNo, type_of_body: item.typeOfBody || null, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make,
+        ownership: item.ownership || null, third_party_insurance_date: formatIsoDate(item.thirdPartyInsuranceDate) || null, model: item.model,
         mra: item.mra || null, banker: item.banker || null, fitness_expiry: formatIsoDate(item.fitnessExpiry) || null,
         balochistan_permit_expiry: formatIsoDate(item.balochistanPermitExpiry) || null, sindh_permit_expiry: formatIsoDate(item.sindhPermitExpiry) || null,
         kpk_permit_expiry: formatIsoDate(item.kpkPermitExpiry) || null, punjab_permit_expiry: formatIsoDate(item.punjabPermitExpiry) || null,
@@ -1209,11 +1211,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       await syncRows("equipment_fleet", "truck_no", rows);
     } catch (error) {
       const msg = String(error?.message || error?.details || "");
-      if (msg.includes("type_of_body") || error?.code === "PGRST204" || error?.code === "42703") {
-        console.warn("Retrying syncEquipment without type_of_body column because schema cache / column is not yet updated:", error.message);
+      if (msg.includes("type_of_body") || msg.includes("ownership") || msg.includes("third_party_insurance_date") || error?.code === "PGRST204" || error?.code === "42703") {
+        console.warn("Retrying syncEquipment without newer optional columns because schema cache / columns are not yet updated:", error.message);
         const fallbackRows = rows.map((r) => {
           const copy = { ...r };
           delete copy.type_of_body;
+          delete copy.ownership;
+          delete copy.third_party_insurance_date;
           return copy;
         });
         await syncRows("equipment_fleet", "truck_no", fallbackRows);
@@ -1522,6 +1526,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             chassisNo: r.chassis_no ?? local.chassisNo ?? "",
             engineNo: r.engine_no ?? local.engineNo ?? "",
             make: r.make ?? local.make ?? "",
+            ownership: r.ownership ?? local.ownership ?? "",
+            thirdPartyInsuranceDate: r.third_party_insurance_date ?? local.thirdPartyInsuranceDate ?? "",
             model: r.model ?? local.model ?? "",
             mra: r.mra ?? local.mra ?? "",
             banker: r.banker ?? local.banker ?? "",
@@ -1551,6 +1557,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             chassisNo: r.chassis_no,
             engineNo: r.engine_no,
             make: r.make,
+            ownership: r.ownership || "",
+            thirdPartyInsuranceDate: r.third_party_insurance_date || "",
             model: r.model,
             mra: r.mra || "",
             banker: r.banker || "",
@@ -3414,6 +3422,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
 
   const PAYMENT_ALERT_READ_KEY = "gtls-payment-alert-read-v1";
+  const EQUIPMENT_EXPIRY_ALERT_FIELDS = [
+    ["fitnessExpiry", "Fitness Expiry"],
+    ["balochistanPermitExpiry", "Balochistan Permit"],
+    ["sindhPermitExpiry", "Sindh Permit"],
+    ["kpkPermitExpiry", "KPK Permit"],
+    ["punjabPermitExpiry", "Punjab Permit"],
+    ["taxPaidUpTo", "Tax Paid Up To"]
+  ];
 
   function getBookingReceivableAmount(item) {
     const storedAmount = Number(item.receivableAmount);
@@ -3438,20 +3454,24 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     return Math.round(amount);
   }
 
-  function getPaymentDueDate(item) {
-    const bookingDate = parseDateValue(item.date);
-    const termDays = getPaymentTermDays(item.paymentTerm);
-    if (!bookingDate || termDays === null) return null;
-    const dueDate = new Date(bookingDate);
+  function getPaymentDueDate(item, paymentTerm = item.paymentTerm, baseDate = item.date) {
+    const startDate = parseDateValue(baseDate);
+    const termDays = getPaymentTermDays(paymentTerm);
+    if (!startDate || termDays === null) return null;
+    const dueDate = new Date(startDate);
     dueDate.setDate(dueDate.getDate() + termDays);
     return dueDate;
   }
 
-  function getPaymentAlertKey(item, dueDate) {
+  function getPaymentAlertKey(item, dueDate, suffix = "") {
     const dateKey = dueDate instanceof Date && !Number.isNaN(dueDate.getTime())
       ? `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}`
       : "unknown";
-    return `${item.id || item.invoiceNo || item.customer || "booking"}|${dateKey}`;
+    return `${item.id || item.invoiceNo || item.customer || "record"}|${suffix}|${dateKey}`;
+  }
+
+  function getExpiryAlertKey(item, expiryDate, field) {
+    return getPaymentAlertKey(item, expiryDate, `equipment-${field}`);
   }
 
   function getReadPaymentAlertKeys() {
@@ -3472,56 +3492,143 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const count = center.querySelector("[data-notification-count]");
     const summary = center.querySelector("[data-notification-summary]");
     const list = center.querySelector("[data-notification-list]");
-    let expiredPayments = [];
+    let activeAlerts = [];
 
     function readBookings() {
       const value = typeof bookingsSource === "function" ? bookingsSource() : bookingsSource;
-      return Array.isArray(value) ? value : [];
+      return value || [];
     }
 
     function renderNotifications() {
       const today = parseDateValue(getTodayIsoDate());
-      expiredPayments = readBookings()
-        .filter((item) => String(item.accountFlow || "").trim().toLowerCase() === "awaited")
-        .map((item) => {
-          const dueDate = getPaymentDueDate(item);
+      const source = readBookings();
+      const bookings = Array.isArray(source) ? source : (Array.isArray(source?.bookings) ? source.bookings : []);
+      const truckJobs = Array.isArray(source) ? [] : (Array.isArray(source?.truckExpenses) ? source.truckExpenses : []);
+      const equipmentFleet = Array.isArray(source) ? [] : (Array.isArray(source?.equipmentFleet) ? source.equipmentFleet : []);
+      const paymentEntries = [
+        ...bookings
+          .filter((item) => String(item.accountFlow || "").trim().toLowerCase() === "awaited")
+          .map((item) => ({
+            item,
+            moduleLabel: "Booking Payment",
+            href: "booking.html",
+            amount: getBookingReceivableAmount(item),
+            subject: item.customer || "Customer",
+            reference: item.invoiceNo || item.id || "Payment",
+            dateLabel: "Due date",
+            paymentTerm: item.paymentTerm,
+            baseDate: item.date,
+            suffix: "booking"
+          })),
+        ...truckJobs.flatMap((item) => [
+          {
+            item,
+            moduleLabel: "Import Payment",
+            href: "truck.html",
+            amount: calculateTruckTripFinancials(item).importReceivable,
+            subject: item.customer || "Truck Job",
+            reference: item.jobNo || item.id || "Payment",
+            dateLabel: "Due date",
+            paymentTerm: item.importPaymentTerm,
+            baseDate: item.date,
+            status: item.importPaymentStatus,
+            suffix: "import"
+          },
+          {
+            item,
+            moduleLabel: "Export Payment",
+            href: "truck.html",
+            amount: calculateTruckTripFinancials(item).exportReceivable,
+            subject: item.exportCustomer || item.customer || "Truck Job",
+            reference: item.jobNo || item.id || "Payment",
+            dateLabel: "Due date",
+            paymentTerm: item.exportPaymentTerm,
+            baseDate: item.exportLoadDate,
+            status: item.exportPaymentStatus,
+            suffix: "export"
+          }
+        ].filter((entry) => String(entry.status || "Awaited").trim().toLowerCase() !== "credit"))
+      ];
+      const paymentAlerts = paymentEntries
+        .map((entry) => {
+          const dueDate = getPaymentDueDate(entry.item, entry.paymentTerm, entry.baseDate);
           const daysOverdue = dueDate && today ? Math.floor((today - dueDate) / 86400000) : -1;
-          return { item, dueDate, daysOverdue, key: getPaymentAlertKey(item, dueDate) };
+          return { ...entry, dueDate, daysOverdue, alertType: "payment", key: getPaymentAlertKey(entry.item, dueDate, entry.suffix) };
         })
         .filter((entry) => entry.dueDate && entry.daysOverdue >= 0)
         .sort((left, right) => right.daysOverdue - left.daysOverdue);
 
+      const expiryAlerts = equipmentFleet.flatMap((item) => EQUIPMENT_EXPIRY_ALERT_FIELDS.map(([field, label]) => {
+        const expiryDate = parseDateValue(item[field]);
+        const daysUntil = expiryDate && today ? Math.ceil((expiryDate - today) / 86400000) : null;
+        if (!expiryDate || daysUntil === null || daysUntil > 30) return null;
+        return {
+          item,
+          moduleLabel: label,
+          href: "equipment.html",
+          amount: null,
+          subject: item.truckNo || item.id || "Equipment",
+          reference: item.truckNo || item.id || "Equipment",
+          dueDate: expiryDate,
+          daysOverdue: Math.max(0, -daysUntil),
+          daysUntil,
+          dateLabel: "Expiry date",
+          alertType: "expiry",
+          key: getExpiryAlertKey(item, expiryDate, field)
+        };
+      }).filter(Boolean));
+
+      activeAlerts = [...paymentAlerts, ...expiryAlerts].sort((left, right) => {
+        if (left.daysOverdue !== right.daysOverdue) return right.daysOverdue - left.daysOverdue;
+        return String(left.dueDate || "").localeCompare(String(right.dueDate || ""));
+      });
+
       const readKeys = getReadPaymentAlertKeys();
-      const unreadCount = expiredPayments.filter((entry) => !readKeys.has(entry.key)).length;
+      const unreadCount = activeAlerts.filter((entry) => !readKeys.has(entry.key)).length;
       count.textContent = unreadCount > 99 ? "99+" : unreadCount;
       count.hidden = unreadCount === 0;
-      summary.textContent = expiredPayments.length
-        ? `${expiredPayments.length} expired payment${expiredPayments.length === 1 ? "" : "s"}`
-        : "No expired payments";
-      list.innerHTML = expiredPayments.length
-        ? expiredPayments.map(({ item, dueDate, daysOverdue }) => `
-          <a class="payment-notification" href="booking.html" title="Open Booking Form">
-            <span class="payment-notification-icon"><strong>${daysOverdue}</strong><small>${daysOverdue === 1 ? "day" : "days"}</small></span>
+      const heading = center.querySelector(".notification-panel-head strong");
+      if (heading) heading.textContent = "Payment & Expiry Alerts";
+      summary.textContent = activeAlerts.length
+        ? `${activeAlerts.length} active alert${activeAlerts.length === 1 ? "" : "s"}`
+        : "No payment or expiry alerts";
+      list.innerHTML = activeAlerts.length
+        ? activeAlerts.map(({ moduleLabel, href, amount, dueDate, daysOverdue, daysUntil, subject, reference, dateLabel, alertType }) => {
+          const statusText = alertType === "expiry"
+            ? (daysUntil < 0 ? "Expired" : daysUntil === 0 ? "Expires today" : "Due soon")
+            : (daysOverdue === 0 ? "Due today" : "Overdue");
+          const badgeNumber = alertType === "expiry"
+            ? (daysUntil < 0 ? daysOverdue : Math.max(0, daysUntil))
+            : daysOverdue;
+          const badgeLabel = alertType === "expiry"
+            ? (daysUntil < 0 ? "days" : daysUntil === 0 ? "today" : "days")
+            : (daysOverdue === 1 ? "day" : "days");
+          const amountMarkup = amount === null || amount === undefined
+            ? ""
+            : `<span>PKR ${money(amount)}</span>`;
+          return `
+          <a class="payment-notification" href="${href}" title="Open ${moduleLabel}">
+            <span class="payment-notification-icon"><strong>${badgeNumber}</strong><small>${badgeLabel}</small></span>
             <span class="payment-notification-copy">
               <span class="payment-notification-title">
-                <strong>${text(item.customer || "Customer")}</strong>
-                <em>${daysOverdue === 0 ? "Due today" : "Overdue"}</em>
+                <strong>${text(subject)}</strong>
+                <em>${text(moduleLabel)} · ${statusText}</em>
               </span>
               <span class="payment-notification-meta">
-                <span>${text(item.invoiceNo || item.id || "Invoice")}</span>
-                <span>PKR ${money(getBookingReceivableAmount(item))}</span>
+                <span>${text(reference)}</span>
+                ${amountMarkup}
               </span>
-              <span class="payment-notification-due">Due date: ${formatShortDate(dueDate)}</span>
+              <span class="payment-notification-due">${dateLabel}: ${formatShortDate(dueDate)}</span>
             </span>
           </a>
-        `).join("")
+        `; }).join("")
         : `
           <div class="notification-empty">
             <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
             </svg>
-            <p>All clear! No payment terms have expired.</p>
+            <p>All clear! No payment or equipment expiry alerts.</p>
           </div>
         `;
     }
@@ -3533,9 +3640,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     trigger.addEventListener("click", () => {
       const opening = panel.hidden;
-      if (opening && expiredPayments.length) {
+      if (opening && activeAlerts.length) {
         const readKeys = getReadPaymentAlertKeys();
-        expiredPayments.forEach((entry) => readKeys.add(entry.key));
+        activeAlerts.forEach((entry) => readKeys.add(entry.key));
         sessionStorage.setItem(PAYMENT_ALERT_READ_KEY, JSON.stringify([...readKeys]));
         count.hidden = true;
         count.textContent = "0";
@@ -3666,7 +3773,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         balochistanPermitAlerts: getExpirySummary(equipmentFleet, "balochistanPermitExpiry"),
         sindhPermitAlerts: getExpirySummary(equipmentFleet, "sindhPermitExpiry"),
         kpkPermitAlerts: getExpirySummary(equipmentFleet, "kpkPermitExpiry"),
-        punjabPermitAlerts: getExpirySummary(equipmentFleet, "punjabPermitExpiry")
+        punjabPermitAlerts: getExpirySummary(equipmentFleet, "punjabPermitExpiry"),
+        taxPaidUpToAlerts: getExpirySummary(equipmentFleet, "taxPaidUpTo")
       };
       const documentAlerts = Object.values(equipmentExpirySummaries).reduce((total, summary) => ({
         alerts: total.alerts + summary.alerts,
@@ -5241,7 +5349,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const records = (Array.isArray(trips) ? trips : [trips])
       .filter(Boolean)
       .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, "asc"));
-    if (!records.length) throw new Error("No pending truck records were found.");
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("l", "pt", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -5873,9 +5980,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         notice.textContent = `Truck trip ${normalized.jobNo} updated successfully.`;
       }
       try {
-        saveStore(store);
+        saveStore(store, { skipRemote: true });
+        await syncStoreImmediately(store, { truckExpenses: true, activityLogs: true });
       } catch (error) {
-        notice.textContent = "The image is too large for browser storage. Please choose a smaller image.";
+        notice.textContent = error?.name === "QuotaExceededError"
+          ? "The image is too large for browser storage. Please choose a smaller image."
+          : `Truck trip saved locally, but Supabase sync failed: ${error.message}`;
         return;
       }
       render();
@@ -6029,9 +6139,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (!isCompletedSummary) {
         currentPendingSummaryTrips = filteredTrips;
         currentPendingSummaryTruckNo = selectedTruckNo;
-        if (pendingSummaryDownloadButton) {
-          pendingSummaryDownloadButton.disabled = !selectedTruckNo || !filteredTrips.length;
-        }
+        if (pendingSummaryDownloadButton) pendingSummaryDownloadButton.disabled = false;
       }
 
       const totals = filteredTrips.reduce((summary, item) => {
@@ -6203,13 +6311,16 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
     if (pendingSummaryDownloadButton) {
       pendingSummaryDownloadButton.addEventListener("click", () => {
-        if (!currentPendingSummaryTruckNo || !currentPendingSummaryTrips.length) return;
         const brokerFilter = {
           impBroker: String(importBrokerFilter?.value || "").trim(),
           expBroker: String(exportBrokerFilter?.value || "").trim(),
           mtyBroker: String(mtyBrokerFilter?.value || "").trim()
         };
-        buildPendingTruckSummaryPdf(currentPendingSummaryTrips, currentPendingSummaryTruckNo, brokerFilter).catch(() => {});
+        buildPendingTruckSummaryPdf(
+          currentPendingSummaryTrips,
+          currentPendingSummaryTruckNo || "All Trucks",
+          brokerFilter
+        ).catch(() => {});
       });
     }
     window.activePageRender = render;
@@ -6238,7 +6349,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       "balochistanPermitExpiry",
       "sindhPermitExpiry",
       "kpkPermitExpiry",
-      "punjabPermitExpiry"
+      "punjabPermitExpiry",
+      "taxPaidUpTo"
     ];
 
     function setNotice(message = "") {
@@ -6304,7 +6416,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       summary.innerHTML = `
         <div class="card span-3"><span class="badge neutral">Fleet</span><strong>${rows.length}</strong><div class="muted">Registered equipment</div></div>
         <div class="card span-3"><span class="badge ${fitnessAlerts ? "bad" : "good"}">Fitness</span><strong>${fitnessAlerts}</strong><div class="muted">Expiry alerts</div></div>
-        <div class="card span-3"><span class="badge ${permitAlerts ? "warn" : "good"}">Permits</span><strong>${permitAlerts}</strong><div class="muted">Permit alerts</div></div>
+        <div class="card span-3"><span class="badge ${permitAlerts ? "warn" : "good"}">Permits &amp; Tax</span><strong>${permitAlerts}</strong><div class="muted">Permit and tax alerts</div></div>
         <div class="card span-3"><span class="badge good">Documents</span><strong>${completeFiles}</strong><div class="muted">Files recorded</div></div>
       `;
     }
@@ -6318,6 +6430,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           item.chassisNo,
           item.engineNo,
           item.make,
+          item.ownership,
+          item.thirdPartyInsuranceDate,
           item.model,
           item.mra,
           item.banker,
@@ -6337,6 +6451,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${text(item.chassisNo)}</td>
           <td>${text(item.engineNo)}</td>
           <td>${text(item.make)}</td>
+          <td>${text(item.ownership || "-")}</td>
+          <td>${expiryCell(item.thirdPartyInsuranceDate)}</td>
           <td>${text(item.model)}</td>
           <td>${text(item.mra)}</td>
           <td>${text(item.banker)}</td>
@@ -6454,9 +6570,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
       if (search) search.value = "";
       try {
-        saveStore(store);
+        saveStore(store, { skipRemote: true });
+        await syncStoreImmediately(store, { equipmentFleet: true, activityLogs: true });
       } catch (error) {
-        setNotice("Document is too large for browser storage. Please select a smaller file.", true);
+        setNotice(error?.name === "QuotaExceededError"
+          ? "Document is too large for browser storage. Please select a smaller file."
+          : `Equipment saved locally, but Supabase sync failed: ${error.message}`, true);
         return;
       }
       resetForm();
@@ -6473,8 +6592,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           try {
             await createRegisterPdf(
               "Equipment & Handling Fleet",
-              ["S.No", "Registration No", "Type of Body", "Chassis No", "Engine No", "Maker", "Model", "MRA"],
-              ["1", item.truckNo, item.typeOfBody || "-", item.chassisNo, item.engineNo, item.make, item.model, item.mra],
+              ["S.No", "Registration No", "Type of Body", "Chassis No", "Engine No", "Maker", "Ownership", "Third Party Insurance Date", "Model", "MRA"],
+              ["1", item.truckNo, item.typeOfBody || "-", item.chassisNo, item.engineNo, item.make, item.ownership || "-", item.thirdPartyInsuranceDate ? formatShortDate(item.thirdPartyInsuranceDate) : "-", item.model, item.mra],
               `${safePdfFileName(item.truckNo || item.id)}_equipment_fleet`
             );
           } catch (error) {
@@ -6796,9 +6915,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
 
       try {
-        saveStore(store);
+        saveStore(store, { skipRemote: true });
+        await syncStoreImmediately(store, { maintenanceJobs: true, activityLogs: true });
       } catch (error) {
-        setNotice("The image is too large for browser storage. Please choose a smaller image.", true);
+        setNotice(error?.name === "QuotaExceededError"
+          ? "The image is too large for browser storage. Please choose a smaller image."
+          : `Maintenance job saved locally, but Supabase sync failed: ${error.message}`, true);
         return;
       }
       const savedId = normalized.id;
@@ -7029,9 +7151,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
 
       try {
-        saveStore(store);
+        saveStore(store, { skipRemote: true });
+        await syncStoreImmediately(store, { employees: true, activityLogs: true });
       } catch (error) {
-        notice.textContent = "The image is too large for browser storage. Please choose a smaller image.";
+        notice.textContent = error?.name === "QuotaExceededError"
+          ? "The image is too large for browser storage. Please choose a smaller image."
+          : `Employee saved locally, but Supabase sync failed: ${error.message}`;
         return;
       }
       render();
@@ -8467,7 +8592,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     setActiveNav();
 
     if (page !== "signin" && page !== "admin-login") {
-      window.refreshPaymentNotifications = bindPaymentNotifications(() => store.bookings);
+      window.refreshPaymentNotifications = bindPaymentNotifications(() => store);
     }
 
     try {

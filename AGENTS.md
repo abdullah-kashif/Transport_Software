@@ -61,6 +61,18 @@
 
 ## 5. Changelog
 
+- **2026-09-23**: Made operational Supabase sync non-destructive. Truck, Equipment, Maintenance, and Employee upserts no longer delete remote rows missing from a local browser snapshot, protecting data during hydration delays, RLS issues, and concurrent sessions.
+
+- **2026-09-23**: Truck Details, Equipment & Handling Fleet, Fleet Maintenance, and Employees now await Supabase sync before showing a successful save. If remote sync fails, the record remains locally cached but the module shows an explicit sync failure message.
+
+- **2026-09-23**: Added Equipment & Handling Fleet `Ownership` and `Third Party Insurance Date` fields after Maker. Both fields persist through local state and Supabase; run `supabase-equipment-ownership-insurance.sql` once before deployment.
+
+- **2026-09-23**: Complete Equipment & Handling Fleet expiry alerts now cover Fitness, all four provincial permits, and Tax Paid Up To. Dashboard and Equipment counters include tax dates, while the global notification bell shows expired or next-30-day fleet expiry alerts with direct links to Equipment alongside payment alerts.
+
+- **2026-09-23**: Payment Alerts now include overdue Booking Form terms and Truck Details Import/Export Payment Term fields. Equipment, Fleet Maintenance, Booking Summary, and Trucker/Broker Summary have no Payment Term input fields.
+
+- **2026-09-23**: Pending Truck Summary Download PDF is always enabled. It exports the current filter result for a selected truck or All Trucks and generates a valid zero-row PDF when no pending records match.
+
 - **2026-09-22**: Truck Details Import/Export Symmetrical Fields, Detention Freight Integration & Invoice Display:
   1. Added 5 symmetrical operational fields to both Import Details and Export Details: `Customer Collection`, `Paid Date`, `Cheque / IBFT`, `Detention`, and `Payment Term` in the Truck Details form (`truck.html`) and data model.
   2. Updated financial calculations in `calculateTruckTripFinancials` and live `calculateTrip`:

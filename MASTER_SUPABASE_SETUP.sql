@@ -18,6 +18,8 @@ alter table public.truck_jobs add column if not exists export_payment_term text;
 alter table public.truck_jobs add column if not exists export_customer_collection numeric default 0;
 alter table public.equipment_fleet add column if not exists original_documents_path text;
 alter table public.equipment_fleet add column if not exists type_of_body text;
+alter table public.equipment_fleet add column if not exists ownership text;
+alter table public.equipment_fleet add column if not exists third_party_insurance_date date;
 alter table public.employees add column if not exists image_path text;
 alter table public.booking_containers add column if not exists quantity numeric;
 alter table public.booking_containers add column if not exists unit_price numeric;
