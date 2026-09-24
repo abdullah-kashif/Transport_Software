@@ -61,6 +61,10 @@
 
 ## 5. Changelog
 
+- **2026-09-24**: Import and Export Truck Details Payment Term expiry notifications now show the relevant truck registration number instead of the customer name.
+
+- **2026-09-24**: Added `Payment Received Date` after `Cheque / IBFT` in both Import Details and Export Details. The values persist through Truck Details form/edit/table flows and Supabase; run `supabase-truck-payment-received-date.sql` once before deployment.
+
 - **2026-09-23**: Made operational Supabase sync non-destructive. Truck, Equipment, Maintenance, and Employee upserts no longer delete remote rows missing from a local browser snapshot, protecting data during hydration delays, RLS issues, and concurrent sessions.
 
 - **2026-09-23**: Truck Details, Equipment & Handling Fleet, Fleet Maintenance, and Employees now await Supabase sync before showing a successful save. If remote sync fails, the record remains locally cached but the module shows an explicit sync failure message.

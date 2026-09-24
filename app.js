@@ -1137,7 +1137,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         import_broker_commission: Number(item.importBrokerCommission || 0),
         import_broker: item.importBroker || null, import_receivable_amount: Number(item.importReceivedAmount || 0),
         import_payment_term: item.importPaymentTerm || null, import_customer_collection: Number(item.importCustomerCollection || 0),
-        import_cheque_details: item.importChequeDetails || null, import_payment_date: formatIsoDate(item.importPaymentDate) || null,
+        import_cheque_details: item.importChequeDetails || null, import_payment_received_date: formatIsoDate(item.importPaymentReceivedDate) || null, import_payment_date: formatIsoDate(item.importPaymentDate) || null,
         import_cheque_details2: item.importChequeDetails2 || null,
         import_payment_status: item.importPaymentStatus === "Credit" ? "Credit" : "Awaited",
         mty_payment_date: formatIsoDate(item.mtyPaymentDate) || null, mty_payment_status: item.mtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
@@ -1154,7 +1154,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         export_size: item.exportSize || null, export_weight: item.exportWeight || null,
         export_receivable_amount: Number(item.exportReceivedAmount || 0),
         export_payment_term: item.exportPaymentTerm || null, export_customer_collection: Number(item.exportCustomerCollection || 0),
-        export_cheque_details: item.exportChequeDetails || null,
+        export_cheque_details: item.exportChequeDetails || null, export_payment_received_date: formatIsoDate(item.exportPaymentReceivedDate) || null,
         export_payment_date: formatIsoDate(item.exportPaymentDate) || null, export_cheque_details2: item.exportChequeDetails2 || null,
         export_payment_status: item.exportPaymentStatus === "Credit" ? "Credit" : "Awaited",
         export_mty_payment_date: formatIsoDate(item.exportMtyPaymentDate) || null,
@@ -1168,7 +1168,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       await syncRows("truck_jobs", "job_no", rows);
     } catch (error) {
       const msg = String(error?.message || error?.details || "");
-      if (msg.includes("export_customer") || msg.includes("export_mty") || msg.includes("export_cargo_description") || msg.includes("detention") || msg.includes("payment_term") || msg.includes("customer_collection") || error?.code === "PGRST204" || error?.code === "42703") {
+      if (msg.includes("export_customer") || msg.includes("export_mty") || msg.includes("export_cargo_description") || msg.includes("detention") || msg.includes("payment_term") || msg.includes("customer_collection") || msg.includes("payment_received_date") || error?.code === "PGRST204" || error?.code === "42703") {
         console.warn("Retrying syncTruckJobs without new columns because schema cache / columns are not yet updated:", error.message);
         const fallbackRows = rows.map((r) => {
           const copy = { ...r };
@@ -1181,10 +1181,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           delete copy.import_detention;
           delete copy.import_payment_term;
           delete copy.import_customer_collection;
+          delete copy.import_payment_received_date;
           delete copy.import_cheque_details2;
           delete copy.export_detention;
           delete copy.export_payment_term;
           delete copy.export_customer_collection;
+          delete copy.export_payment_received_date;
           delete copy.export_cheque_details2;
           return copy;
         });
@@ -1432,7 +1434,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             importReceivedAmount: Number(r.import_receivable_amount || 0),
             importPaymentTerm: r.import_payment_term || local.importPaymentTerm || "",
             importCustomerCollection: Number(r.import_customer_collection !== undefined && r.import_customer_collection !== null ? r.import_customer_collection : (local.importCustomerCollection || 0)),
-            importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
+            importChequeDetails: r.import_cheque_details || "", importPaymentReceivedDate: r.import_payment_received_date || local.importPaymentReceivedDate || "", importPaymentDate: r.import_payment_date || "",
             importChequeDetails2: r.import_cheque_details2 || local.importChequeDetails2 || "",
             importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
             importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "",
@@ -1448,7 +1450,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             exportReceivedAmount: Number(r.export_receivable_amount || 0),
             exportPaymentTerm: r.export_payment_term || local.exportPaymentTerm || "",
             exportCustomerCollection: Number(r.export_customer_collection !== undefined && r.export_customer_collection !== null ? r.export_customer_collection : (local.exportCustomerCollection || 0)),
-            exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
+            exportChequeDetails: r.export_cheque_details || "", exportPaymentReceivedDate: r.export_payment_received_date || local.exportPaymentReceivedDate || "", exportPaymentDate: r.export_payment_date || "",
             exportChequeDetails2: r.export_cheque_details2 || local.exportChequeDetails2 || "",
             exportPaymentStatus: r.export_payment_status,
             exportMtyPaymentDate: r.export_mty_payment_date || local.exportMtyPaymentDate || "",
@@ -1475,7 +1477,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             importReceivedAmount: Number(r.import_receivable_amount || 0),
             importPaymentTerm: r.import_payment_term || "",
             importCustomerCollection: Number(r.import_customer_collection || 0),
-            importChequeDetails: r.import_cheque_details || "", importPaymentDate: r.import_payment_date || "",
+            importChequeDetails: r.import_cheque_details || "", importPaymentReceivedDate: r.import_payment_received_date || "", importPaymentDate: r.import_payment_date || "",
             importChequeDetails2: r.import_cheque_details2 || "",
             importPaymentStatus: r.import_payment_status, mtyPaymentDate: r.mty_payment_date || "", mtyPaymentStatus: r.mty_payment_status,
             importRemarks: r.import_remarks || "", exportLoadDate: r.export_load_date || "", exportTruckNo: r.export_truck_no || "",
@@ -1491,7 +1493,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             exportReceivedAmount: Number(r.export_receivable_amount || 0),
             exportPaymentTerm: r.export_payment_term || "",
             exportCustomerCollection: Number(r.export_customer_collection || 0),
-            exportChequeDetails: r.export_cheque_details || "", exportPaymentDate: r.export_payment_date || "",
+            exportChequeDetails: r.export_cheque_details || "", exportPaymentReceivedDate: r.export_payment_received_date || "", exportPaymentDate: r.export_payment_date || "",
             exportChequeDetails2: r.export_cheque_details2 || "",
             exportPaymentStatus: r.export_payment_status,
             exportMtyPaymentDate: r.export_mty_payment_date || "",
@@ -3526,7 +3528,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             moduleLabel: "Import Payment",
             href: "truck.html",
             amount: calculateTruckTripFinancials(item).importReceivable,
-            subject: item.customer || "Truck Job",
+            subject: item.truckNo || item.jobNo || item.id || "Truck Job",
             reference: item.jobNo || item.id || "Payment",
             dateLabel: "Due date",
             paymentTerm: item.importPaymentTerm,
@@ -3539,7 +3541,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             moduleLabel: "Export Payment",
             href: "truck.html",
             amount: calculateTruckTripFinancials(item).exportReceivable,
-            subject: item.exportCustomer || item.customer || "Truck Job",
+            subject: item.exportTruckNo || item.truckNo || item.jobNo || item.id || "Truck Job",
             reference: item.jobNo || item.id || "Payment",
             dateLabel: "Due date",
             paymentTerm: item.exportPaymentTerm,
@@ -5830,7 +5832,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="55">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="57">No truck trip records available yet.</td></tr>`;
         return;
       }
       body.innerHTML = rows.map((item, index) => {
@@ -5841,11 +5843,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${text(item.customer)}</td><td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
           <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
           <td>${money(item.importFreight)}</td><td>${money(item.importDetention || 0)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td>
-          <td>${text(item.importPaymentTerm || "-")}</td><td>${text(item.importChequeDetails || "-")}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td>${money(item.importCustomerCollection || 0)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td>${text(item.importChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.importRemarks || item.remarks || "-")}</td>
+          <td>${text(item.importPaymentTerm || "-")}</td><td>${text(item.importChequeDetails || "-")}</td><td>${item.importPaymentReceivedDate ? formatShortDate(item.importPaymentReceivedDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td>${money(item.importCustomerCollection || 0)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td>${text(item.importChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.importRemarks || item.remarks || "-")}</td>
           <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportCustomer || item.customer || "-")}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${text(item.exportCargoDescription || item.cargoDescription || "-")}</td>
           <td>${money(item.exportMtyBoxFreight || 0)}</td><td>${text(item.exportMtyBroker || "-")}</td>
           <td>${money(item.exportFreight)}</td><td>${money(item.exportDetention || 0)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportReceivedAmount)}</td>
-          <td>${text(item.exportPaymentTerm || "-")}</td><td>${text(item.exportChequeDetails || "-")}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td>${money(item.exportCustomerCollection || 0)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td>${text(item.exportChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
+          <td>${text(item.exportPaymentTerm || "-")}</td><td>${text(item.exportChequeDetails || "-")}</td><td>${item.exportPaymentReceivedDate ? formatShortDate(item.exportPaymentReceivedDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td>${money(item.exportCustomerCollection || 0)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td>${text(item.exportChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
           <td>${item.image ? `
             <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image">
               <img src="${escapeHtml(item.image)}" alt="Truck details attachment" />

@@ -323,6 +323,10 @@ P&L example: a Receivable Amount of 257.90 with two broker rows of 100 each give
 
 ### Recent Changes Log
 
+| **2026-09-24** | Truck Payment Term Notification Labels | Import and Export Truck Details Payment Term alerts now identify the relevant truck by Import/Export Truck Registration No instead of customer name. | `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-24** | Truck Payment Received Dates | Added `Payment Received Date` immediately after `Cheque / IBFT` in both Import Details and Export Details. Values persist through the Truck Details form, table, Supabase `truck_jobs` sync/hydration, and the migration `supabase-truck-payment-received-date.sql`. | `truck.html`, `app.js`, `MASTER_SUPABASE_SETUP.sql`, `supabase-truck-payment-received-date.sql`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
 | **2026-09-23** | Non-Destructive Operational Sync | Operational `syncRows` upserts Truck, Equipment, Maintenance, and Employee records without deleting remote rows that are absent from a local snapshot. This protects Supabase data during startup hydration, RLS delays, or concurrent client sessions. | `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 
 | **2026-09-23** | Operational Save Confirmation | Truck Details, Equipment & Handling Fleet, Fleet Maintenance, and Employees now wait for their Supabase sync before showing a successful save. Local session storage remains a fallback, and sync failures are shown as explicit local-only warnings. | `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |

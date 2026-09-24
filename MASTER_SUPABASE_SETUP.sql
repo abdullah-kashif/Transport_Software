@@ -16,6 +16,8 @@ alter table public.truck_jobs add column if not exists import_customer_collectio
 alter table public.truck_jobs add column if not exists export_detention numeric default 0;
 alter table public.truck_jobs add column if not exists export_payment_term text;
 alter table public.truck_jobs add column if not exists export_customer_collection numeric default 0;
+alter table public.truck_jobs add column if not exists import_payment_received_date date;
+alter table public.truck_jobs add column if not exists export_payment_received_date date;
 alter table public.equipment_fleet add column if not exists original_documents_path text;
 alter table public.equipment_fleet add column if not exists type_of_body text;
 alter table public.equipment_fleet add column if not exists ownership text;
