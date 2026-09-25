@@ -35,9 +35,15 @@ alter table public.bookings add column if not exists broker_entries jsonb defaul
 grant usage on schema public to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.equipment_fleet to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.maintenance_jobs to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.two_pay_records to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.bookings to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.booking_containers to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.booking_brokers to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.truck_jobs to authenticated, service_role;
+grant select, insert, update, delete on table public.employees to authenticated, service_role;
+grant select, insert, update, delete on table public.accounts to authenticated, service_role;
+grant select, insert, update, delete on table public.account_entries to authenticated, service_role;
+grant select, insert on table public.activity_logs to authenticated, service_role;
 grant all on all sequences in schema public to authenticated, anon, service_role;
 
 drop policy if exists "equipment_fleet_module_access" on public.equipment_fleet;
@@ -51,6 +57,13 @@ create policy "maintenance_jobs_module_access" on public.maintenance_jobs
 for all to authenticated
 using (public.is_active_user() and public.has_module_access('maintenance'))
 with check (public.is_active_user() and public.has_module_access('maintenance'));
+
+alter table public.two_pay_records enable row level security;
+drop policy if exists "two_pay_records_module_access" on public.two_pay_records;
+create policy "two_pay_records_module_access" on public.two_pay_records
+for all to authenticated
+using (public.is_active_user() and public.has_module_access('two-pay-records'))
+with check (public.is_active_user() and public.has_module_access('two-pay-records'));
 
 -- Keep new generated IDs readable: Job-1, Job-2 and MNT-1, MNT-2.
 alter table public.bookings

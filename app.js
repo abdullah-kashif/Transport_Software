@@ -35,6 +35,7 @@
     { value: "employee", label: "Employees" },
     { value: "khata", label: "Accounts Receivable" },
     { value: "accounts-payable", label: "Accounts Payable" },
+    { value: "two-pay-records", label: "Two Pay Records" },
     { value: "admin", label: "Admin" },
     { value: "activity-logs", label: "Activity Logs" }
   ];
@@ -75,7 +76,8 @@
       }
     ],
     customerKhatas: [],
-    vendorKhatas: []
+    vendorKhatas: [],
+    twoPayRecords: []
   };
 
   function assignSequentialIds(items = [], prefix, field = "id") {
@@ -222,6 +224,10 @@
       store.maintenanceJobs = [];
     }
 
+    if (!Array.isArray(store.twoPayRecords)) {
+      store.twoPayRecords = [];
+    }
+
     if (!Array.isArray(store.activityLogs)) {
       store.activityLogs = [];
     }
@@ -268,6 +274,7 @@
     { key: "truckExpenses", module: "Truck Details", filter: (item) => Boolean(item.jobNo) },
     { key: "equipmentFleet", module: "Equipment & Handling Fleet" },
     { key: "maintenanceJobs", module: "Fleet Maintenance" },
+    { key: "twoPayRecords", module: "Two Pay Records" },
     { key: "employees", module: "Employees" },
     { key: "adminUsers", module: "Admin Users" },
     { key: "customerKhatas", module: "Accounts Receivable", nested: true },
@@ -775,7 +782,7 @@ async function uploadBookingBilty(booking) {
 
   async function saveBookingToSupabase(booking) {
     const client = getSupabaseClient();
-    if (!client) return null;
+    if (!client) throw new Error("Supabase is not configured or the login session is unavailable.");
     const biltyPath = await uploadBookingBilty(booking);
     const payload = mapBookingForSupabase({ ...booking, biltyPath });
     let saved;
@@ -845,35 +852,35 @@ async function uploadBookingBilty(booking) {
     const { error: deleteBrokersError } = await client.from("booking_brokers")
       .delete()
       .eq("booking_id", saved.id);
-    if (!deleteBrokersError) {
-      const brokerLines = getBookingBrokerLines(booking)
-        .filter((line) => line.truckerBroker || line.brokerAmount != null || line.brokerPaymentDetails || line.brokerPaymentDate)
-        .map((line, index) => ({
-          booking_id: saved.id,
-          trucker_broker: line.truckerBroker || null,
-          broker_amount: line.brokerAmount == null || line.brokerAmount === "" ? null : Number(line.brokerAmount),
-          broker_payment_details: line.brokerPaymentDetails || null,
-          broker_payment_date: formatIsoDate(line.brokerPaymentDate) || null,
-          container_ref: line.containerRef || "all",
-          truck_no: line.truckNo || null,
-          container_size: line.containerSize || null,
-          sort_order: index
-        }));
-      if (brokerLines.length) {
-        const { error: insertBrokersError } = await client.from("booking_brokers").insert(brokerLines);
-        if (insertBrokersError) {
-          if (insertBrokersError.message && (insertBrokersError.message.includes("truck_no") || insertBrokersError.message.includes("container_size") || insertBrokersError.code === "PGRST204" || insertBrokersError.code === "42703")) {
-            console.warn("booking_brokers missing truck_no/container_size columns; retrying insert without them:", insertBrokersError.message);
-            const fallbackBrokers = brokerLines.map(({ truck_no, container_size, ...rest }) => rest);
-            await client.from("booking_brokers").insert(fallbackBrokers);
-          } else {
-            console.warn("Supabase booking_brokers insert warning:", insertBrokersError.message);
-          }
+    if (deleteBrokersError) throw deleteBrokersError;
+    const brokerLines = getBookingBrokerLines(booking)
+      .filter((line) => line.truckerBroker || line.brokerAmount != null || line.brokerPaymentDetails || line.brokerPaymentDate)
+      .map((line, index) => ({
+        booking_id: saved.id,
+        trucker_broker: line.truckerBroker || null,
+        broker_amount: line.brokerAmount == null || line.brokerAmount === "" ? null : Number(line.brokerAmount),
+        broker_payment_details: line.brokerPaymentDetails || null,
+        broker_payment_date: formatIsoDate(line.brokerPaymentDate) || null,
+        container_ref: line.containerRef || "all",
+        truck_no: line.truckNo || null,
+        container_size: line.containerSize || null,
+        sort_order: index
+      }));
+    if (brokerLines.length) {
+      const { error: insertBrokersError } = await client.from("booking_brokers").insert(brokerLines);
+      if (insertBrokersError) {
+        if (insertBrokersError.message && (insertBrokersError.message.includes("truck_no") || insertBrokersError.message.includes("container_size") || insertBrokersError.code === "PGRST204" || insertBrokersError.code === "42703")) {
+          console.warn("booking_brokers missing truck_no/container_size columns; retrying insert without them:", insertBrokersError.message);
+          const fallbackBrokers = brokerLines.map(({ truck_no, container_size, ...rest }) => rest);
+          const { error: fallbackError } = await client.from("booking_brokers").insert(fallbackBrokers);
+          if (fallbackError) throw fallbackError;
+        } else {
+          throw insertBrokersError;
         }
       }
     }
   } catch (brokerErr) {
-    console.warn("booking_brokers sync bypassed (run supabase-booking-brokers-table.sql):", brokerErr.message);
+    throw new Error(`Booking broker records could not be synchronized: ${brokerErr.message}`);
   }
 
   const savedPath = String(saved.bilty_path || biltyPath || "");
@@ -958,6 +965,7 @@ async function uploadBookingBilty(booking) {
       equipmentFleet: collectionChanged(previousStore, store, "equipmentFleet"),
       maintenanceJobs: collectionChanged(previousStore, store, "maintenanceJobs"),
       employees: collectionChanged(previousStore, store, "employees"),
+      twoPayRecords: collectionChanged(previousStore, store, "twoPayRecords"),
       customerKhatas: collectionChanged(previousStore, store, "customerKhatas"),
       vendorKhatas: collectionChanged(previousStore, store, "vendorKhatas"),
       activityLogs: collectionChanged(previousStore, store, "activityLogs")
@@ -1253,6 +1261,75 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     await syncRows("employees", "employee_no", rows);
   }
 
+  async function syncTwoPayRecords(records) {
+    const rows = (records || []).map((item) => ({
+      id: item.id,
+      date: formatIsoDate(item.date) || null,
+      origin: item.origin || null,
+      bl_no: item.blNo || null,
+      container_no: item.containerNo || null,
+      lot_of: item.lotOf || null,
+      destination: item.destination || null,
+      consignee_name: item.consigneeName || null,
+      size: item.size || null,
+      description: item.description || null,
+      truck_no: item.truckNo || null,
+      road_freight_paid: Number(item.roadFreightPaid || 0),
+      road_freight_two_pay: Number(item.roadFreightTwoPay || 0),
+      tax_amount: Number(item.taxAmount || 0),
+      detention_charges: Number(item.detentionCharges || 0),
+      billing_amount: Number(item.billingAmount || 0),
+      global_receivable: Number(item.globalReceivable || 0),
+      bill_no: item.billNo || null,
+      party_collection: Number(item.partyCollection || 0),
+      party_collection_paid_amount: Number(item.partyCollectionPaidAmount || 0),
+      party_collection_paid_date: formatIsoDate(item.partyCollectionPaidDate) || null,
+      party_balance: Number(item.partyBalance || 0),
+      party_remarks: item.partyRemarks || null,
+      received_amount: Number(item.receivedAmount || 0),
+      received_balance: Number(item.receivedBalance || 0),
+      received_date: formatIsoDate(item.receivedDate) || null,
+      received_id: item.receivedId || null,
+      remarks: item.remarks || null,
+      updated_at: new Date().toISOString()
+    }));
+    await syncRows("two_pay_records", "id", rows);
+  }
+
+  function mapTwoPayRecordFromSupabase(row = {}, local = {}) {
+    return {
+      ...local,
+      id: row.id || local.id,
+      date: row.date || local.date || "",
+      origin: row.origin ?? local.origin ?? "",
+      blNo: row.bl_no ?? local.blNo ?? "",
+      containerNo: row.container_no ?? local.containerNo ?? "",
+      lotOf: row.lot_of ?? local.lotOf ?? "",
+      destination: row.destination ?? local.destination ?? "",
+      consigneeName: row.consignee_name ?? local.consigneeName ?? "",
+      size: row.size ?? local.size ?? "",
+      description: row.description ?? local.description ?? "",
+      truckNo: row.truck_no ?? local.truckNo ?? "",
+      roadFreightPaid: Number(row.road_freight_paid ?? local.roadFreightPaid ?? 0),
+      roadFreightTwoPay: Number(row.road_freight_two_pay ?? local.roadFreightTwoPay ?? 0),
+      taxAmount: Number(row.tax_amount ?? local.taxAmount ?? 0),
+      detentionCharges: Number(row.detention_charges ?? local.detentionCharges ?? 0),
+      billingAmount: Number(row.billing_amount ?? local.billingAmount ?? 0),
+      globalReceivable: Number(row.global_receivable ?? local.globalReceivable ?? 0),
+      billNo: row.bill_no ?? local.billNo ?? "",
+      partyCollection: Number(row.party_collection ?? local.partyCollection ?? 0),
+      partyCollectionPaidAmount: Number(row.party_collection_paid_amount ?? local.partyCollectionPaidAmount ?? 0),
+      partyCollectionPaidDate: row.party_collection_paid_date ?? local.partyCollectionPaidDate ?? "",
+      partyBalance: Number(row.party_balance ?? local.partyBalance ?? 0),
+      partyRemarks: row.party_remarks ?? local.partyRemarks ?? "",
+      receivedAmount: Number(row.received_amount ?? local.receivedAmount ?? 0),
+      receivedBalance: Number(row.received_balance ?? local.receivedBalance ?? 0),
+      receivedDate: row.received_date ?? local.receivedDate ?? "",
+      receivedId: row.received_id ?? local.receivedId ?? "",
+      remarks: row.remarks ?? local.remarks ?? ""
+    };
+  }
+
   async function syncAccounts(records, accountType, options = {}) {
     const client = getSupabaseClient();
     if (!client) return;
@@ -1366,12 +1443,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
 
   async function syncOperationalStore(store, changed = {}) {
-    if (!getSupabaseClient()) return;
+    if (!getSupabaseClient()) throw new Error("Supabase is not configured or the login session is unavailable.");
     const jobs = [];
     if (changed.truckExpenses && hasModuleAccessForSync("truck")) jobs.push(syncTruckJobs(store.truckExpenses));
     if (changed.equipmentFleet && hasModuleAccessForSync("equipment")) jobs.push(syncEquipment(store.equipmentFleet));
     if (changed.maintenanceJobs && hasModuleAccessForSync("maintenance")) jobs.push(syncMaintenance(store.maintenanceJobs));
     if (changed.employees && hasModuleAccessForSync("employee")) jobs.push(syncEmployees(store.employees));
+    if (changed.twoPayRecords && hasModuleAccessForSync("two-pay-records")) jobs.push(syncTwoPayRecords(store.twoPayRecords));
     if (changed.customerKhatas && hasModuleAccessForSync("khata")) {
       const records = Array.isArray(changed.customerKhataRecords) ? changed.customerKhataRecords : store.customerKhatas;
       jobs.push(syncAccounts(records, "receivable", { pruneMissing: !Array.isArray(changed.customerKhataRecords) }));
@@ -1401,11 +1479,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       return data || [];
     };
-    const [trucks, equipment, maintenance, employees, accounts, logs] = await Promise.all([
+    const [trucks, equipment, maintenance, employees, twoPayRecords, accounts, logs] = await Promise.all([
       load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
       load("equipment_fleet", hasModuleAccessForSync("equipment") || hasModuleAccessForSync("maintenance"), "truck_no"),
       load("maintenance_jobs", hasModuleAccessForSync("maintenance"), "repair_date"),
       load("employees", hasModuleAccessForSync("employee"), "joining_date"),
+      load("two_pay_records", hasModuleAccessForSync("two-pay-records"), "date"),
       load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
       load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at")
     ]);
@@ -1690,6 +1769,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       replaceArrayContents(store.employees, mergedEmp);
     }
 
+    if (Array.isArray(twoPayRecords)) {
+      // A successful Supabase response is authoritative for this register.
+      // This removes records that were manually deleted in Supabase instead of
+      // leaving a stale browser-cache copy visible after a hard refresh.
+      replaceArrayContents(store.twoPayRecords, twoPayRecords.map((remote) => mapTwoPayRecordFromSupabase(remote)));
+    }
+
     if (Array.isArray(accounts)) {
       const { data: entries, error } = await client.from("account_entries").select("*").order("entry_date", { ascending: true });
       if (!error) {
@@ -1740,7 +1826,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   }
   const appPages = new Set([
     "dashboard", "booking", "ledger", "broker-summary", "truck", "truck-summary",
-    "completed-truck-summary", "equipment", "maintenance", 
+    "completed-truck-summary", "equipment", "maintenance", "two-pay-records",
     "employees", "employee", "khata", "accounts-payable", "admin", "activity-logs"
   ]);
 
@@ -1828,7 +1914,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           </div>
         </div>
       `;
-    } else if (["ledger", "broker-summary", "khata", "accounts-payable", "completed-truck-summary", "truck-summary", "equipment", "activity-logs"].includes(page)) {
+    } else if (["ledger", "broker-summary", "khata", "accounts-payable", "completed-truck-summary", "truck-summary", "equipment", "two-pay-records", "activity-logs"].includes(page)) {
       contentHtml = `
         <div class="audit-summary" style="margin-bottom: 20px;">
           <div class="skeleton-card" style="min-height: 88px; padding: 13px 15px;"><div class="skeleton-text skeleton-shimmer" style="width: 80px; height: 11px; margin-bottom: 9px; background: #e8d8c7;"></div><div class="skeleton-text skeleton-shimmer" style="width: 60px; height: 25px; margin: 0; background: #ebdccb;"></div></div>
@@ -2878,11 +2964,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
     pdf.text(title.toUpperCase(), 36, 125);
+    const bodyRows = Array.isArray(row) && Array.isArray(row[0]) ? row : [row];
     pdf.autoTable({
       startY: 142,
       margin: { left: 36, right: 36, bottom: 62 },
       head: [headers],
-      body: [row],
+      body: bodyRows,
       theme: "grid",
       styles: { fontSize: 7.5, cellPadding: 5, halign: "center", valign: "middle", lineColor: [93, 72, 52], lineWidth: 0.55 },
       headStyles: { fillColor: [240, 225, 208], textColor: [25, 42, 62], fontStyle: "bold" },
@@ -3268,7 +3355,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         <button class="nav-dropdown-toggle" type="button" aria-expanded="false">
           <span class="nav-icon">${getNavigationIcon("ledger")}</span>
           <span class="nav-label">Operations Summary</span>
-          <span class="nav-dropdown-chevron" aria-hidden="true">⌄</span>
+          <span class="nav-dropdown-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="m7 9 5 5 5-5"></path></svg></span>
         </button>
         <div class="nav-dropdown-menu">
           <a href="ledger.html" data-page="ledger"><span class="nav-icon">${getNavigationIcon("ledger")}</span><span class="nav-label">Booking Summary</span></a>
@@ -3329,6 +3416,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       "broker-summary": '<path d="M4 5h16v14H4z"></path><path d="M8 9h8M8 13h5"></path><circle cx="17" cy="17" r="3"></circle><path d="m19 19 2 2"></path>',
       truck: '<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7z"></path><circle cx="7" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle>',
       "truck-summary": '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
+      "two-pay-records": '<path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
       "completed-truck-summary": '<circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path>',
       equipment: '<path d="M4 14h11v5H4zM15 11h4l2 3v5h-6z"></path><path d="M7 14V8h6M13 8l3-3M3 19h19"></path><circle cx="8" cy="20" r="1.5"></circle><circle cx="18" cy="20" r="1.5"></circle>',
       maintenance: '<path d="m14.7 6.3 3-3a4.2 4.2 0 0 1-5.5 5.5l-6.8 6.8a2.1 2.1 0 0 0 3 3l6.8-6.8a4.2 4.2 0 0 0 5.5-5.5l-3 3z"></path><circle cx="7" cy="17" r=".8"></circle>',
@@ -3463,6 +3551,27 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const dueDate = new Date(startDate);
     dueDate.setDate(dueDate.getDate() + termDays);
     return dueDate;
+  }
+
+  function ensureTwoPayRecordsNavigation() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      if (nav.querySelector('[data-page="two-pay-records"]')) return;
+      const link = document.createElement("a");
+      link.href = "two-pay-records.html";
+      link.dataset.page = "two-pay-records";
+      link.textContent = "Two Pay Records";
+      const employeeLink = nav.querySelector('[data-page="employee"]');
+      nav.insertBefore(link, employeeLink || nav.querySelector('[data-page="admin"], [data-page="admin-login"]'));
+    });
+  }
+
+  function ensureOperationalNavigationOrder() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      const twoPayLink = nav.querySelector('[data-page="two-pay-records"]');
+      const equipmentLink = nav.querySelector('[data-page="equipment"]');
+      if (!twoPayLink || !equipmentLink || twoPayLink.nextElementSibling === equipmentLink) return;
+      twoPayLink.insertAdjacentElement("afterend", equipmentLink);
+    });
   }
 
   function getPaymentAlertKey(item, dueDate, suffix = "") {
@@ -4859,10 +4968,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
 
       let syncMessage = `${editingId ? `Booking ${editingId} updated` : "New booking saved"} successfully.`;
+      let syncFailed = false;
       try {
         const remoteResult = await saveBookingToSupabase(savedBooking);
         if (remoteResult) Object.assign(savedBooking, remoteResult);
       } catch (error) {
+        syncFailed = true;
         syncMessage = `Booking saved in this browser, but Supabase sync failed: ${error.message}`;
       }
       saveStore(store);
@@ -4870,7 +4981,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       refreshPaymentNotifications();
       resetForm();
       notice.hidden = false;
-      notice.classList.remove("error");
+      notice.classList.toggle("error", syncFailed);
       notice.textContent = syncMessage;
     });
 
@@ -5058,7 +5169,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     function getFilteredRows() {
-      const selectedStatus = String(statusFilter?.value || "Payable");
+      const selectedStatus = String(statusFilter?.value || "All");
       const selectedBroker = String(brokerFilter?.value || "").trim();
       const startDate = String(startDateFilter?.value || "");
       const endDate = String(endDateFilter?.value || "");
@@ -6329,12 +6440,251 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     render();
   }
 
+  function twoPayRecordsPage(store) {
+    const form = document.querySelector("[data-two-pay-form]");
+    const body = document.querySelector("[data-two-pay-rows]");
+    const notice = document.querySelector("[data-notice]");
+    const search = document.querySelector("[data-two-pay-search]");
+    const startDate = document.querySelector("[data-two-pay-start]");
+    const endDate = document.querySelector("[data-two-pay-end]");
+    const order = document.querySelector("[data-two-pay-order]");
+    const count = document.querySelector("[data-two-pay-count]");
+    const totalBilling = document.querySelector("[data-two-pay-total-billing]");
+    const totalReceivable = document.querySelector("[data-two-pay-total-receivable]");
+    const totalBalance = document.querySelector("[data-two-pay-total-balance]");
+    const downloadSummaryButton = document.querySelector("[data-download-two-pay-summary]");
+    if (!form || !body) return;
+    let editingId = "";
+
+    const numericFields = [
+      "roadFreightPaid", "roadFreightTwoPay", "taxAmount", "detentionCharges", "billingAmount",
+      "globalReceivable", "partyCollection", "partyCollectionPaidAmount", "receivedAmount"
+    ];
+
+    function createId() {
+      if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+      return `tpr-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function updateBalances() {
+      const partyCollection = Number(form.elements.partyCollection?.value || 0);
+      const partyPaid = Number(form.elements.partyCollectionPaidAmount?.value || 0);
+      const billing = Number(form.elements.billingAmount?.value || 0);
+      const received = Number(form.elements.receivedAmount?.value || 0);
+      if (form.elements.partyBalance) form.elements.partyBalance.value = String(partyCollection - partyPaid);
+      if (form.elements.receivedBalance) form.elements.receivedBalance.value = String(billing - received);
+    }
+
+    function resetForm() {
+      form.reset();
+      numericFields.forEach((name) => { if (form.elements[name]) form.elements[name].value = "0"; });
+      updateBalances();
+      editingId = "";
+      form.querySelector("[data-submit-label]").textContent = "Save Two Pay Record";
+    }
+
+    function fillForm(item) {
+      Object.keys(item || {}).forEach((key) => {
+        if (form.elements[key]) form.elements[key].value = item[key] ?? "";
+      });
+      editingId = item.id;
+      form.querySelector("[data-submit-label]").textContent = "Update Two Pay Record";
+      updateBalances();
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function getFilteredRows() {
+      const query = String(search?.value || "").trim().toLowerCase();
+      const from = String(startDate?.value || "");
+      const to = String(endDate?.value || "");
+      return (store.twoPayRecords || [])
+        .filter((item) => !from || String(item.date || "") >= from)
+        .filter((item) => !to || String(item.date || "") <= to)
+        .filter((item) => !query || [item.date, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks]
+          .some((value) => String(value || "").toLowerCase().includes(query)))
+        .sort((left, right) => {
+          const result = String(left.date || "").localeCompare(String(right.date || ""));
+          return (order?.value || "desc") === "asc" ? result : -result;
+        });
+    }
+
+    function getTwoPayPdfValues(item) {
+      return [
+        formatShortDate(item.date), item.origin || "-", item.blNo || "-", item.containerNo || "-", item.lotOf || "-",
+        item.destination || "-", item.consigneeName || "-", item.size || "-", item.description || "-", item.truckNo || "-",
+        money(item.roadFreightPaid), money(item.roadFreightTwoPay), money(item.taxAmount), money(item.detentionCharges),
+        money(item.billingAmount), money(item.globalReceivable), item.billNo || "-", money(item.partyCollection),
+        money(item.partyCollectionPaidAmount), item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-",
+        money(item.partyBalance), item.partyRemarks || "-", money(item.receivedAmount), money(item.receivedBalance),
+        item.receivedDate ? formatShortDate(item.receivedDate) : "-", item.receivedId || "-", item.remarks || "-"
+      ];
+    }
+
+    async function buildTwoPayRecordPdf(item) {
+      if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("p", "pt", "a4");
+      const letterhead = await loadInvoiceTemplateDataUrl();
+      const header = await cropImageDataUrl(letterhead, 0, 270);
+      if (header) pdf.addImage(header, "JPEG", 28, 10, 535, 128);
+      pdf.setTextColor(24, 48, 77);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(15);
+      pdf.text("TWO PAY RECORD", 36, 158);
+      pdf.autoTable({
+        startY: 174,
+        theme: "grid",
+        showHead: "firstPage",
+        head: [["Field", "Value"]],
+        body: [
+          ["Date", formatShortDate(item.date)], ["Origin", item.origin || "-"], ["BL No", item.blNo || "-"],
+          ["Container No", item.containerNo || "-"], ["Lot Of", item.lotOf || "-"], ["Destination", item.destination || "-"],
+          ["Consignee Name", item.consigneeName || "-"], ["Size", item.size || "-"], ["Description", item.description || "-"],
+          ["Truck No", item.truckNo || "-"], ["Road Freight / Paid", money(item.roadFreightPaid)],
+          ["Road Freight / Two Pay", money(item.roadFreightTwoPay)], ["Tax Amount", money(item.taxAmount)],
+          ["Detention Charges", money(item.detentionCharges)], ["Billing Amount", money(item.billingAmount)],
+          ["Global / Receivable", money(item.globalReceivable)], ["Bill No", item.billNo || "-"],
+          ["Party Collection", money(item.partyCollection)], ["Party Collection Paid Amount", money(item.partyCollectionPaidAmount)],
+          ["Party Collection Paid Date", item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"],
+          ["Party Balance", money(item.partyBalance)], ["Party Remarks", item.partyRemarks || "-"],
+          ["Received Amount", money(item.receivedAmount)], ["Received Balance", money(item.receivedBalance)],
+          ["Received Date", item.receivedDate ? formatShortDate(item.receivedDate) : "-"], ["Received ID", item.receivedId || "-"],
+          ["Received Remarks", item.remarks || "-"]
+        ],
+        styles: { fontSize: 9, cellPadding: 6, lineColor: [226, 210, 193], textColor: [25, 40, 58] },
+        headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
+        columnStyles: { 0: { cellWidth: 190, fontStyle: "bold" }, 1: { cellWidth: 330 } }
+      });
+      const fileKey = String(item.blNo || item.containerNo || item.id || "record").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+      pdf.save(`two-pay-record-${fileKey || "record"}.pdf`);
+    }
+
+    async function buildTwoPaySummaryPdf(rows) {
+      if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("l", "pt", "a3");
+      const letterhead = await loadInvoiceTemplateDataUrl();
+      const header = await cropImageDataUrl(letterhead, 0, 270);
+      if (header) pdf.addImage(header, "JPEG", 24, 10, 730, 132);
+      pdf.setTextColor(24, 48, 77);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(15);
+      pdf.text("TWO PAY RECORDS SUMMARY", 36, 158);
+      const totals = rows.reduce((total, item) => ({
+        billing: total.billing + Number(item.billingAmount || 0),
+        receivable: total.receivable + Number(item.globalReceivable || 0),
+        balance: total.balance + Number(item.receivedBalance || 0)
+      }), { billing: 0, receivable: 0, balance: 0 });
+      pdf.autoTable({
+        startY: 174,
+        margin: { left: 20, right: 20 },
+        theme: "grid",
+        showFoot: "lastPage",
+        head: [["S.No", "Date", "Origin", "BL No", "Container No", "Lot Of", "Destination", "Consignee Name", "Size", "Description", "Truck No", "Road Freight / Paid", "Road Freight / Two Pay", "Tax Amount", "Detention Charges", "Billing Amount", "Global / Receivable", "Bill No", "Party Collection", "Party Paid Amount", "Party Paid Date", "Party Balance", "Party Remarks", "Received Amount", "Received Balance", "Received Date", "Received ID", "Received Remarks"]],
+        body: rows.map((item, index) => [String(index + 1), ...getTwoPayPdfValues(item)]),
+        foot: [["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Total", money(totals.billing), money(totals.receivable), "", "", "", "", "", "", money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0)), money(totals.balance), "", "", ""]],
+        styles: { fontSize: 6.5, cellPadding: 3, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
+        headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 6.5 },
+        footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold" }
+      });
+      pdf.save("two-pay-records-summary.pdf");
+    }
+
+    function render() {
+      const rows = getFilteredRows();
+      const billing = rows.reduce((sum, item) => sum + Number(item.billingAmount || 0), 0);
+      const receivable = rows.reduce((sum, item) => sum + Number(item.globalReceivable || 0), 0);
+      const balance = rows.reduce((sum, item) => sum + Number(item.receivedBalance || 0), 0);
+      if (count) count.textContent = `${rows.length} record(s)`;
+      if (totalBilling) totalBilling.textContent = `PKR ${money(billing)}`;
+      if (totalReceivable) totalReceivable.textContent = `PKR ${money(receivable)}`;
+      if (totalBalance) totalBalance.textContent = `PKR ${money(balance)}`;
+      body.innerHTML = rows.length ? rows.map((item, index) => `
+        <tr>
+          <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td><td>${text(item.containerNo || "-")}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${text(item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${text(item.truckNo || "-")}</td>
+          <td>${money(item.roadFreightPaid)}</td><td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td><td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(item.partyBalance)}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
+          <td><div class="table-actions"><button class="btn small" type="button" data-download-two-pay="${escapeHtml(item.id)}">Download</button><button class="btn small" type="button" data-edit-two-pay="${escapeHtml(item.id)}">Edit</button></div></td>
+        </tr>
+      `).join("") : `<tr><td colspan="29" class="empty-state">No Two Pay records available.</td></tr>`;
+    }
+
+    [search, startDate, endDate, order].filter(Boolean).forEach((control) => {
+      control.addEventListener(control === search ? "input" : "change", render);
+    });
+    ["partyCollection", "partyCollectionPaidAmount", "billingAmount", "receivedAmount"].forEach((name) => {
+      form.elements[name]?.addEventListener("input", updateBalances);
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      updateBalances();
+      const raw = Object.fromEntries(new FormData(form).entries());
+      const normalized = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, String(value || "").trim()]));
+      numericFields.forEach((name) => { normalized[name] = Number(normalized[name] || 0); });
+      normalized.partyBalance = normalized.partyCollection - normalized.partyCollectionPaidAmount;
+      normalized.receivedBalance = normalized.billingAmount - normalized.receivedAmount;
+      normalized.id = editingId || createId();
+      if (editingId) {
+        const index = store.twoPayRecords.findIndex((item) => item.id === editingId);
+        if (index === -1) return;
+        store.twoPayRecords[index] = normalized;
+      } else {
+        store.twoPayRecords.unshift(normalized);
+      }
+      try {
+        saveStore(store, { skipRemote: true });
+        await syncStoreImmediately(store, { twoPayRecords: true, activityLogs: true });
+        notice.textContent = editingId ? "Two Pay record updated successfully." : "Two Pay record saved successfully.";
+        notice.classList.remove("error");
+      } catch (error) {
+        notice.textContent = `Two Pay record saved locally, but Supabase sync failed: ${error.message}`;
+        notice.classList.add("error");
+      }
+      notice.hidden = false;
+      render();
+      resetForm();
+    });
+    form.querySelector("[data-reset-two-pay]")?.addEventListener("click", resetForm);
+    downloadSummaryButton?.addEventListener("click", () => {
+      const rows = getFilteredRows();
+      if (!rows.length) {
+        notice.textContent = "No Two Pay records are available for the selected filters.";
+        notice.classList.add("error");
+        notice.hidden = false;
+        return;
+      }
+      buildTwoPaySummaryPdf(rows).catch((error) => {
+        notice.textContent = `Download failed: ${error.message}`;
+        notice.classList.add("error");
+        notice.hidden = false;
+      });
+    });
+    body.addEventListener("click", (event) => {
+      const downloadId = event.target.closest("[data-download-two-pay]")?.dataset.downloadTwoPay;
+      if (downloadId) {
+        const item = store.twoPayRecords.find((record) => String(record.id) === String(downloadId));
+        if (item) buildTwoPayRecordPdf(item).catch((error) => {
+          notice.textContent = `Download failed: ${error.message}`;
+          notice.classList.add("error");
+          notice.hidden = false;
+        });
+        return;
+      }
+      const editId = event.target.closest("[data-edit-two-pay]")?.dataset.editTwoPay;
+      if (editId) fillForm(store.twoPayRecords.find((item) => item.id === editId));
+    });
+    window.activePageRender = render;
+    resetForm();
+    render();
+  }
+
   function equipmentPage(store) {
     const form = document.querySelector("[data-equipment-form]");
     const body = document.querySelector("[data-equipment-rows]");
     const summary = document.querySelector("[data-equipment-summary]");
     const search = document.querySelector("[data-equipment-search]");
+    const makerFilter = document.querySelector("[data-equipment-maker-filter]");
     const count = document.querySelector("[data-equipment-count]");
+    const downloadSummaryButton = document.querySelector("[data-download-equipment-summary]");
     const notice = document.querySelector("[data-notice]");
     const documentInput = document.querySelector("[data-equipment-document-input]");
     const documentName = document.querySelector("[data-equipment-document-name]");
@@ -6425,7 +6775,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function getFilteredRows() {
       const query = String(search?.value || "").trim().toLowerCase();
+      const maker = String(makerFilter?.value || "").trim().toLowerCase();
       return [...store.equipmentFleet]
+        .filter((item) => !maker || String(item.make || "").trim().toLowerCase() === maker)
         .filter((item) => !query || [
           item.truckNo,
           item.typeOfBody,
@@ -6443,7 +6795,20 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         .sort((left, right) => String(left.truckNo || "").localeCompare(String(right.truckNo || "")));
     }
 
+    function renderMakerFilter() {
+      if (!makerFilter) return;
+      const activeMaker = String(makerFilter.value || "").trim();
+      const makers = [...new Set(store.equipmentFleet
+        .map((item) => String(item.make || "").trim())
+        .filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right));
+      makerFilter.innerHTML = `<option value="">All Makers</option>${makers
+        .map((maker) => `<option value="${escapeHtml(maker)}">${escapeHtml(maker)}</option>`).join("")}`;
+      makerFilter.value = makers.includes(activeMaker) ? activeMaker : "";
+    }
+
     function render() {
+      renderMakerFilter();
       const rows = getFilteredRows();
       body.innerHTML = rows.map((item, index) => `
         <tr>
@@ -6612,6 +6977,39 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (editId) fillForm(store.equipmentFleet.find((item) => item.id === editId || item.truckNo === editId));
     });
 
+    downloadSummaryButton?.addEventListener("click", async () => {
+      const rows = getFilteredRows();
+      if (!rows.length) {
+        setNotice("No equipment records match the current filters.");
+        return;
+      }
+      try {
+        const headers = [
+          "S.No", "Registration No", "Type of Body", "Chassis No", "Engine No", "Maker", "Ownership",
+          "Third Party Insurance Date", "Model", "MRA", "Banker", "Fitness Expiry", "Balochistan Permit",
+          "Sindh Permit", "KPK Permit", "Punjab Permit", "Tax Paid Up To", "Original Documents"
+        ];
+        const pdfRows = rows.map((item, index) => [
+          String(index + 1), item.truckNo || "-", item.typeOfBody || "-", item.chassisNo || "-", item.engineNo || "-",
+          item.make || "-", item.ownership || "-", item.thirdPartyInsuranceDate ? formatShortDate(item.thirdPartyInsuranceDate) : "-",
+          item.model || "-", item.mra || "-", item.banker || "-", item.fitnessExpiry ? formatShortDate(item.fitnessExpiry) : "-",
+          item.balochistanPermitExpiry ? formatShortDate(item.balochistanPermitExpiry) : "-",
+          item.sindhPermitExpiry ? formatShortDate(item.sindhPermitExpiry) : "-",
+          item.kpkPermitExpiry ? formatShortDate(item.kpkPermitExpiry) : "-",
+          item.punjabPermitExpiry ? formatShortDate(item.punjabPermitExpiry) : "-",
+          item.taxPaidUpTo ? formatShortDate(item.taxPaidUpTo) : "-", item.originalDocs || item.documentName || "-"
+        ]);
+        await createRegisterPdf(
+          "Equipment & Handling Fleet Summary",
+          headers,
+          pdfRows,
+          "equipment-handling-fleet-summary"
+        );
+      } catch (error) {
+        setNotice(error.message);
+      }
+    });
+
     closeDocumentModalButton?.addEventListener("click", closeDocumentModal);
     documentModal?.addEventListener("click", (event) => {
       if (event.target === documentModal) closeDocumentModal();
@@ -6622,10 +7020,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     document.querySelector("[data-reset-equipment-form]").addEventListener("click", () => {
       if (search) search.value = "";
+      if (makerFilter) makerFilter.value = "";
       resetForm();
       render();
     });
     if (search) search.addEventListener("input", render);
+    if (makerFilter) makerFilter.addEventListener("change", render);
     resetForm();
     window.activePageRender = render;
     render();
@@ -6635,6 +7035,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const form = document.querySelector("[data-maintenance-form]");
     const body = document.querySelector("[data-maintenance-rows]");
     const summary = document.querySelector("[data-maintenance-summary]");
+    const search = document.querySelector("[data-maintenance-search]");
     const truckFilter = document.querySelector("[data-maintenance-truck-filter]");
     const dateOrder = document.querySelector("[data-maintenance-date-order]");
     const count = document.querySelector("[data-maintenance-count]");
@@ -6780,8 +7181,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     function getFilteredRows() {
+      const terms = String(search?.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
       return [...store.maintenanceJobs]
         .filter((item) => !truckFilter?.value || item.truckNo === truckFilter.value)
+        .filter((item) => {
+          if (!terms.length) return true;
+          const searchable = [item.id, item.truckNo, item.complaintDate, item.repairDate, item.partName,
+            item.oldSerialNumber, item.newSerialNumber, item.partCost, item.warrantyPeriod,
+            item.warrantyExpiry, getWarrantyState(item.warrantyExpiry).label, item.driverName,
+            item.approvedBy].join(" ").toLowerCase();
+          return terms.every((term) => searchable.includes(term));
+        })
         .sort((left, right) => compareDateValues(left.repairDate || left.complaintDate, right.repairDate || right.complaintDate, dateOrder?.value || "desc"));
     }
 
@@ -6957,6 +7367,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (imageId) openImageModal(store.maintenanceJobs.find((item) => item.id === imageId)?.image);
     });
 
+    search?.addEventListener("input", render);
     truckFilter?.addEventListener("change", render);
     dateOrder?.addEventListener("change", render);
     document.querySelector("[data-reset-maintenance-form]").addEventListener("click", () => {
@@ -8606,6 +9017,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (page === "truck") truckPage(store);
       if (page === "truck-summary" || page === "completed-truck-summary") truckSummaryPage(store);
       if (page === "equipment") equipmentPage(store);
+      if (page === "two-pay-records") twoPayRecordsPage(store);
       if (page === "maintenance") maintenancePage(store);
       if (page === "employee") employeePage(store);
       if (page === "admin-login") adminLoginPage(store);
@@ -8623,7 +9035,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (["dashboard", "booking", "ledger", "broker-summary", "khata"].includes(page)) {
       hydrationPromises.push(hydrateBookingsFromSupabase(store));
     }
-    if (["dashboard", "truck", "truck-summary", "completed-truck-summary", "equipment", "maintenance", "employee", "khata", "accounts-payable", "activity-logs"].includes(page)) {
+    if (["dashboard", "truck", "truck-summary", "completed-truck-summary", "equipment", "two-pay-records", "maintenance", "employee", "khata", "accounts-payable", "activity-logs"].includes(page)) {
       hydrationPromises.push(hydrateOperationalStore(store));
     }
 
@@ -8703,10 +9115,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     bindPageTransitions();
     syncAdminNavigationRoute();
     ensureEquipmentNavigation();
+    ensureTwoPayRecordsNavigation();
     ensureMaintenanceNavigation();
     ensureAccountsNavigationOrder();
     ensureBookingSummaryNavigation();
     ensureActivityLogsNavigation();
+    ensureOperationalNavigationOrder();
     applySessionAccess();
     bindMobileNav();
     if (page !== "signin") bindSoftwareSignOut();

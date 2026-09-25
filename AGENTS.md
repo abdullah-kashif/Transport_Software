@@ -35,6 +35,7 @@
 | **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 7348) |
 | **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 7500) |
 | **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 7500) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` |
 
 ---
 
@@ -60,6 +61,36 @@
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
 
 ## 5. Changelog
+
+- **2026-09-25**: Aligned Equipment Register and Maintenance History filter controls, download/count controls, and moved both register headings to the top of their shared toolbar row for consistent spacing.
+
+- **2026-09-25**: Equipment & Handling Fleet now has a dynamic Maker filter and an always-available Download Summary button that exports all records or the currently filtered records.
+
+- **2026-09-25**: Navigation order is now enforced so Two Pay Records always appears immediately before Equipment & Handling Fleet and Fleet Maintenance, across all pages and refreshes.
+
+- **2026-09-25**: Replaced the plain Operations Summary caret with a styled circular SVG chevron that rotates on open/close without changing dropdown behavior.
+
+- **2026-09-25**: Trucker/Broker Summary Status now defaults to `All`; users can still select `Paid` or `Payable`.
+
+- **2026-09-25**: Made Two Pay Records hydration Supabase-authoritative after a successful read, so manually deleted database records disappear after hard refresh while read failures do not erase the local cache.
+
+- **2026-09-25**: Matched Fleet Maintenance and Equipment Register filter layout to Truck Trip Ledger with General Filter labeling, title-left/filter-right desktop rows, and responsive wrapping on smaller screens.
+
+- **2026-09-25**: Added Fleet Maintenance History General Filter with combined Truck No/Date Order filtering and searchable job, truck, part, serial, warranty, cost, driver, and approval details.
+
+- **2026-09-25**: Completed a cross-module Supabase sync audit covering Booking, Truck Details, Equipment, Fleet Maintenance, Employees, Khata, Activity Logs, and Two Pay Records. User-facing saves now surface unavailable-Supabase failures, Booking broker/container relational errors are no longer silently ignored, and `MASTER_SUPABASE_SETUP.sql` includes grants for all core data tables.
+
+- **2026-09-25**: Added Supabase save-integrity guards: Booking and operational saves no longer silently report success when only browser storage is available, broker/container relational write failures are surfaced, and Two Pay Records participate in operational change detection.
+
+- **2026-09-25**: Fixed clipped Date Order text in the compact Two Pay filter row by correcting select height, padding, and line height.
+
+- **2026-09-25**: Two Pay record detail PDFs show the `Field / Value` header only once, while the register filters and Download Summary/count controls use a compact centered single row on desktop and responsive wrapping on smaller screens.
+
+- **2026-09-25**: Added per-record and filtered-summary PDF downloads to Two Pay Records, removed the helper sentence, aligned the count with filters, and extended the interactive card background treatment to shared software cards.
+
+- **2026-09-25**: Placed compact interactive Billing Amount, Global / Receivable, and Received Balance cards in the first Two Pay Records section below the page title, with responsive General Filter, Start Date, End Date, Date Order, and record-count controls.
+
+- **2026-09-25**: Added the isolated `Two Pay Records` module with the supplied register heads, live Party/Received balance calculations, Supabase `two_pay_records` sync/hydration, navigation/RBAC access key, and RLS migration `supabase-two-pay-records.sql`.
 
 - **2026-09-24**: Import and Export Truck Details Payment Term expiry notifications now show the relevant truck registration number instead of the customer name.
 

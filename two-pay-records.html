@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Two Pay Records</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="alternate icon" href="favicon.ico" />
+  <link rel="stylesheet" href="styles.css?v=20260902-1" />
+</head>
+<body data-page="two-pay-records">
+  <div class="app">
+    <div class="mobile-topbar"><button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button><strong>GTLS Transport</strong></div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head"><strong>Menu</strong><button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button></div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
+        <a href="two-pay-records.html" data-page="two-pay-records">Two Pay Records</a>
+        <a href="equipment.html" data-page="equipment">Equipment &amp; Handling Fleet</a>
+        <a href="maintenance.html" data-page="maintenance">Fleet Maintenance</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Accounts Receivable</a>
+        <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="admin.html" data-page="admin">Admin</a>
+      </nav>
+      <div class="tip"></div>
+    </aside>
+    <main class="main">
+      <section class="hero dashboard-hero">
+        <h2>Two Pay Records</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-7-3-9"></path><path d="M10 21h4"></path></svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head"><div><strong>Payment Alerts</strong><span data-notification-summary>No expired payments</span></div><button class="notification-close" type="button" data-notification-close aria-label="Close notifications">&times;</button></div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen">
+        <div class="grid two-pay-stats" aria-label="Two Pay Records totals">
+          <div class="card span-4 two-pay-stat-card billing"><span class="badge neutral">Billing Amount</span><strong data-two-pay-total-billing>PKR 0</strong><small>Current filtered records</small></div>
+          <div class="card span-4 two-pay-stat-card receivable"><span class="badge neutral">Global / Receivable</span><strong data-two-pay-total-receivable>PKR 0</strong><small>Receivable value</small></div>
+          <div class="card span-4 two-pay-stat-card balance"><span class="badge warn">Received Balance</span><strong data-two-pay-total-balance>PKR 0</strong><small>Outstanding amount</small></div>
+        </div>
+        <div class="screen-head"><div><h3>Create / Update Two Pay Record</h3></div></div>
+        <form class="form-grid" data-two-pay-form autocomplete="off">
+          <div class="field"><label>Date</label><input name="date" type="date" required /></div>
+          <div class="field"><label>Origin</label><input name="origin" /></div>
+          <div class="field"><label>BL No</label><input name="blNo" /></div>
+          <div class="field"><label>Container No</label><input name="containerNo" /></div>
+          <div class="field"><label>Lot Of</label><input name="lotOf" /></div>
+          <div class="field"><label>Destination</label><input name="destination" /></div>
+          <div class="field"><label>Consignee Name</label><input name="consigneeName" /></div>
+          <div class="field"><label>Size</label><input name="size" placeholder="20 / 40" /></div>
+          <div class="field"><label>Description</label><input name="description" /></div>
+          <div class="field"><label>Truck No</label><input name="truckNo" /></div>
+          <div class="field"><label>Road Freight / Paid</label><input name="roadFreightPaid" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Road Freight / Two Pay</label><input name="roadFreightTwoPay" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Tax Amount</label><input name="taxAmount" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Detention Charges</label><input name="detentionCharges" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Billing Amount</label><input name="billingAmount" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Global / Receivable</label><input name="globalReceivable" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Bill No</label><input name="billNo" /></div>
+          <div class="field"><label>Party Collection</label><input name="partyCollection" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Party Collection Paid Amount</label><input name="partyCollectionPaidAmount" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Party Collection Paid Date</label><input name="partyCollectionPaidDate" type="date" /></div>
+          <div class="field"><label>Party Balance</label><input name="partyBalance" type="number" readonly value="0" /></div>
+          <div class="field wide"><label>Party Remarks</label><input name="partyRemarks" /></div>
+          <div class="field"><label>Received Amount</label><input name="receivedAmount" type="number" step="0.01" min="0" value="0" /></div>
+          <div class="field"><label>Received Balance</label><input name="receivedBalance" type="number" readonly value="0" /></div>
+          <div class="field"><label>Received Date</label><input name="receivedDate" type="date" /></div>
+          <div class="field"><label>Received ID</label><input name="receivedId" /></div>
+          <div class="field wide"><label>Received Remarks</label><input name="remarks" placeholder="Payment Awaited / Full Payment Received" /></div>
+          <div class="field full actions"><button class="btn primary" type="submit" data-submit-label>Save Two Pay Record</button><button class="btn" type="button" data-reset-two-pay>Clear Form</button></div>
+        </form>
+        <div class="notice" data-notice hidden></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head two-pay-title"><div><h3>Two Pay Register</h3></div></div>
+        <div class="two-pay-toolbar">
+          <div class="two-pay-filter-toolbar">
+            <label class="equipment-search"><span>General Filter</span><input type="search" data-two-pay-search placeholder="Search records..." /></label>
+            <label class="equipment-search"><span>Start Date</span><input type="date" data-two-pay-start /></label>
+            <label class="equipment-search"><span>End Date</span><input type="date" data-two-pay-end /></label>
+            <label class="equipment-search"><span>Date Order</span><select data-two-pay-order aria-label="Date order"><option value="desc" selected>Descending (Newest First)</option><option value="asc">Ascending (Oldest First)</option></select></label>
+            <button class="btn small two-pay-download-summary" type="button" data-download-two-pay-summary>Download Summary</button>
+            <span class="ledger-count" data-two-pay-count>0 record(s)</span>
+          </div>
+        </div>
+        <div class="table-wrap two-pay-table-wrap">
+          <table class="two-pay-table">
+            <thead><tr>
+              <th>S.No</th><th>Date</th><th>Origin</th><th>BL No</th><th>Container No</th><th>Lot Of</th><th>Destination</th><th>Consignee Name</th><th>Size</th><th>Description</th><th>Truck No</th><th>Road Freight / Paid</th><th>Road Freight / Two Pay</th><th>Tax Amount</th><th>Detention Charges</th><th>Billing Amount</th><th>Global / Receivable</th><th>Bill No</th><th>Party Collection</th><th>Party Collection Paid Amount</th><th>Party Collection Paid Date</th><th>Party Balance</th><th>Party Remarks</th><th>Received Amount</th><th>Received Balance</th><th>Received Date</th><th>Received ID</th><th>Received Remarks</th><th>Action</th>
+            </tr></thead>
+            <tbody data-two-pay-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="app.js?v=20260925-2"></script>
+</body>
+</html>

@@ -6,7 +6,7 @@
   <title>GTLS Transport - Fleet Maintenance</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20260902-1" />
+  <link rel="stylesheet" href="styles.css?v=20260925-3" />
 </head>
 <body data-page="maintenance">
   <div class="app">
@@ -106,6 +106,7 @@
         <div class="screen-head maintenance-register-head">
           <div><h3>Maintenance History</h3></div>
           <div class="maintenance-toolbar">
+            <label class="maintenance-search"><span>General Filter</span><input type="search" data-maintenance-search placeholder="Search maintenance records..." /></label>
             <label><span>Truck No</span><select data-maintenance-truck-filter><option value="">All Trucks</option></select></label>
             <label><span>Date Order</span><select data-maintenance-date-order><option value="desc">Descending (Newest First)</option><option value="asc">Ascending (Oldest First)</option></select></label>
             <span class="ledger-count" data-maintenance-count>0 record(s)</span>

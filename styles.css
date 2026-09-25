@@ -334,9 +334,31 @@ body.page-navigating .auth-shell {
 
 .nav-dropdown-chevron {
   margin-left: auto;
-  font-size: 18px;
-  line-height: 1;
-  transition: transform 0.18s ease;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.nav-dropdown-chevron svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-dropdown-toggle:hover .nav-dropdown-chevron,
+.nav-dropdown.open .nav-dropdown-chevron {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .nav-dropdown-toggle .nav-label { white-space: nowrap; flex: 1 1 auto; }
@@ -898,11 +920,21 @@ body[data-page="ledger"] .hero .kicker {
 }
 
 .card {
-  background: var(--paper-2);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--paper-2) 0%, #f9ecde 100%);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 12px;
   box-shadow: 0 2px 6px rgba(29, 51, 73, 0.04);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.grid > .card:hover,
+.grid > .card:focus-within {
+  transform: translateY(-2px);
+  border-color: rgba(197, 107, 45, 0.48);
+  box-shadow: 0 10px 22px rgba(70, 46, 26, 0.1);
 }
 
 .panel {
@@ -2688,10 +2720,160 @@ body.confirm-modal-open {
   min-height: 44px;
 }
 
+.equipment-search select {
+  height: 44px;
+  min-height: 44px;
+}
+
+.equipment-summary-download {
+  height: 44px;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
 .equipment-table {
   min-width: 2200px;
   table-layout: auto;
   font-size: 12.5px;
+}
+
+.two-pay-table {
+  min-width: 3600px;
+}
+
+.two-pay-table th,
+.two-pay-table td {
+  white-space: nowrap;
+}
+
+.two-pay-title {
+  margin-bottom: 14px;
+}
+
+.two-pay-title p {
+  margin: 4px 0 0;
+}
+
+.two-pay-stats {
+  margin-bottom: 18px;
+}
+
+.two-pay-stat-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 82px;
+  padding: 10px 14px;
+  border-color: rgba(197, 107, 45, 0.28);
+}
+
+.two-pay-stat-card::after {
+  content: "";
+  position: absolute;
+  right: -32px;
+  bottom: -42px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(197, 107, 45, 0.09);
+  pointer-events: none;
+}
+
+.two-pay-stat-card:hover,
+.two-pay-stat-card:focus-within {
+  transform: translateY(-3px);
+  border-color: rgba(197, 107, 45, 0.58);
+  box-shadow: 0 12px 24px rgba(70, 46, 26, 0.12);
+}
+
+.two-pay-download-summary {
+  align-self: end;
+  min-height: 44px;
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.two-pay-download-summary:hover,
+.two-pay-download-summary:focus-visible {
+  background: #a95120;
+  color: #fff;
+}
+
+.two-pay-stat-card strong {
+  position: relative;
+  z-index: 1;
+  margin: 5px 0 1px;
+  font-size: 19px;
+}
+
+.two-pay-stat-card small {
+  position: relative;
+  z-index: 1;
+  color: #6c7f94;
+  font-size: 11px;
+}
+
+.two-pay-stat-card .badge {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.two-pay-stat-card.balance {
+  background: linear-gradient(135deg, #fffdf9 0%, #fff0dc 100%);
+}
+
+.two-pay-toolbar {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fffaf4;
+}
+
+.two-pay-filter-toolbar {
+  display: grid;
+  grid-template-columns: minmax(205px, 1.55fr) repeat(2, minmax(122px, .9fr)) minmax(175px, 1.1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.two-pay-filter-toolbar .equipment-search {
+  min-width: 0;
+}
+
+.two-pay-filter-toolbar select,
+.two-pay-filter-toolbar input {
+  width: 100%;
+  min-height: 40px;
+  height: 40px;
+  padding: 8px 12px;
+  line-height: 22px;
+  font-size: 12px;
+}
+
+.two-pay-filter-toolbar .ledger-count {
+  align-self: center;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  justify-self: stretch;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.two-pay-filter-toolbar .equipment-search span {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.two-pay-filter-toolbar .two-pay-download-summary {
+  align-self: center;
+  min-height: 40px;
+  height: 40px;
+  padding: 8px 12px;
+  font-size: 11px;
 }
 
 .equipment-table th {
@@ -2747,7 +2929,7 @@ body.confirm-modal-open {
 }
 
 .maintenance-register-head {
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .maintenance-toolbar {
@@ -2758,11 +2940,55 @@ body.confirm-modal-open {
   flex-wrap: wrap;
 }
 
+.equipment-toolbar .ledger-count,
+.maintenance-toolbar .ledger-count {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
 .maintenance-toolbar label {
   display: grid;
   gap: 6px;
   min-width: 220px;
   margin: 0;
+}
+
+.maintenance-toolbar .maintenance-search {
+  min-width: min(300px, 100%);
+}
+
+@media (min-width: 1161px) {
+  .maintenance-register-head,
+  .equipment-register-head {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+
+  .maintenance-toolbar,
+  .equipment-register-head .equipment-toolbar {
+    flex-wrap: nowrap;
+    flex: 0 1 auto;
+  }
+
+  .equipment-register-head .equipment-search {
+    min-width: min(300px, 28vw);
+  }
+}
+
+@media (max-width: 1160px) {
+  .maintenance-register-head,
+  .equipment-register-head {
+    align-items: flex-start;
+  }
+
+  .maintenance-toolbar,
+  .equipment-register-head .equipment-toolbar {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .maintenance-toolbar label span {
@@ -4838,4 +5064,41 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
   border-radius: 6px;
   background-color: rgba(240, 230, 218, 0.35);
   margin-bottom: 8px;
+}
+
+@media (max-width: 1160px) {
+  .two-pay-filter-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .two-pay-filter-toolbar .equipment-search:first-child {
+    grid-column: span 2;
+  }
+
+  .two-pay-filter-toolbar .ledger-count {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 720px) {
+  .two-pay-filter-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .two-pay-filter-toolbar .equipment-search:first-child,
+  .two-pay-filter-toolbar .ledger-count {
+    grid-column: auto;
+  }
+
+  .two-pay-filter-toolbar .ledger-count {
+    width: 100%;
+  }
+
+  .two-pay-download-summary {
+    width: 100%;
+  }
+
+  .two-pay-stat-card {
+    min-height: 96px;
+  }
 }

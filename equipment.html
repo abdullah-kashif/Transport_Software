@@ -6,7 +6,7 @@
   <title>GTLS Transport - Equipment &amp; Handling Fleet</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20260902-1" />
+  <link rel="stylesheet" href="styles.css?v=20260925-3" />
 </head>
 <body data-page="equipment">
   <div class="app">
@@ -110,9 +110,16 @@
           <div><h3>Equipment Register</h3></div>
           <div class="equipment-toolbar">
             <label class="equipment-search">
-              <span>Search</span>
+              <span>General Filter</span>
               <input type="search" data-equipment-search placeholder="Registration, body type, chassis, maker..." />
             </label>
+            <label class="equipment-search equipment-maker-filter">
+              <span>Maker</span>
+              <select data-equipment-maker-filter>
+                <option value="">All Makers</option>
+              </select>
+            </label>
+            <button class="btn equipment-summary-download" type="button" data-download-equipment-summary>Download Summary</button>
             <span class="ledger-count" data-equipment-count>0 record(s)</span>
           </div>
         </div>
@@ -157,7 +164,7 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20260902-1"></script>
+<script src="app.js?v=20260925-2"></script>
 </body>
 </html>
 

@@ -66,6 +66,7 @@ GTLS Transport Software is a high-performance, modular enterprise web applicatio
 | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | Employee Directory (salaries, joining date, status, department, picture) | `data-page="employee"` |
 | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | Accounts Receivable Khata (customer statements, debit/credit entries, WhatsApp share) | `data-page="khata"` |
 | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html) | Accounts Payable Khata (vendor/carrier accounts, debit/credit tracking) | `data-page="accounts-payable"` |
+| [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | Two Pay Records register for paid/two-pay freight, tax, detention, billing, collections, balances, and received payment details | `data-page="two-pay-records"` |
 | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | User Management (Super Admin only: create/edit users, assign module permissions) | `data-page="admin"` |
 | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | Comprehensive audit trail of all CREATE, UPDATE, DELETE, LOGIN events | `data-page="activity-logs"` |
 | [`app.js`](file:///h:/Transport_Software-main/app.js) | Central JavaScript engine (state, Supabase sync, routers, calculations, UI) | Core App Engine (5,800+ lines) |
@@ -322,6 +323,36 @@ Powered by `jspdf` and `jspdf-autotable`, with embedded corporate letterheads:
 P&L example: a Receivable Amount of 257.90 with two broker rows of 100 each gives each row a Broker P&L of 157.90 and the job a Net P&L of 57.90 (`257.90 - 200`).
 
 ### Recent Changes Log
+
+| **2026-09-25** | Equipment and Maintenance Register Toolbar Alignment | Aligned filter, download, and record-count controls on a shared baseline and moved both register headings to the top of the toolbar row while preserving responsive wrapping. | `equipment.html`, `maintenance.html`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Equipment Maker Filter and Summary Download | Added a dynamic Maker dropdown alongside General Filter. Equipment Summary downloads are always available and export every record when unfiltered or only the records matching the active filters. | `equipment.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Two Pay and Equipment Navigation Order | Enforced the sidebar order so Two Pay Records is immediately before Equipment & Handling Fleet, followed by Fleet Maintenance on every page. | `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Operations Summary Dropdown Icon | Replaced the plain Operations Summary caret with a styled circular SVG chevron that rotates with the dropdown state and remains compatible with collapsed sidebar behavior. | `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Trucker/Broker Summary Status Default | Changed the Trucker/Broker Summary status filter to default to `All`, while retaining selectable `Paid` and `Payable` filters for rows and totals. | `broker-summary.html`, `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Two Pay Supabase-Authoritative Hydration | A successful `two_pay_records` Supabase response now replaces the local register, including an empty response. Manually deleted Supabase records therefore disappear after hard refresh; local cache remains untouched only when the Supabase read itself fails. | `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Maintenance and Equipment Register Filter Layout | Matched Fleet Maintenance and Equipment Register filter presentation to the Truck Trip Ledger: module title stays left while General Filter, Truck No/Date Order, and record count remain on one desktop row; responsive wrapping remains active below desktop width. | `maintenance.html`, `equipment.html`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Fleet Maintenance General Filter | Added a responsive General Filter to Fleet Maintenance History. It combines with Truck No and Date Order and searches job, truck, dates, part, serial, warranty, driver, approval, cost, and warranty-status values. | `maintenance.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Cross-Module Supabase Sync Audit | Audited Booking, Truck Details, Equipment, Fleet Maintenance, Employees, Khata, Activity Logs, and Two Pay Records save/hydration paths. Confirmed explicit immediate sync for user-facing operational forms, Supabase hydration on page load, Admin module access coverage, and visible failure handling when Supabase is unavailable. Strengthened booking broker/container error propagation, and centralized grants for all core data tables so relational failures cannot be reported as a successful save. | `app.js`, `MASTER_SUPABASE_SETUP.sql`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Supabase Save Integrity Guard | Removed silent browser-only success paths when Supabase is unavailable. Booking saves now fail visibly when Supabase is not configured or broker/container relational writes fail, and operational sync now reports the same condition instead of treating a local cache write as a successful database save. Two Pay Records are included in debounced operational change detection. | `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Two Pay Date Order Visibility | Adjusted the compact Two Pay filter control height, padding, and line height so the Date Order option text remains fully visible while keeping the single-row responsive layout. | `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Two Pay PDF Header and Filter Row Layout | Two Pay record detail PDFs now render the `Field / Value` header only on the first page. The register's General Filter, Start Date, End Date, Date Order, Download Summary, and record count controls use compact centered sizing in one desktop row with responsive wrapping on smaller screens. | `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Two Pay Record Downloads and Shared Card Styling | Added a per-record PDF download and a filtered Two Pay Register summary download after Date Order. The summary uses the active General Filter/date range/order and includes a final-page totals row. Removed the register helper sentence, aligned the record count with controls, and extended the compact interactive card background treatment across shared software cards. | `two-pay-records.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Two Pay Records KPI and Responsive Filters | Placed compact interactive Billing Amount, Global / Receivable, and Received Balance cards in the first Two Pay Records section immediately below the page title. Reworked search, date, order, and count controls into a responsive filter toolbar for laptop, tablet, and mobile layouts. | `two-pay-records.html`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-25** | Two Pay Records Module | Added an isolated Two Pay Records form/register using the supplied freight, tax, detention, billing, receivable, party collection, received amount, balance, date, ID, and remarks heads. Party and received balances calculate live, records persist through Supabase `two_pay_records`, and the module has its own RBAC key and RLS migration. | `two-pay-records.html`, `app.js`, `styles.css`, `MASTER_SUPABASE_SETUP.sql`, `supabase-two-pay-records.sql`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 
 | **2026-09-24** | Truck Payment Term Notification Labels | Import and Export Truck Details Payment Term alerts now identify the relevant truck by Import/Export Truck Registration No instead of customer name. | `app.js`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 
