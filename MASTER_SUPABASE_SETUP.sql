@@ -29,6 +29,7 @@ alter table public.booking_brokers add column if not exists container_ref text d
 alter table public.booking_brokers add column if not exists truck_no text;
 alter table public.booking_brokers add column if not exists container_size text;
 alter table public.bookings add column if not exists broker_entries jsonb default '[]'::jsonb;
+alter table public.two_pay_records add column if not exists customer_name text;
 
 -- Allow authenticated and anon users to persist and
 -- reload Booking, Container, Broker, Equipment & Handling Fleet, and Fleet Maintenance records.

@@ -20,34 +20,34 @@
 
 | Module / Page | HTML File | `data-page` Attribute | Handler in `app.js` |
 | :--- | :--- | :--- | :--- |
-| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2134) |
-| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3552) |
-| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3729) |
-| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5046) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5580) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 5912) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 5912) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 6211) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 6505) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 6844) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 7070) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 7100) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 7348) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 7500) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 7500) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` |
+| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2240) |
+| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3792) |
+| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3964) |
+| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5283) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5816) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6227) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6227) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6527) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 6790) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7140) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7493) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 7722) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 7752) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8000) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8152) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8152) |
 
 ---
 
 ## 3. Core Engine Functions in `app.js`
 
-- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 164) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`.
-- **State Store**: `loadStore()` (~Line 174) & `saveStore(store, options)` (~Line 374).
-- **Audit Logging**: `collectAuditChanges()` (~Line 332), `appendAuditLog()` (~Line 314), `pruneActivityLogs()` (~Line 257).
-- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 468), `signInWithSupabase()` (~Line 499), `enforceSoftwareAccess(page)` (~Line 2163).
-- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2609), `calculateKhataSummary(account)` (~Line 2652), `calculateTruckTripFinancials(trip)` (~Line 5568).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 2904), `buildSummaryRecordPdf()` (~Line 3068), `createRegisterPdf()` (~Line 2846), `buildTruckDetailsInvoicePdf()` (~Line 5443).
-- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 954), `syncOperationalStore()` (~Line 1358), `hydrateOperationalStore()` (~Line 1379), `syncTruckJobs()` (~Line 1120).
+- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 166) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`.
+- **State Store**: `loadStore()` (~Line 176) & `saveStore(store, options)` (~Line 381).
+- **Audit Logging**: `collectAuditChanges()` (~Line 339), `appendAuditLog()` (~Line 321), `pruneActivityLogs()` (~Line 263).
+- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 475), `signInWithSupabase()` (~Line 506), `enforceSoftwareAccess(page)` (~Line 2269).
+- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 5804).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3011), `buildSummaryRecordPdf()` (~Line 3175), `createRegisterPdf()` (~Line 2952), `buildTruckDetailsInvoicePdf()` (~Line 5679).
+- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1447), `hydrateOperationalStore()` (~Line 1469), `syncTruckJobs()` (~Line 1129).
 - **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
 
 ---
@@ -61,6 +61,18 @@
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
 
 ## 5. Changelog
+
+- **2026-09-26**: Two Pay Records now saves Customer Name to Supabase, shows it after Date in the form/register/PDFs, and supports a Customer filter (including Unassigned historical rows). A new filtered Party Collection Pending card sums positive `Party Collection - Paid Amount` balances; pending rows are marked in the register. The form keeps three regular fields per desktop row. Apply `supabase-two-pay-customer-name.sql` before saving with the new field.
+
+- **2026-09-26**: Booking Summary customer PDF now reserves footer space and paginates all rows; each page prints the letterhead, title, customer, and footer while totals appear only on the last page.
+
+- **2026-09-26**: Equipment expiry alerts now start exactly one calendar month before the date, using the same status rule on Dashboard, notification bell, and Equipment Register. Third Party Insurance Date is included in dashboard and bell alerts alongside Fitness, all provincial permits, and Tax Paid Up To. Updated the `app.js` version on all pages so the new bell logic replaces cached code.
+
+- **2026-09-26**: Moved Truck Trip Ledger heading to the top of its register section and aligned P&L, filters, record count, and rightmost Download Summary in a single desktop toolbar row with responsive wrapping.
+
+- **2026-09-26**: Truck Trip Ledger now marks zero/empty Round Trip Expense as red `Missing` and has an Expense Status dropdown (All Expenses, Missing, Entered) that combines with its other filters and PDF download.
+
+- **2026-09-26**: Truck Trip Ledger now has General Filter and Import Load Date range filters, searches import/export truck registrations, and downloads all or filtered jobs as a letterhead PDF with final-page totals.
 
 - **2026-09-25**: Aligned Equipment Register and Maintenance History filter controls, download/count controls, and moved both register headings to the top of their shared toolbar row for consistent spacing.
 

@@ -324,6 +324,18 @@ P&L example: a Receivable Amount of 257.90 with two broker rows of 100 each give
 
 ### Recent Changes Log
 
+| **2026-09-26** | Two Pay Customer and Pending Collection | Added Customer Name after Date to Two Pay form, register, detail/summary PDFs, and `two_pay_records.customer_name` Supabase sync. Register Customer dropdown supports historical blank names as Unassigned. The fourth KPI sums positive Party Collection minus Paid Amount for currently filtered records, with Pending badges on matching rows. Form fields retain three-column layout. Run `supabase-two-pay-customer-name.sql` before using the new field. | `app.js`, `two-pay-records.html`, `styles.css`, `MASTER_SUPABASE_SETUP.sql`, `supabase-two-pay-customer-name.sql`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-26** | Booking Summary PDF Pagination | Reserved a bottom margin for the customer-summary PDF footer so long tables continue onto following pages instead of being covered. Letterhead, title, customer, and footer render on each page; the total row remains only on the last page. | `app.js`, `ledger.html`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-26** | Equipment Calendar-Month Expiry Alerts | Dashboard, notification bell, and Equipment Register use one calendar-month-before-expiry rule, with expired dates remaining flagged. Third Party Insurance joins Fitness, four provincial permits, and Tax Paid Up To in Dashboard KPIs and notification alerts. All pages load a new `app.js` version to refresh cached bell logic. No schema migration is needed. | `app.js`, HTML pages, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-26** | Truck Trip Ledger Toolbar Alignment | Moved the heading to the top of the register section. P&L, General Filter, Truck No, Start/End Date, Expense Status, Job Order, count, and rightmost Download Summary share one desktop row; smaller screens wrap responsively. | `truck.html`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-26** | Truck Round Trip Expense Status | Truck Trip Ledger highlights zero or empty Round Trip Expense as red `Missing`; Expense Status dropdown filters All Expenses, Missing, or Entered alongside truck, date, and general search. PDF summary labels missing expense rows consistently. Existing form and database store blanks as zero, so explicit zero is classified as Missing. | `truck.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
+| **2026-09-26** | Truck Trip Ledger Filters and Download | Added General Filter and Start/End Date filters (Import Load Date) to Truck Trip Ledger. Truck No matches import or export registration. Download Summary exports the current ordered filter result, or all jobs when filters are empty, on letterhead PDF with totals on its last page. | `truck.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
 | **2026-09-25** | Equipment and Maintenance Register Toolbar Alignment | Aligned filter, download, and record-count controls on a shared baseline and moved both register headings to the top of the toolbar row while preserving responsive wrapping. | `equipment.html`, `maintenance.html`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 
 | **2026-09-25** | Equipment Maker Filter and Summary Download | Added a dynamic Maker dropdown alongside General Filter. Equipment Summary downloads are always available and export every record when unfiltered or only the records matching the active filters. | `equipment.html`, `app.js`, `styles.css`, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |

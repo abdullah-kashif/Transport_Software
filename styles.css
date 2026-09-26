@@ -2080,6 +2080,67 @@ th {
   flex-wrap: wrap;
 }
 
+.truck-ledger-head {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.truck-ledger-head h3 {
+  margin-bottom: 10px;
+}
+
+.truck-ledger-filter {
+  width: 100%;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.truck-ledger-filter .truck-ledger-search {
+  min-width: 170px;
+  max-width: 240px;
+}
+
+.truck-ledger-filter .ledger-filter-control input,
+.truck-ledger-filter .ledger-filter-control select {
+  width: 100%;
+  height: 38px;
+}
+
+.truck-ledger-download,
+.truck-ledger-filter .ledger-count {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.truck-ledger-download {
+  margin-left: auto;
+}
+
+@media (min-width: 1600px) {
+  .truck-ledger-filter {
+    display: grid;
+    grid-template-columns: minmax(125px, .85fr) minmax(155px, 1.4fr) repeat(4, minmax(105px, .9fr)) minmax(185px, 1.4fr) auto auto;
+    align-items: end;
+  }
+
+  .truck-ledger-filter .ledger-filter-control,
+  .truck-ledger-filter .truck-ledger-search {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .truck-ledger-filter .ledger-total {
+    min-width: 0;
+  }
+
+  .truck-ledger-filter .ledger-count,
+  .truck-ledger-download {
+    justify-self: end;
+  }
+}
+
 .booking-ledger-screen-head {
   margin-bottom: 12px;
 }
@@ -2738,7 +2799,7 @@ body.confirm-modal-open {
 }
 
 .two-pay-table {
-  min-width: 3600px;
+  min-width: 3740px;
 }
 
 .two-pay-table th,
@@ -2822,6 +2883,10 @@ body.confirm-modal-open {
   background: linear-gradient(135deg, #fffdf9 0%, #fff0dc 100%);
 }
 
+.two-pay-stat-card.party-pending {
+  background: linear-gradient(135deg, #fffdf9 0%, #ffe7d3 100%);
+}
+
 .two-pay-toolbar {
   margin-bottom: 18px;
   padding: 14px;
@@ -2832,7 +2897,7 @@ body.confirm-modal-open {
 
 .two-pay-filter-toolbar {
   display: grid;
-  grid-template-columns: minmax(205px, 1.55fr) repeat(2, minmax(122px, .9fr)) minmax(175px, 1.1fr) auto auto;
+  grid-template-columns: minmax(145px, 1.3fr) minmax(120px, .9fr) repeat(2, minmax(118px, .8fr)) minmax(160px, 1fr) auto auto;
   align-items: center;
   gap: 8px;
 }
@@ -3710,6 +3775,13 @@ body[data-page="truck"] .truck-trip-table td:nth-child(50) {
 body[data-page="truck"] .truck-trip-table td.remarks-cell {
   min-width: 260px;
   white-space: normal;
+}
+
+body[data-page="truck"] .truck-trip-table td.truck-expense-missing {
+  background: #fff0ee;
+  color: #b42318;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #eab3ab;
 }
 
 body[data-page="booking"] .ledger-table thead th {
@@ -5066,7 +5138,7 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
   margin-bottom: 8px;
 }
 
-@media (max-width: 1160px) {
+@media (max-width: 1400px) {
   .two-pay-filter-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

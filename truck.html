@@ -6,7 +6,7 @@
   <title>GTLS Transport - Truck Details</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20260902-1" />
+  <link rel="stylesheet" href="styles.css?v=20260926-3" />
 </head>
 <body data-page="truck">
   <div class="app">
@@ -108,7 +108,20 @@
         <div class="notice" data-notice hidden></div>
       </section>
       <section class="screen">
-        <div class="screen-head"><div><h3>Truck Trip Ledger</h3></div><div class="ledger-filter"><div class="ledger-total" aria-live="polite"><span>P&amp;L</span><strong data-truck-ledger-profit-loss>PKR 0</strong></div><div class="ledger-filter-control"><label for="truck-customer-filter">Truck No</label><select id="truck-customer-filter" data-truck-customer-filter><option value="">All Trucks</option></select></div><div class="ledger-filter-control"><label for="truck-job-sort">Job Order</label><select id="truck-job-sort" data-truck-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div><span class="ledger-count" data-truck-trip-count>0 record(s)</span></div></div>
+        <div class="screen-head truck-ledger-head">
+          <div><h3>Truck Trip Ledger</h3></div>
+          <div class="ledger-filter truck-ledger-filter">
+            <div class="ledger-total" aria-live="polite"><span>P&amp;L</span><strong data-truck-ledger-profit-loss>PKR 0</strong></div>
+            <div class="ledger-filter-control truck-ledger-search"><label for="truck-ledger-search">General Filter</label><input id="truck-ledger-search" type="search" data-truck-ledger-search placeholder="Search trip records..." /></div>
+            <div class="ledger-filter-control"><label for="truck-customer-filter">Truck No</label><select id="truck-customer-filter" data-truck-customer-filter><option value="">All Trucks</option></select></div>
+            <div class="ledger-filter-control"><label for="truck-ledger-start">Start Date</label><input id="truck-ledger-start" type="date" data-truck-ledger-start /></div>
+            <div class="ledger-filter-control"><label for="truck-ledger-end">End Date</label><input id="truck-ledger-end" type="date" data-truck-ledger-end /></div>
+            <div class="ledger-filter-control"><label for="truck-expense-status">Expense Status</label><select id="truck-expense-status" data-truck-expense-status><option value="all">All Expenses</option><option value="missing">Missing</option><option value="entered">Entered</option></select></div>
+            <div class="ledger-filter-control ledger-filter-control-job-order"><label for="truck-job-sort">Job Order</label><select id="truck-job-sort" data-truck-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div>
+            <span class="ledger-count" data-truck-trip-count>0 record(s)</span>
+            <button class="btn primary truck-ledger-download" type="button" data-download-truck-ledger>Download Summary</button>
+          </div>
+        </div>
         <div class="table-wrap"><table class="ledger-table truck-trip-table"><thead><tr>
               <th>S.No</th><th>Job No</th><th>Import Load Date</th><th>Import Truck Registration No</th><th>Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Detention</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Receivable Amount</th><th>Payment Term</th><th>Cheque / IBFT</th><th>Payment Received Date</th><th>Import Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Customer Collection</th><th>Paid Date</th><th>Cheque / IBFT</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Export Freight</th><th>Detention</th><th>Broker Commission</th><th>Export - Broker</th><th>Export Receivable Amount</th><th>Payment Term</th><th>Cheque / IBFT</th><th>Payment Received Date</th><th>Export Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Customer Collection</th><th>Paid Date</th><th>Cheque / IBFT</th><th>Export Remarks</th><th>Grand Total</th><th>Round Trip Expense</th><th>P&amp;L</th><th>Image</th><th>Actions</th>
         </tr></thead><tbody data-truck-trip-rows></tbody></table></div>
@@ -123,6 +136,6 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20260902-1"></script>
+<script src="app.js?v=20260926-3"></script>
 </body>
 </html>

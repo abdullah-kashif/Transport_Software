@@ -1265,6 +1265,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const rows = (records || []).map((item) => ({
       id: item.id,
       date: formatIsoDate(item.date) || null,
+      customer_name: item.customerName || null,
       origin: item.origin || null,
       bl_no: item.blNo || null,
       container_no: item.containerNo || null,
@@ -1301,6 +1302,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       ...local,
       id: row.id || local.id,
       date: row.date || local.date || "",
+      customerName: row.customer_name ?? local.customerName ?? "",
       origin: row.origin ?? local.origin ?? "",
       blNo: row.bl_no ?? local.blNo ?? "",
       containerNo: row.container_no ?? local.containerNo ?? "",
@@ -3185,21 +3187,28 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       summary.totalAmount += Number(item.totalAmount || tax.totalAmount || 0);
       return summary;
     }, { roadHaulage: 0, salesTax: 0, totalAmount: 0 });
-    if (letterheadHeader) {
-      const headerWidth = 520;
-      const headerHeight = 124;
-      pdf.addImage(letterheadHeader, "JPEG", 20, 10, headerWidth, headerHeight);
-    }
-    pdf.setTextColor(24, 48, 77);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(15);
-    pdf.text("CUSTOMER SUMMARY", 36, 150);
-    pdf.setFontSize(12);
-    pdf.text(String(customer || "Unknown Customer"), 36, 170);
     pdf.autoTable({
       startY: 184,
+      margin: { top: 184, bottom: 100, left: 28, right: 28 },
       theme: "grid",
       showFoot: "lastPage",
+      rowPageBreak: "avoid",
+      didDrawPage: () => {
+        if (letterheadHeader) pdf.addImage(letterheadHeader, "JPEG", 20, 10, 520, 124);
+        pdf.setTextColor(24, 48, 77);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(15);
+        pdf.text("CUSTOMER SUMMARY", 36, 150);
+        pdf.setFontSize(12);
+        pdf.text(String(customer || "Unknown Customer"), 36, 170);
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.8);
+        pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(32, 32, 32);
+        pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
+      },
       head: [["S.No", "Date", "Booking No", "BL No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
@@ -3235,15 +3244,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         10: { cellWidth: 130 }
       }
     });
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
-    pdf.setDrawColor(0, 0, 0);
-    pdf.setLineWidth(0.8);
-    pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-    pdf.setTextColor(32, 32, 32);
-    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
     pdf.save(`${String(customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
   }
 
@@ -3513,6 +3513,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
   const PAYMENT_ALERT_READ_KEY = "gtls-payment-alert-read-v1";
   const EQUIPMENT_EXPIRY_ALERT_FIELDS = [
+    ["thirdPartyInsuranceDate", "Third Party Insurance"],
     ["fitnessExpiry", "Fitness Expiry"],
     ["balochistanPermitExpiry", "Balochistan Permit"],
     ["sindhPermitExpiry", "Sindh Permit"],
@@ -3520,6 +3521,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     ["punjabPermitExpiry", "Punjab Permit"],
     ["taxPaidUpTo", "Tax Paid Up To"]
   ];
+
+  function getEquipmentExpiryStatus(value, today = parseDateValue(getTodayIsoDate())) {
+    const expiry = parseDateValue(value);
+    if (!expiry || !today) return "na";
+    const expiryDay = new Date(expiry.getFullYear(), expiry.getMonth(), expiry.getDate());
+    const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (todayDay > expiryDay) return "expired";
+    const previousMonth = new Date(expiryDay.getFullYear(), expiryDay.getMonth() - 1, 1);
+    const lastDay = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0).getDate();
+    const alertStart = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), Math.min(expiryDay.getDate(), lastDay));
+    return todayDay >= alertStart ? "due" : "valid";
+  }
 
   function getBookingReceivableAmount(item) {
     const storedAmount = Number(item.receivableAmount);
@@ -3671,8 +3684,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
       const expiryAlerts = equipmentFleet.flatMap((item) => EQUIPMENT_EXPIRY_ALERT_FIELDS.map(([field, label]) => {
         const expiryDate = parseDateValue(item[field]);
+        const expiryStatus = getEquipmentExpiryStatus(item[field], today);
         const daysUntil = expiryDate && today ? Math.ceil((expiryDate - today) / 86400000) : null;
-        if (!expiryDate || daysUntil === null || daysUntil > 30) return null;
+        if (expiryStatus !== "due" && expiryStatus !== "expired") return null;
         return {
           item,
           moduleLabel: label,
@@ -3807,8 +3821,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         card.classList.toggle("expiry-due", summary.due > 0 && summary.expired === 0);
         card.classList.toggle("expiry-expired", summary.expired > 0);
         card.title = summary.alerts
-          ? `${summary.expired} expired, ${summary.due} due within 30 days`
-          : "No expiry within 30 days";
+          ? `${summary.expired} expired, ${summary.due} due within one calendar month`
+          : "No expiry within one calendar month";
       }
       if (detail) {
         detail.textContent = summary.alerts
@@ -3838,14 +3852,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     function getDocumentExpiryState(value) {
-      if (!value) return "valid";
-      const today = parseDateValue(getTodayIsoDate());
-      const expiry = parseDateValue(value);
-      if (!expiry || !today) return "valid";
-      const days = Math.ceil((expiry - today) / 86400000);
-      if (days < 0) return "expired";
-      if (days <= 30) return "due";
-      return "valid";
+      return getEquipmentExpiryStatus(value);
     }
 
     function getExpirySummary(equipmentFleet, field) {
@@ -3880,6 +3887,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const customerAccountMetrics = getAccountMetrics(customerAccounts);
       const supplierAccountMetrics = getAccountMetrics(supplierAccounts);
       const equipmentExpirySummaries = {
+        thirdPartyInsuranceAlerts: getExpirySummary(equipmentFleet, "thirdPartyInsuranceDate"),
         fitnessAlerts: getExpirySummary(equipmentFleet, "fitnessExpiry"),
         balochistanPermitAlerts: getExpirySummary(equipmentFleet, "balochistanPermitExpiry"),
         sindhPermitAlerts: getExpirySummary(equipmentFleet, "sindhPermitExpiry"),
@@ -5811,7 +5819,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const notice = document.querySelector("[data-notice]");
     const count = document.querySelector("[data-truck-trip-count]");
     const customerFilter = document.querySelector("[data-truck-customer-filter]");
+    const searchFilter = document.querySelector("[data-truck-ledger-search]");
+    const startDateFilter = document.querySelector("[data-truck-ledger-start]");
+    const endDateFilter = document.querySelector("[data-truck-ledger-end]");
+    const expenseStatusFilter = document.querySelector("[data-truck-expense-status]");
     const jobSort = document.querySelector("[data-truck-job-sort]");
+    const downloadButton = document.querySelector("[data-download-truck-ledger]");
     const profitLossTotal = document.querySelector("[data-truck-ledger-profit-loss]");
     const imageInput = form?.querySelector("[data-truck-image-input]");
     const imagePreview = form?.querySelector("[data-truck-image-preview]");
@@ -5926,16 +5939,38 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       closeTruckImageModalButton?.focus();
     }
 
-    function render() {
+    function getFilteredRows() {
       const allRows = store.truckExpenses.filter((item) => item.jobNo);
-      const truckNumbers = [...new Set(allRows.map((item) => String(item.truckNo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const truckNumbers = [...new Set(allRows.flatMap((item) => [item.truckNo, item.exportTruckNo])
+        .map((value) => String(value || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const selectedTruckNo = String(customerFilter?.value || "").trim();
       if (customerFilter) {
         customerFilter.innerHTML = `<option value="">All Trucks</option>${truckNumbers.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${text(truckNo)}</option>`).join("")}`;
         customerFilter.value = truckNumbers.includes(selectedTruckNo) ? selectedTruckNo : "";
       }
-      const rows = (selectedTruckNo ? allRows.filter((item) => String(item.truckNo || "").trim() === selectedTruckNo) : [...allRows])
+      const query = String(searchFilter?.value || "").trim().toLowerCase();
+      const from = parseDateValue(startDateFilter?.value);
+      const to = parseDateValue(endDateFilter?.value);
+      const expenseStatus = expenseStatusFilter?.value || "all";
+      return allRows
+        .filter((item) => !selectedTruckNo || [item.truckNo, item.exportTruckNo]
+          .some((value) => String(value || "").trim() === selectedTruckNo))
+        .filter((item) => {
+          if (!from && !to) return true;
+          const jobDate = parseDateValue(item.date);
+          return Boolean(jobDate && (!from || jobDate >= from) && (!to || jobDate <= to));
+        })
+        .filter((item) => expenseStatus === "all" ||
+          (expenseStatus === "missing" ? Number(item.roundTripExpense || 0) <= 0 : Number(item.roundTripExpense || 0) > 0))
+        .filter((item) => !query || Object.entries(item).some(([key, value]) =>
+          !["image", "imagePath"].includes(key) && value != null && typeof value !== "object" &&
+          String(value).toLowerCase().includes(query)) ||
+          [item.date, item.exportLoadDate].some((value) => formatShortDate(value).toLowerCase().includes(query)))
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
+    }
+
+    function render() {
+      const rows = getFilteredRows();
 
       if (profitLossTotal) {
         const totalProfitLoss = rows.reduce((total, item) => total + calculateTruckTripFinancials(item).profitLoss, 0);
@@ -5958,7 +5993,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportCustomer || item.customer || "-")}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${text(item.exportCargoDescription || item.cargoDescription || "-")}</td>
           <td>${money(item.exportMtyBoxFreight || 0)}</td><td>${text(item.exportMtyBroker || "-")}</td>
           <td>${money(item.exportFreight)}</td><td>${money(item.exportDetention || 0)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportReceivedAmount)}</td>
-          <td>${text(item.exportPaymentTerm || "-")}</td><td>${text(item.exportChequeDetails || "-")}</td><td>${item.exportPaymentReceivedDate ? formatShortDate(item.exportPaymentReceivedDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td>${money(item.exportCustomerCollection || 0)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td>${text(item.exportChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td>${money(financials.roundTripExpense)}</td><td>${money(financials.profitLoss)}</td>
+          <td>${text(item.exportPaymentTerm || "-")}</td><td>${text(item.exportChequeDetails || "-")}</td><td>${item.exportPaymentReceivedDate ? formatShortDate(item.exportPaymentReceivedDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td>${money(item.exportCustomerCollection || 0)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td>${text(item.exportChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td class="${Number(item.roundTripExpense || 0) > 0 ? "" : "truck-expense-missing"}" title="${Number(item.roundTripExpense || 0) > 0 ? "Round trip expense entered" : "Round trip expense not entered"}">${Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing"}</td><td>${money(financials.profitLoss)}</td>
           <td>${item.image ? `
             <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image">
               <img src="${escapeHtml(item.image)}" alt="Truck details attachment" />
@@ -6125,8 +6160,57 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (editId) fillForm(store.truckExpenses.find((item) => item.id === editId));
     });
 
+    downloadButton?.addEventListener("click", async () => {
+      const rows = getFilteredRows();
+      if (!rows.length) {
+        notice.textContent = "No truck trip records match the current filters.";
+        return;
+      }
+      try {
+        if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF("l", "pt", "a3");
+        const letterhead = await loadInvoiceTemplateDataUrl();
+        const header = await cropImageDataUrl(letterhead, 0, 270);
+        if (header) pdf.addImage(header, "JPEG", 24, 10, 730, 132);
+        pdf.setTextColor(24, 48, 77);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(15);
+        pdf.text("TRUCK TRIP LEDGER SUMMARY", 36, 158);
+        const totals = rows.reduce((sum, item) => {
+          const financials = calculateTruckTripFinancials(item);
+          sum.grand += financials.grandTotal;
+          sum.expense += financials.roundTripExpense;
+          sum.profit += financials.profitLoss;
+          return sum;
+        }, { grand: 0, expense: 0, profit: 0 });
+        pdf.autoTable({
+          startY: 174,
+          margin: { left: 24, right: 24, top: 36, bottom: 40 },
+          theme: "grid",
+          showFoot: "lastPage",
+          head: [["S.No", "Job No", "Import Date", "Import Truck", "Customer / Payer", "Export Date", "Export Truck", "Import Freight", "Export Freight", "Import Receivable", "Export Receivable", "MTY Freight", "Grand Total", "Round Trip Expense", "P&L"]],
+          body: rows.map((item, index) => {
+            const financials = calculateTruckTripFinancials(item);
+            return [String(index + 1), item.jobNo || "-", formatShortDate(item.date), item.truckNo || "-", item.customer || "-", formatShortDate(item.exportLoadDate), item.exportTruckNo || item.truckNo || "-", money(item.importFreight), money(item.exportFreight), money(item.importReceivedAmount), money(item.exportReceivedAmount), money(Number(item.mtyBoxFreight || 0) + Number(item.exportMtyBoxFreight || 0)), money(financials.grandTotal), Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing", money(financials.profitLoss)];
+          }),
+          foot: [["", "", "", "", "", "", "", "", "", "", "", "Total", money(totals.grand), money(totals.expense), money(totals.profit)]],
+          styles: { fontSize: 7, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
+          headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
+          footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold" }
+        });
+        pdf.save("truck-trip-ledger-summary.pdf");
+      } catch (error) {
+        notice.textContent = `Truck ledger download failed: ${error.message}`;
+      }
+    });
+
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
+    searchFilter?.addEventListener("input", render);
     if (customerFilter) customerFilter.addEventListener("change", render);
+    startDateFilter?.addEventListener("change", render);
+    endDateFilter?.addEventListener("change", render);
+    expenseStatusFilter?.addEventListener("change", render);
     if (jobSort) jobSort.addEventListener("change", render);
     closeTruckImageModalButton?.addEventListener("click", closeTruckImageModal);
     truckImageModal?.addEventListener("click", (event) => {
@@ -6445,6 +6529,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const body = document.querySelector("[data-two-pay-rows]");
     const notice = document.querySelector("[data-notice]");
     const search = document.querySelector("[data-two-pay-search]");
+    const customerFilter = document.querySelector("[data-two-pay-customer]");
     const startDate = document.querySelector("[data-two-pay-start]");
     const endDate = document.querySelector("[data-two-pay-end]");
     const order = document.querySelector("[data-two-pay-order]");
@@ -6452,6 +6537,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const totalBilling = document.querySelector("[data-two-pay-total-billing]");
     const totalReceivable = document.querySelector("[data-two-pay-total-receivable]");
     const totalBalance = document.querySelector("[data-two-pay-total-balance]");
+    const totalPartyPending = document.querySelector("[data-two-pay-total-party-pending]");
     const downloadSummaryButton = document.querySelector("[data-download-two-pay-summary]");
     if (!form || !body) return;
     let editingId = "";
@@ -6460,6 +6546,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       "roadFreightPaid", "roadFreightTwoPay", "taxAmount", "detentionCharges", "billingAmount",
       "globalReceivable", "partyCollection", "partyCollectionPaidAmount", "receivedAmount"
     ];
+    const getPartyBalance = (item) => Number(item.partyCollection || 0) - Number(item.partyCollectionPaidAmount || 0);
+    const getPartyPending = (item) => Math.max(0, getPartyBalance(item));
 
     function createId() {
       if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -6495,12 +6583,16 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function getFilteredRows() {
       const query = String(search?.value || "").trim().toLowerCase();
+      const selectedCustomer = String(customerFilter?.value || "").trim().toLowerCase();
       const from = String(startDate?.value || "");
       const to = String(endDate?.value || "");
       return (store.twoPayRecords || [])
+        .filter((item) => !selectedCustomer || (selectedCustomer === "__unassigned__"
+          ? !String(item.customerName || "").trim()
+          : String(item.customerName || "").trim().toLowerCase() === selectedCustomer))
         .filter((item) => !from || String(item.date || "") >= from)
         .filter((item) => !to || String(item.date || "") <= to)
-        .filter((item) => !query || [item.date, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks]
+        .filter((item) => !query || [item.date, item.customerName, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks]
           .some((value) => String(value || "").toLowerCase().includes(query)))
         .sort((left, right) => {
           const result = String(left.date || "").localeCompare(String(right.date || ""));
@@ -6510,12 +6602,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function getTwoPayPdfValues(item) {
       return [
-        formatShortDate(item.date), item.origin || "-", item.blNo || "-", item.containerNo || "-", item.lotOf || "-",
+        formatShortDate(item.date), item.customerName || "-", item.origin || "-", item.blNo || "-", item.containerNo || "-", item.lotOf || "-",
         item.destination || "-", item.consigneeName || "-", item.size || "-", item.description || "-", item.truckNo || "-",
         money(item.roadFreightPaid), money(item.roadFreightTwoPay), money(item.taxAmount), money(item.detentionCharges),
         money(item.billingAmount), money(item.globalReceivable), item.billNo || "-", money(item.partyCollection),
         money(item.partyCollectionPaidAmount), item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-",
-        money(item.partyBalance), item.partyRemarks || "-", money(item.receivedAmount), money(item.receivedBalance),
+        money(getPartyBalance(item)), item.partyRemarks || "-", money(item.receivedAmount), money(item.receivedBalance),
         item.receivedDate ? formatShortDate(item.receivedDate) : "-", item.receivedId || "-", item.remarks || "-"
       ];
     }
@@ -6537,7 +6629,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         showHead: "firstPage",
         head: [["Field", "Value"]],
         body: [
-          ["Date", formatShortDate(item.date)], ["Origin", item.origin || "-"], ["BL No", item.blNo || "-"],
+          ["Date", formatShortDate(item.date)], ["Customer Name", item.customerName || "-"], ["Origin", item.origin || "-"], ["BL No", item.blNo || "-"],
           ["Container No", item.containerNo || "-"], ["Lot Of", item.lotOf || "-"], ["Destination", item.destination || "-"],
           ["Consignee Name", item.consigneeName || "-"], ["Size", item.size || "-"], ["Description", item.description || "-"],
           ["Truck No", item.truckNo || "-"], ["Road Freight / Paid", money(item.roadFreightPaid)],
@@ -6546,7 +6638,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           ["Global / Receivable", money(item.globalReceivable)], ["Bill No", item.billNo || "-"],
           ["Party Collection", money(item.partyCollection)], ["Party Collection Paid Amount", money(item.partyCollectionPaidAmount)],
           ["Party Collection Paid Date", item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"],
-          ["Party Balance", money(item.partyBalance)], ["Party Remarks", item.partyRemarks || "-"],
+          ["Party Balance", money(getPartyBalance(item))], ["Party Remarks", item.partyRemarks || "-"],
           ["Received Amount", money(item.receivedAmount)], ["Received Balance", money(item.receivedBalance)],
           ["Received Date", item.receivedDate ? formatShortDate(item.receivedDate) : "-"], ["Received ID", item.receivedId || "-"],
           ["Received Remarks", item.remarks || "-"]
@@ -6575,14 +6667,21 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         receivable: total.receivable + Number(item.globalReceivable || 0),
         balance: total.balance + Number(item.receivedBalance || 0)
       }), { billing: 0, receivable: 0, balance: 0 });
+      const headers = ["S.No", "Date", "Customer Name", "Origin", "BL No", "Container No", "Lot Of", "Destination", "Consignee Name", "Size", "Description", "Truck No", "Road Freight / Paid", "Road Freight / Two Pay", "Tax Amount", "Detention Charges", "Billing Amount", "Global / Receivable", "Bill No", "Party Collection", "Party Paid Amount", "Party Paid Date", "Party Balance", "Party Remarks", "Received Amount", "Received Balance", "Received Date", "Received ID", "Received Remarks"];
+      const footer = Array(headers.length).fill("");
+      footer[headers.indexOf("Detention Charges")] = "Total";
+      footer[headers.indexOf("Billing Amount")] = money(totals.billing);
+      footer[headers.indexOf("Global / Receivable")] = money(totals.receivable);
+      footer[headers.indexOf("Received Amount")] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
+      footer[headers.indexOf("Received Balance")] = money(totals.balance);
       pdf.autoTable({
         startY: 174,
         margin: { left: 20, right: 20 },
         theme: "grid",
         showFoot: "lastPage",
-        head: [["S.No", "Date", "Origin", "BL No", "Container No", "Lot Of", "Destination", "Consignee Name", "Size", "Description", "Truck No", "Road Freight / Paid", "Road Freight / Two Pay", "Tax Amount", "Detention Charges", "Billing Amount", "Global / Receivable", "Bill No", "Party Collection", "Party Paid Amount", "Party Paid Date", "Party Balance", "Party Remarks", "Received Amount", "Received Balance", "Received Date", "Received ID", "Received Remarks"]],
+        head: [headers],
         body: rows.map((item, index) => [String(index + 1), ...getTwoPayPdfValues(item)]),
-        foot: [["", "", "", "", "", "", "", "", "", "", "", "", "", "", "Total", money(totals.billing), money(totals.receivable), "", "", "", "", "", "", money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0)), money(totals.balance), "", "", ""]],
+        foot: [footer],
         styles: { fontSize: 6.5, cellPadding: 3, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
         headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 6.5 },
         footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold" }
@@ -6591,24 +6690,35 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
 
     function render() {
+      if (customerFilter) {
+        const selectedCustomer = customerFilter.value;
+        const customerNames = [...new Map((store.twoPayRecords || []).map((item) => String(item.customerName || "").trim())
+          .filter(Boolean).map((name) => [name.toLowerCase(), name])).values()]
+          .sort((left, right) => left.localeCompare(right));
+        const hasUnassigned = (store.twoPayRecords || []).some((item) => !String(item.customerName || "").trim());
+        customerFilter.innerHTML = `<option value="">All Customers</option>${customerNames.map((name) => `<option value="${escapeHtml(name.toLowerCase())}">${text(name)}</option>`).join("")}${hasUnassigned ? '<option value="__unassigned__">Unassigned</option>' : ""}`;
+        customerFilter.value = [...customerNames.map((name) => name.toLowerCase()), ...(hasUnassigned ? ["__unassigned__"] : [])].includes(selectedCustomer) ? selectedCustomer : "";
+      }
       const rows = getFilteredRows();
       const billing = rows.reduce((sum, item) => sum + Number(item.billingAmount || 0), 0);
       const receivable = rows.reduce((sum, item) => sum + Number(item.globalReceivable || 0), 0);
       const balance = rows.reduce((sum, item) => sum + Number(item.receivedBalance || 0), 0);
+      const partyPending = rows.reduce((sum, item) => sum + getPartyPending(item), 0);
       if (count) count.textContent = `${rows.length} record(s)`;
       if (totalBilling) totalBilling.textContent = `PKR ${money(billing)}`;
       if (totalReceivable) totalReceivable.textContent = `PKR ${money(receivable)}`;
       if (totalBalance) totalBalance.textContent = `PKR ${money(balance)}`;
+      if (totalPartyPending) totalPartyPending.textContent = `PKR ${money(partyPending)}`;
       body.innerHTML = rows.length ? rows.map((item, index) => `
         <tr>
-          <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td><td>${text(item.containerNo || "-")}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${text(item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${text(item.truckNo || "-")}</td>
-          <td>${money(item.roadFreightPaid)}</td><td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td><td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(item.partyBalance)}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
+          <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.customerName || "-")}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td><td>${text(item.containerNo || "-")}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${text(item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${text(item.truckNo || "-")}</td>
+          <td>${money(item.roadFreightPaid)}</td><td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td><td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(getPartyBalance(item))}${getPartyPending(item) > 0 ? ' <span class="badge warn">Pending</span>' : ""}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
           <td><div class="table-actions"><button class="btn small" type="button" data-download-two-pay="${escapeHtml(item.id)}">Download</button><button class="btn small" type="button" data-edit-two-pay="${escapeHtml(item.id)}">Edit</button></div></td>
         </tr>
-      `).join("") : `<tr><td colspan="29" class="empty-state">No Two Pay records available.</td></tr>`;
+      `).join("") : `<tr><td colspan="30" class="empty-state">No Two Pay records available.</td></tr>`;
     }
 
-    [search, startDate, endDate, order].filter(Boolean).forEach((control) => {
+    [search, customerFilter, startDate, endDate, order].filter(Boolean).forEach((control) => {
       control.addEventListener(control === search ? "input" : "change", render);
     });
     ["partyCollection", "partyCollectionPaidAmount", "billingAmount", "receivedAmount"].forEach((name) => {
@@ -6742,11 +6852,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (!value) return { className: "na", label: "N/A" };
       const expiry = parseDateValue(value);
       if (!expiry) return { className: "na", label: text(value) };
-      const today = parseDateValue(getTodayIsoDate());
-      const days = Math.ceil((expiry - today) / 86400000);
-      if (days < 0) return { className: "expired", label: formatShortDate(value) };
-      if (days <= 90) return { className: "due", label: formatShortDate(value) };
-      return { className: "valid", label: formatShortDate(value) };
+      return { className: getEquipmentExpiryStatus(value), label: formatShortDate(value) };
     }
 
     function expiryCell(value) {
@@ -9067,7 +9173,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   function bindGlobalDateAutoSelect() {
     document.addEventListener("focusin", (event) => {
       const target = event.target;
-      if (target && target.tagName === "INPUT" && target.type === "date" && !target.value) {
+      if (target && target.tagName === "INPUT" && target.type === "date" && !target.value &&
+        !target.matches("[data-truck-ledger-start], [data-truck-ledger-end]")) {
         target.value = getTodayIsoDate();
         target.dispatchEvent(new Event("input", { bubbles: true }));
         target.dispatchEvent(new Event("change", { bubbles: true }));
@@ -9076,7 +9183,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     document.addEventListener("click", (event) => {
       const target = event.target;
-      if (target && target.tagName === "INPUT" && target.type === "date" && !target.value) {
+      if (target && target.tagName === "INPUT" && target.type === "date" && !target.value &&
+        !target.matches("[data-truck-ledger-start], [data-truck-ledger-end]")) {
         target.value = getTodayIsoDate();
         target.dispatchEvent(new Event("input", { bubbles: true }));
         target.dispatchEvent(new Event("change", { bubbles: true }));
