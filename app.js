@@ -2949,34 +2949,51 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     return String(value || fallback).trim().replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || fallback;
   }
 
+  function summaryTitleY(headerHeight) {
+    return 10 + headerHeight + 36;
+  }
+
+  function fitSummaryColumnStyles(columns, availableWidth) {
+    const originalWidth = Object.values(columns).reduce((sum, column) => sum + column.cellWidth, 0);
+    const scale = availableWidth / originalWidth;
+    return Object.fromEntries(Object.entries(columns).map(([index, column]) => [index, {
+      ...column,
+      cellWidth: column.cellWidth * scale
+    }]));
+  }
+
   async function createRegisterPdf(title, headers, row, fileName, imageData = "") {
     if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
     const { jsPDF } = window.jspdf;
-    const isWide = headers.length > 11;
-    const pdf = new jsPDF("l", "pt", isWide ? "a3" : "a4");
+    const isSummary = /summary/i.test(title);
+    const isWide = isSummary || headers.length >= 11;
+    const pdf = new jsPDF("l", "pt", isSummary && headers.length > 12 ? "a2" : isWide ? "a3" : "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
-    const headerWidth = isWide ? 850 : 620;
-    const headerHeight = headerWidth * (270 / 1131);
-    const headerX = (pageWidth - headerWidth) / 2;
+    const headerHeight = isSummary ? 136 : (isWide ? 700 : 620) * (270 / 1131);
+    const headerWidth = headerHeight * (1131 / 270);
+    const headerX = isSummary ? 36 : (pageWidth - headerWidth) / 2;
+    const titleY = summaryTitleY(headerHeight);
     if (letterheadHeader) {
       pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight, undefined, "FAST");
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
-    pdf.text(title.toUpperCase(), 36, 150);
+    pdf.text(title.toUpperCase(), 36, titleY);
     const bodyRows = Array.isArray(row) && Array.isArray(row[0]) ? row : [row];
     pdf.autoTable({
-      startY: 168,
+      startY: titleY + 18,
       margin: { left: 24, right: 24, bottom: 62 },
+      tableWidth: isSummary ? pageWidth - 48 : "auto",
       head: [headers],
       body: bodyRows,
       theme: "grid",
-      styles: { fontSize: isWide ? 9.5 : 8.8, cellPadding: 5.5, halign: "center", valign: "middle", lineColor: [93, 72, 52], lineWidth: 0.55, overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontStyle: "bold", fontSize: isWide ? 9.5 : 8.8, minCellHeight: 36, valign: "middle", halign: "center", overflow: "linebreak" },
+      styles: { fontSize: isSummary ? 10 : isWide ? 9.5 : 8.8, cellPadding: 5.5, halign: "center", valign: "middle", lineColor: isSummary ? [40, 40, 40] : [93, 72, 52], lineWidth: isSummary ? 0.65 : 0.55, overflow: "linebreak" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontStyle: "bold", fontSize: isSummary ? 10 : isWide ? 9.5 : 8.8, minCellHeight: 36, valign: "middle", halign: "center", overflow: "linebreak" },
+      bodyStyles: isSummary ? { minCellHeight: 34 } : {},
       alternateRowStyles: { fillColor: [255, 251, 247] }
     });
     const totalPages = pdf.internal.getNumberOfPages();
@@ -3179,7 +3196,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function buildSummaryRecordPdf(customer, bookings) {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("l", "pt", "a4");
+    const pdf = new jsPDF("l", "pt", "a3");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
@@ -3192,32 +3209,32 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       return summary;
     }, { roadHaulage: 0, salesTax: 0, totalAmount: 0 });
 
-    const headerWidth = 620;
-    const headerHeight = headerWidth * (270 / 1131);
-    const headerX = (pageWidth - headerWidth) / 2;
+    const headerHeight = 136;
+    const headerWidth = headerHeight * (1131 / 270);
+    const headerX = 36;
+    const titleY = summaryTitleY(headerHeight);
     if (letterheadHeader) {
       pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
-    pdf.text("CUSTOMER SUMMARY", 36, 150);
+    pdf.text("CUSTOMER SUMMARY", 36, titleY);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(11);
-    pdf.text(String(customer || "Unknown Customer"), 36, 170);
+    pdf.text(String(customer || "Unknown Customer"), 36, titleY + 20);
 
     pdf.autoTable({
-      startY: 184,
+      startY: titleY + 34,
       margin: { top: 36, bottom: 65, left: 28, right: 28 },
       theme: "grid",
       showFoot: "lastPage",
-      head: [["S.No", "Date", "Booking No", "BL No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
+      head: [["S.No", "Date", "BL No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
         return [
           String(index + 1),
           formatShortDate(item.date),
-          text(item.bookingNo || item.id),
           text(item.blNo || "-"),
           text(item.invoiceNo || "-"),
           text(item.customer || customer || "-"),
@@ -3228,22 +3245,28 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           text(item.remarks || "-")
         ];
       }),
-      foot: [["", "", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
-      styles: { fontSize: 9.5, cellPadding: 5.5, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 9.5, fontStyle: "bold" },
-      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 9.5 },
-      columnStyles: {
-        0: { cellWidth: 26, halign: "center" },
-        1: { cellWidth: 54, halign: "center" },
-        2: { cellWidth: 62, halign: "center" },
-        3: { cellWidth: 66, halign: "center" },
-        4: { cellWidth: 66, halign: "center" },
-        5: { cellWidth: 86 },
-        6: { cellWidth: 54, halign: "center" },
-        7: { cellWidth: 80, halign: "right" },
-        8: { cellWidth: 70, halign: "right" },
-        9: { cellWidth: 76, halign: "right" },
-        10: { cellWidth: 130 }
+      foot: [["", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
+      styles: { fontSize: 10, cellPadding: 6, lineColor: [40, 40, 40], lineWidth: 0.65, textColor: [0, 0, 0], overflow: "linebreak" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10, fontStyle: "bold", minCellHeight: 38, halign: "center", valign: "middle", overflow: "linebreak" },
+      bodyStyles: { minCellHeight: 34 },
+      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 10 },
+      columnStyles: fitSummaryColumnStyles({
+        0: { cellWidth: 36, halign: "center" },
+        1: { cellWidth: 70, halign: "center" },
+        2: { cellWidth: 80, halign: "center" },
+        3: { cellWidth: 75, halign: "center" },
+        4: { cellWidth: 100 },
+        5: { cellWidth: 60, halign: "center" },
+        6: { cellWidth: 93, halign: "right" },
+        7: { cellWidth: 82, halign: "right" },
+        8: { cellWidth: 86, halign: "right" },
+        9: { cellWidth: 104 }
+      }, pageWidth - 56),
+      didParseCell: (data) => {
+        if (data.section === "head") {
+          data.cell.styles.halign = "center";
+          data.cell.styles.valign = "middle";
+        }
       }
     });
     const totalPages = pdf.internal.getNumberOfPages();
@@ -3261,7 +3284,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function buildBookingFilteredSummaryPdf(bookings = []) {
     if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("l", "pt", "a4");
+    const pdf = new jsPDF("l", "pt", "a3");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
@@ -3276,21 +3299,22 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
       return sum + (netProfitLoss != null ? Number(netProfitLoss) : 0);
     }, 0);
-    const headerWidth = 620;
-    const headerHeight = headerWidth * (270 / 1131);
-    const headerX = (pageWidth - headerWidth) / 2;
+    const headerHeight = 136;
+    const headerWidth = headerHeight * (1131 / 270);
+    const headerX = 36;
+    const titleY = summaryTitleY(headerHeight);
     if (letterheadHeader) {
       pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
-    pdf.text("BOOKING SUMMARY", 36, 150);
+    pdf.text("BOOKING SUMMARY", 36, titleY);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
-    pdf.text(`Generated: ${formatShortDate(new Date())}`, 36, 170);
+    pdf.text(`Generated: ${formatShortDate(new Date())}`, 36, titleY + 20);
     pdf.autoTable({
-      startY: 184,
+      startY: titleY + 34,
       margin: { top: 36, bottom: 65, left: 28, right: 28 },
       theme: "grid",
       showFoot: "lastPage",
@@ -3313,10 +3337,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ];
       }),
       foot: [["", "", "", "", "", "Total", money(totalSalesTax), money(totalAmount), money(totalNetPnL), ""]],
-      styles: { fontSize: 9.5, cellPadding: { top: 5.5, bottom: 5.5, left: 3, right: 3 }, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak", valign: "middle" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 9.5, fontStyle: "bold", halign: "center", valign: "middle" },
-      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 9.5, valign: "middle" },
-      columnStyles: {
+      styles: { fontSize: 10, cellPadding: { top: 6, bottom: 6, left: 4, right: 4 }, lineColor: [40, 40, 40], lineWidth: 0.65, textColor: [0, 0, 0], overflow: "linebreak", valign: "middle" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10, fontStyle: "bold", halign: "center", valign: "middle", minCellHeight: 38 },
+      bodyStyles: { minCellHeight: 34 },
+      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 10, valign: "middle" },
+      columnStyles: fitSummaryColumnStyles({
         0: { cellWidth: 30, halign: "center" },
         1: { cellWidth: 70, halign: "center" },
         2: { cellWidth: 64, halign: "center" },
@@ -3327,6 +3352,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         7: { cellWidth: 84, halign: "right" },
         8: { cellWidth: 74, halign: "right" },
         9: { cellWidth: 108 }
+      }, pageWidth - 56),
+      didParseCell: (data) => {
+        if (data.section === "head") data.cell.styles.halign = "center";
       }
     });
     const totalPages = pdf.internal.getNumberOfPages();
@@ -5109,14 +5137,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function buildBrokerSummaryPdf(rows, statusLabel = "Payable", fileName = "", selectedBroker = "") {
     if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("l", "pt", "a4");
+    const pdf = new jsPDF("l", "pt", "a3");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
-    const headerWidth = 620;
-    const headerHeight = headerWidth * (270 / 1131);
-    const headerX = (pageWidth - headerWidth) / 2;
+    const headerHeight = 136;
+    const headerWidth = headerHeight * (1131 / 270);
+    const headerX = 36;
+    const titleY = summaryTitleY(headerHeight);
     if (letterheadHeader) {
       pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
     }
@@ -5135,13 +5164,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         truckerTitle = "TRUCKER / BROKER: ALL TRUCKERS / BROKERS";
       }
     }
-    pdf.text(truckerTitle, 36, 150);
+    pdf.text(truckerTitle, 36, titleY);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
-    pdf.text(`Status: ${statusLabel} | Generated: ${formatShortDate(new Date())}`, 36, 170);
+    pdf.text(`Status: ${statusLabel} | Generated: ${formatShortDate(new Date())}`, 36, titleY + 20);
     const totalAmount = rows.reduce((sum, r) => sum + Number(r.entry.amount || 0), 0);
     pdf.autoTable({
-      startY: 184,
+      startY: titleY + 34,
       margin: { top: 36, left: 28, right: 28, bottom: 65 },
       theme: "grid",
       head: [["Booking No", "Booking Date", "Truck No", "Container No", "Container Size", "Amount", "Route"]],
@@ -5151,15 +5180,16 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         text(row.entry.truckNo && row.entry.truckNo !== "All Trucks" ? row.entry.truckNo : (row.booking.truckNo || "-")),
         text(getBrokerRowContainerNo(row)),
         text(row.entry.containerSize && row.entry.containerSize !== "All Sizes" ? row.entry.containerSize : (row.booking.containerSize || "-")),
-        row.entry.amount != null ? `PKR ${money(row.entry.amount)}` : "-",
+        row.entry.amount != null ? money(row.entry.amount) : "-",
         text(row.booking.route || "-")
       ]),
-      foot: [["Total", "", "", "", "", `PKR ${money(totalAmount)}`, ""]],
+      foot: [["Total", "", "", "", "", money(totalAmount), ""]],
       showFoot: "lastPage",
-      styles: { fontSize: 10, cellPadding: 6, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10.5, fontStyle: "bold" },
+      styles: { fontSize: 10.5, cellPadding: 7, lineColor: [40, 40, 40], lineWidth: 0.65, textColor: [0, 0, 0], overflow: "linebreak" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10.5, fontStyle: "bold", minCellHeight: 38, valign: "middle", halign: "center" },
+      bodyStyles: { minCellHeight: 34 },
       footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 10.5 },
-      columnStyles: {
+      columnStyles: fitSummaryColumnStyles({
         0: { cellWidth: 85 },
         1: { cellWidth: 80 },
         2: { cellWidth: 95 },
@@ -5167,6 +5197,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         4: { cellWidth: 85 },
         5: { cellWidth: 110, halign: "right" },
         6: { cellWidth: 190 }
+      }, pageWidth - 56),
+      didParseCell: (data) => {
+        if (data.section === "head") data.cell.styles.halign = "center";
       }
     });
     const totalPages = pdf.internal.getNumberOfPages();
@@ -5519,21 +5552,22 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       .filter(Boolean)
       .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, "asc"));
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("l", "pt", "a4");
+    const pdf = new jsPDF("l", "pt", "a3");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
-    const headerWidth = 620;
-    const headerHeight = headerWidth * (270 / 1131);
-    const headerX = (pageWidth - headerWidth) / 2;
+    const headerHeight = 136;
+    const headerWidth = headerHeight * (1131 / 270);
+    const headerX = 28;
+    const titleY = summaryTitleY(headerHeight);
     if (letterheadHeader) {
       pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12);
-    pdf.text("PENDING TRUCK SUMMARY", 28, 150);
+    pdf.text("PENDING TRUCK SUMMARY", 28, titleY);
 
     let subHeader = `Truck No: ${text(summaryTruckNo)}`;
     const brokerDetails = [];
@@ -5541,7 +5575,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     if (brokerFilter.expBroker) brokerDetails.push(`Exp Broker: ${brokerFilter.expBroker}`);
     if (brokerFilter.mtyBroker) brokerDetails.push(`MTY Broker: ${brokerFilter.mtyBroker}`);
     if (brokerDetails.length) subHeader += ` | ${brokerDetails.join(" | ")}`;
-    pdf.text(subHeader, 28, 168);
+    pdf.text(subHeader, 28, titleY + 18);
 
     function shortPdfDate(value) {
       const movementDate = parseDateValue(value);
@@ -5661,7 +5695,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const totalReceivable = rows.reduce((total, row) => total + Number(row.amount || 0), 0);
 
     pdf.autoTable({
-      startY: 182,
+      startY: titleY + 32,
       theme: "grid",
       margin: { top: 36, left: 20, right: 20, bottom: 72 },
       showFoot: "lastPage",
@@ -5672,8 +5706,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       body: rows.map((row) => row.cells),
       foot: [["", "", "", "", "", "", "", "", "", "Total", money(totalReceivable), "", ""]],
       styles: {
-        fontSize: 9.2,
-        cellPadding: 5.5,
+        fontSize: 10,
+        cellPadding: 6,
         lineColor: [0, 0, 0],
         lineWidth: 0.65,
         textColor: [0, 0, 0],
@@ -5685,19 +5719,22 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         textColor: [0, 0, 0],
         fontStyle: "bold",
         halign: "center",
-        minCellHeight: 32,
-        fontSize: 9.5
+        valign: "middle",
+        minCellHeight: 38,
+        fontSize: 10,
+        cellPadding: 5,
+        overflow: "linebreak"
       },
-      bodyStyles: { minCellHeight: 28, halign: "center" },
+      bodyStyles: { minCellHeight: 32, halign: "center" },
       footStyles: {
         fillColor: [255, 247, 239],
         textColor: [24, 48, 77],
         fontStyle: "bold",
         halign: "center",
         minCellHeight: 26,
-        fontSize: 9.2
+        fontSize: 10
       },
-      columnStyles: {
+      columnStyles: fitSummaryColumnStyles({
         0: { cellWidth: 30, halign: "center" },
         1: { cellWidth: 52, halign: "center" },
         2: { cellWidth: 46, halign: "center" },
@@ -5711,7 +5748,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         10: { cellWidth: 82, halign: "center" },
         11: { cellWidth: 95, halign: "center" },
         12: { cellWidth: 86, halign: "center" }
-      }
+      }, pageWidth - 40)
     });
     const totalPages = pdf.internal.getNumberOfPages();
     pdf.setPage(totalPages);
@@ -6228,14 +6265,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         const pageHeight = pdf.internal.pageSize.getHeight();
         const letterhead = await loadInvoiceTemplateDataUrl();
         const header = await cropImageDataUrl(letterhead, 0, 270);
-        const headerWidth = 850;
         const headerHeight = 136;
-        const headerX = (pageWidth - headerWidth) / 2;
+        const headerWidth = headerHeight * (1131 / 270);
+        const headerX = 36;
+        const titleY = summaryTitleY(headerHeight);
         if (header) pdf.addImage(header, "JPEG", headerX, 10, headerWidth, headerHeight);
         pdf.setTextColor(24, 48, 77);
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(15);
-        pdf.text("TRUCK TRIP LEDGER SUMMARY", 36, 158);
+        pdf.text("TRUCK TRIP LEDGER SUMMARY", 36, titleY);
         const totals = rows.reduce((sum, item) => {
           const financials = calculateTruckTripFinancials(item);
           sum.grand += financials.grandTotal;
@@ -6243,34 +6281,32 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           sum.profit += financials.profitLoss;
           return sum;
         }, { grand: 0, expense: 0, profit: 0 });
-        const amountColumnIndices = [7, 8, 9, 10, 11, 12, 13, 14];
+        const amountColumnIndices = [5, 6, 7, 8, 9, 10, 11, 12];
         pdf.autoTable({
-          startY: 174,
+          startY: titleY + 16,
           margin: { left: 24, right: 24, top: 36, bottom: 65 },
           theme: "grid",
           showFoot: "lastPage",
           head: [[
             "S.No",
-            "Job No",
-            "Import\nDate",
-            "Import\nTruck",
-            "Customer /\nPayer",
-            "Export\nDate",
-            "Export\nTruck",
-            "Import\nFreight",
-            "Export\nFreight",
-            "Import\nReceivable",
-            "Export\nReceivable",
-            "MTY\nFreight",
-            "Grand\nTotal",
+            "Import Date",
+            "Import Truck",
+            "Export Date",
+            "Export Truck",
+            "Import Freight",
+            "Export Freight",
+            "Import Receivable",
+            "Export Receivable",
+            "MTY Freight",
+            "Grand Total",
             "Round Trip\nExpense",
             "P&L"
           ]],
           body: rows.map((item, index) => {
             const financials = calculateTruckTripFinancials(item);
-            return [String(index + 1), item.jobNo || "-", formatShortDate(item.date), item.truckNo || "-", item.customer || "-", formatShortDate(item.exportLoadDate), item.exportTruckNo || item.truckNo || "-", money(item.importFreight), money(item.exportFreight), money(item.importReceivedAmount), money(item.exportReceivedAmount), money(Number(item.mtyBoxFreight || 0) + Number(item.exportMtyBoxFreight || 0)), money(financials.grandTotal), Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing", money(financials.profitLoss)];
+            return [String(index + 1), formatShortDate(item.date), item.truckNo || "-", formatShortDate(item.exportLoadDate), item.exportTruckNo || item.truckNo || "-", money(item.importFreight), money(item.exportFreight), money(item.importReceivedAmount), money(item.exportReceivedAmount), money(Number(item.mtyBoxFreight || 0) + Number(item.exportMtyBoxFreight || 0)), money(financials.grandTotal), Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing", money(financials.profitLoss)];
           }),
-          foot: [["", "", "", "", "", "", "", "", "", "", "", "Total", money(totals.grand), money(totals.expense), money(totals.profit)]],
+          foot: [["", "", "", "", "", "", "", "", "", "Total", money(totals.grand), money(totals.expense), money(totals.profit)]],
           styles: {
             fontSize: 10,
             cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
@@ -6304,20 +6340,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           },
           columnStyles: {
             0: { cellWidth: 34, halign: "center" },
-            1: { cellWidth: 58, halign: "center" },
-            2: { cellWidth: 66, halign: "center" },
+            1: { cellWidth: 80, halign: "center" },
+            2: { cellWidth: 94, halign: "center" },
             3: { cellWidth: 80, halign: "center" },
-            4: { cellWidth: 140 },
-            5: { cellWidth: 66, halign: "center" },
-            6: { cellWidth: 80, halign: "center" },
-            7: { cellWidth: 72, halign: "right" },
-            8: { cellWidth: 72, halign: "right" },
-            9: { cellWidth: 78, halign: "right" },
-            10: { cellWidth: 78, halign: "right" },
-            11: { cellWidth: 68, halign: "right" },
-            12: { cellWidth: 80, halign: "right" },
-            13: { cellWidth: 80, halign: "right" },
-            14: { cellWidth: 74, halign: "right" }
+            4: { cellWidth: 94, halign: "center" },
+            5: { cellWidth: 90, halign: "right" },
+            6: { cellWidth: 90, halign: "right" },
+            7: { cellWidth: 100, halign: "right" },
+            8: { cellWidth: 100, halign: "right" },
+            9: { cellWidth: 90, halign: "right" },
+            10: { cellWidth: 100, halign: "right" },
+            11: { cellWidth: 100, halign: "right" },
+            12: { cellWidth: 90, halign: "right" }
           },
           didParseCell: (data) => {
             if (data.section === "head") {
@@ -6746,12 +6780,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function getTwoPayPdfValues(item) {
       return [
-        formatShortDate(item.date), item.customerName || "-", item.origin || "-", item.blNo || "-", item.containerNo || "-", item.lotOf || "-",
-        item.destination || "-", item.consigneeName || "-", item.size || "-", item.description || "-", item.truckNo || "-",
-        money(item.roadFreightPaid), money(item.roadFreightTwoPay), money(item.taxAmount), money(item.detentionCharges),
+        formatShortDate(item.date), item.blNo || "-", item.destination || "-", item.consigneeName || "-",
+        item.size || "-", item.description || "-", money(item.roadFreightPaid), money(item.roadFreightTwoPay), money(item.detentionCharges),
         money(item.billingAmount), money(item.globalReceivable), item.billNo || "-", money(item.partyCollection),
-        money(item.partyCollectionPaidAmount), item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-",
-        money(getPartyBalance(item)), item.partyRemarks || "-", money(item.receivedAmount), money(item.receivedBalance),
+        money(getPartyBalance(item)), money(item.receivedAmount), money(item.receivedBalance),
         item.receivedDate ? formatShortDate(item.receivedDate) : "-", item.receivedId || "-", item.remarks || "-"
       ];
     }
@@ -6818,19 +6850,26 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     async function buildTwoPaySummaryPdf(rows) {
       if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF("l", "pt", "a3");
+      const pdf = new jsPDF("l", "pt", "a2");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const letterhead = await loadInvoiceTemplateDataUrl();
       const header = await cropImageDataUrl(letterhead, 0, 270);
-      const headerWidth = 850;
       const headerHeight = 136;
-      const headerX = (pageWidth - headerWidth) / 2;
+      const headerWidth = headerHeight * (1131 / 270);
+      const headerX = 36;
+      const titleY = summaryTitleY(headerHeight);
       if (header) pdf.addImage(header, "JPEG", headerX, 10, headerWidth, headerHeight);
       pdf.setTextColor(24, 48, 77);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(15);
-      pdf.text("TWO PAY RECORDS SUMMARY", 36, 158);
+      pdf.text("TWO PAY RECORDS SUMMARY", 36, titleY);
+      const customerNames = [...new Set(rows.map((item) => String(item.customerName || "").trim() || "Unassigned"))];
+      const customerLabel = customerNames.length === 1 ? customerNames[0] : "All Customers";
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      const customerLines = pdf.splitTextToSize(`Customer Name: ${customerLabel}`, pageWidth - 72);
+      pdf.text(customerLines, 36, titleY + 20);
       const totals = rows.reduce((total, item) => ({
         billing: total.billing + Number(item.billingAmount || 0),
         receivable: total.receivable + Number(item.globalReceivable || 0),
@@ -6839,45 +6878,36 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const headers = [
         "S.No",
         "Date",
-        "Customer\nName",
-        "Origin",
         "BL No",
-        "Container\nNo",
-        "Lot\nOf",
-        "Desti-\nnation",
-        "Consignee\nName",
+        "Destination",
+        "Consignee Name",
         "Size",
-        "Descrip-\ntion",
-        "Truck\nNo",
+        "Description",
         "Road\nFreight\n/ Paid",
         "Road\nFreight\n/ Two Pay",
-        "Tax\nAmount",
         "Detention\nCharges",
         "Billing\nAmount",
         "Global /\nReceivable",
-        "Bill\nNo",
+        "Bill No",
         "Party\nCollection",
-        "Party Paid\nAmount",
-        "Party Paid\nDate",
-        "Party\nBalance",
-        "Party\nRemarks",
+        "Party Balance",
         "Received\nAmount",
         "Receivable\nBalance",
         "Received\nDate",
-        "Received\nID",
+        "Received ID",
         "Received\nRemarks"
       ];
       const footer = Array(headers.length).fill("");
-      footer[15] = "Total";
-      footer[16] = money(totals.billing);
-      footer[17] = money(totals.receivable);
-      footer[24] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
-      footer[25] = money(totals.balance);
+      footer[9] = "Total";
+      footer[10] = money(totals.billing);
+      footer[11] = money(totals.receivable);
+      footer[15] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
+      footer[16] = money(totals.balance);
 
-      const amountColumnIndices = [12, 13, 14, 15, 16, 17, 19, 20, 22, 24, 25];
+      const amountColumnIndices = [7, 8, 9, 10, 11, 13, 14, 15, 16];
 
       pdf.autoTable({
-        startY: 174,
+        startY: titleY + 20 + customerLines.length * 15 + 9,
         margin: { left: 12, right: 12, bottom: 65 },
         theme: "grid",
         showFoot: "lastPage",
@@ -6885,8 +6915,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         body: rows.map((item, index) => [String(index + 1), ...getTwoPayPdfValues(item)]),
         foot: [footer],
         styles: {
-          fontSize: 8.5,
-          cellPadding: { top: 6, bottom: 6, left: 2, right: 2 },
+          fontSize: 10,
+          cellPadding: { top: 7, bottom: 7, left: 3, right: 3 },
           lineColor: [40, 40, 40],
           lineWidth: 0.65,
           textColor: [0, 0, 0],
@@ -6896,7 +6926,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         headStyles: {
           fillColor: [24, 48, 77],
           textColor: [255, 255, 255],
-          fontSize: 8.5,
+          fontSize: 10,
           fontStyle: "bold",
           minCellHeight: 46,
           valign: "middle",
@@ -6904,48 +6934,39 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           overflow: "linebreak"
         },
         bodyStyles: {
-          minCellHeight: 34,
+          minCellHeight: 38,
           valign: "middle"
         },
         footStyles: {
           fillColor: [248, 234, 220],
           textColor: [24, 48, 77],
           fontStyle: "bold",
-          fontSize: 8.5,
+          fontSize: 10,
           minCellHeight: 32,
           valign: "middle"
         },
-        columnStyles: {
-          0: { cellWidth: 20, halign: "center" },
-          1: { cellWidth: 38, halign: "center" },
-          2: { cellWidth: 48 },
-          3: { cellWidth: 34 },
-          4: { cellWidth: 42 },
-          5: { cellWidth: 48 },
-          6: { cellWidth: 24, halign: "center" },
-          7: { cellWidth: 42 },
-          8: { cellWidth: 48 },
-          9: { cellWidth: 20, halign: "center" },
-          10: { cellWidth: 46 },
-          11: { cellWidth: 42, halign: "center" },
-          12: { cellWidth: 48, halign: "right" },
-          13: { cellWidth: 48, halign: "right" },
-          14: { cellWidth: 36, halign: "right" },
-          15: { cellWidth: 36, halign: "right" },
-          16: { cellWidth: 48, halign: "right" },
-          17: { cellWidth: 48, halign: "right" },
-          18: { cellWidth: 32, halign: "center" },
-          19: { cellWidth: 46, halign: "right" },
-          20: { cellWidth: 46, halign: "right" },
-          21: { cellWidth: 36, halign: "center" },
-          22: { cellWidth: 46, halign: "right" },
-          23: { cellWidth: 42 },
-          24: { cellWidth: 46, halign: "right" },
-          25: { cellWidth: 48, halign: "right" },
-          26: { cellWidth: 36, halign: "center" },
-          27: { cellWidth: 30, halign: "center" },
-          28: { cellWidth: 48 }
-        },
+        columnStyles: fitSummaryColumnStyles({
+          0: { cellWidth: 26, halign: "center" },
+          1: { cellWidth: 54, halign: "center" },
+          2: { cellWidth: 60 },
+          3: { cellWidth: 58 },
+          4: { cellWidth: 74 },
+          5: { cellWidth: 28, halign: "center" },
+          6: { cellWidth: 69 },
+          7: { cellWidth: 60, halign: "right" },
+          8: { cellWidth: 66, halign: "right" },
+          9: { cellWidth: 60, halign: "right" },
+          10: { cellWidth: 66, halign: "right" },
+          11: { cellWidth: 68, halign: "right" },
+          12: { cellWidth: 55, halign: "center" },
+          13: { cellWidth: 60, halign: "right" },
+          14: { cellWidth: 60, halign: "right" },
+          15: { cellWidth: 64, halign: "right" },
+          16: { cellWidth: 64, halign: "right" },
+          17: { cellWidth: 54, halign: "center" },
+          18: { cellWidth: 48, halign: "center" },
+          19: { cellWidth: 72 }
+        }, pageWidth - 24),
         didParseCell: (data) => {
           if (data.section === "head") {
             data.cell.styles.overflow = "linebreak";
@@ -7376,18 +7397,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       try {
         const headers = [
           "S.No", "Registration No", "Type of Body", "Chassis No", "Engine No", "Maker", "Ownership",
-          "Third Party Insurance Date", "Model", "MRA", "Banker", "Fitness Expiry", "Balochistan Permit",
-          "Sindh Permit", "KPK Permit", "Punjab Permit", "Tax Paid Up To", "Original Documents"
+          "Model", "MRA", "Fitness Expiry", "Tax Paid Up To"
         ];
         const pdfRows = rows.map((item, index) => [
           String(index + 1), item.truckNo || "-", item.typeOfBody || "-", item.chassisNo || "-", item.engineNo || "-",
-          item.make || "-", item.ownership || "-", item.thirdPartyInsuranceDate ? formatShortDate(item.thirdPartyInsuranceDate) : "-",
-          item.model || "-", item.mra || "-", item.banker || "-", item.fitnessExpiry ? formatShortDate(item.fitnessExpiry) : "-",
-          item.balochistanPermitExpiry ? formatShortDate(item.balochistanPermitExpiry) : "-",
-          item.sindhPermitExpiry ? formatShortDate(item.sindhPermitExpiry) : "-",
-          item.kpkPermitExpiry ? formatShortDate(item.kpkPermitExpiry) : "-",
-          item.punjabPermitExpiry ? formatShortDate(item.punjabPermitExpiry) : "-",
-          item.taxPaidUpTo ? formatShortDate(item.taxPaidUpTo) : "-", item.originalDocs || item.documentName || "-"
+          item.make || "-", item.ownership || "-", item.model || "-", item.mra || "-",
+          item.fitnessExpiry ? formatShortDate(item.fitnessExpiry) : "-",
+          item.taxPaidUpTo ? formatShortDate(item.taxPaidUpTo) : "-"
         ]);
         await createRegisterPdf(
           "Equipment & Handling Fleet Summary",

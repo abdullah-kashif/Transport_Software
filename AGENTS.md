@@ -21,21 +21,21 @@
 | Module / Page | HTML File | `data-page` Attribute | Handler in `app.js` |
 | :--- | :--- | :--- | :--- |
 | **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2240) |
-| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3792) |
-| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3964) |
-| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5331) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5870) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6371) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6371) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6671) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7074) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7424) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7809) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8038) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8068) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8316) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8468) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8468) |
+| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3847) |
+| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 4019) |
+| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5364) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5907) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6405) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6405) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6705) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7095) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7440) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7825) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8054) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8084) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8332) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8484) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8484) |
 
 ---
 
@@ -45,8 +45,8 @@
 - **State Store**: `loadStore()` (~Line 176) & `saveStore(store, options)` (~Line 381).
 - **Audit Logging**: `collectAuditChanges()` (~Line 339), `appendAuditLog()` (~Line 321), `pruneActivityLogs()` (~Line 263).
 - **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 475), `signInWithSupabase()` (~Line 506), `enforceSoftwareAccess(page)` (~Line 2269).
-- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 5804).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3011), `buildSummaryRecordPdf()` (~Line 3175), `createRegisterPdf()` (~Line 2952), `buildTruckDetailsInvoicePdf()` (~Line 5679).
+- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 5895).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 5767).
 - **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1447), `hydrateOperationalStore()` (~Line 1469), `syncTruckJobs()` (~Line 1129).
 - **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
 
@@ -59,6 +59,20 @@
 3. **No Build Step Required**: Never install bundlers (webpack, vite, rollup) unless explicitly asked. The app runs directly by opening any `.html` file or via a static web server.
 4. **Refer to Documentation**: For comprehensive data structures and database schema, read [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md).
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
+
+- **2026-09-29**: Large-format summary PDFs: Customer Booking, filtered Booking, Trucker/Broker, and Pending Truck summaries now use A3 landscape, proportioned left-aligned letterheads, wider fitted columns, 10+ pt table text, and high-contrast grid lines matching Truck Trip Ledger. Equipment summary remains A3; dense Fleet Maintenance and Two Pay summaries use A2 landscape for readable 10 pt text. Truck Trip Ledger and other headings stay on one line where space permits and wrap at word boundaries otherwise. Individual invoices and account statements are unchanged. Updated `app.js?v=20260929-8` across 17 HTML pages. No schema change.
+
+- **2026-09-29**: Truck Trip Ledger general summary letterhead alignment: Positioned the correctly proportioned A3 letterhead at the 36 pt left margin, matching the summary title. The table and vertical layout remain unchanged. Updated `app.js?v=20260929-7` across all 17 HTML pages.
+
+- **2026-09-29**: Truck Trip Ledger general summary letterhead aspect ratio: The cropped `Invoice.jpg` header is 1131×270. Its A3 PDF rendering now computes width from its existing 136 pt height, preventing the logo and wordmark from stretching while keeping the title and table positions unchanged. Updated `app.js?v=20260929-6` across all 17 HTML pages.
+
+- **2026-09-29**: Pending Truck Summary PDF header layout: Reduced header font to 8 pt and padding to 3.5 pt, centered labels vertically, and split Cargo Description and Receivable Amount at word boundaries. Body rows and column data remain unchanged. Updated `app.js?v=20260929-5` across all 17 HTML pages.
+
+- **2026-09-29**: Letterhead spacing for all summary PDFs: Shared `summaryTitleY()` places summary titles 36 pt below the letterhead image bottom, with subtitles and tables following each title. This covers Customer/Booking, Trucker/Broker, Pending Truck, Truck Trip Ledger, Two Pay, and register PDFs including Equipment and Maintenance. Trucker/Broker PDF Amount cells and total now show numbers without `PKR`. Updated `app.js?v=20260929-4` across all 17 HTML pages. No database change.
+
+- **2026-09-29**: Customer Booking Summary PDF header alignment: Reduced header font to 8 pt, centered labels horizontally and vertically, gave `S.No` enough width to stay on one line, and split `Road Haulage Charges` at a word boundary. Adjusted Remarks width to preserve the A4 landscape table width. Updated `app.js?v=20260929-3` across 17 HTML pages. PDF content and Supabase fields are unchanged.
+
+- **2026-09-29**: PDF summary columns and layout: Removed Job No and Customer / Payer from Truck Trip Ledger general summary, seven requested fields from Equipment & Handling Fleet summary, nine requested fields from Two Pay Records summary, and Booking No from the customer Booking Summary PDF. Two Pay summary now prints Customer Name below its title; mixed-customer exports show All Customers. Rebalanced fixed PDF column widths and moved Equipment summary title and table below the letterhead image. Updated `app.js?v=20260929-2` across all 17 HTML files. Screen tables and Supabase mappings are unchanged.
 
 - **2026-09-29**: Small Laptop Responsive Layout & Dashboard Typography & Text Wrap Overhaul:
   1. **Dashboard KPI Layout & Digit Wrap Elimination**: Removed restrictive 6-column desktop override and established symmetrical 3-column grids (`repeat(3, minmax(0, 1fr))`) for Booking Form (2 rows of 3), Truck Summary (2 rows of 3), and Equipment Fleet (3 rows of 3). Enforced `white-space: nowrap !important;`, `tabular-nums`, and balanced font sizing (`16.5px` desktop, `15px` laptop) on currency amounts (`PKR 599,044,792.38`), eliminating mid-number breaks and orphaned digits across all screen resolutions. Added non-breaking spaces `&nbsp;` between `PKR` and numerical values in `dashboard.html`.
