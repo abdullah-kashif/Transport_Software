@@ -1049,8 +1049,11 @@ body[data-page="dashboard"] .screen:first-of-type>.screen-head h3 {
   position: relative;
   overflow: hidden;
   min-width: 0;
-  min-height: 88px;
-  padding: 10px 12px;
+  min-height: 84px;
+  padding: 11px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   border: 1px solid #d7dde3;
   border-radius: 8px;
   background: #fffefd;
@@ -1064,15 +1067,15 @@ a.dashboard-kpi-card {
 }
 
 .booking-kpi-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .truck-kpi-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .equipment-kpi-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .accounts-kpi-grid {
@@ -1080,15 +1083,20 @@ a.dashboard-kpi-card {
 }
 
 .compact-kpi-card {
-  min-height: 76px;
-  padding: 11px 14px;
+  min-height: 80px;
+  padding: 10px 14px;
 }
 
 .compact-kpi-caption {
   display: block;
   margin-top: 3px;
   color: #6b7d8f;
-  font-size: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-kpi-card.expiry-due {
@@ -1144,25 +1152,38 @@ a.dashboard-kpi-card:focus-visible {
 
 .dashboard-kpi-card strong {
   display: block;
-  margin: 8px 8px 0;
+  margin: 4px 0 2px;
   color: var(--nav);
-  font-size: 22px;
-  line-height: 1.05;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-kpi-card.currency strong {
-  font-size: 18px;
+  font-size: 16.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap !important;
 }
 
 .dashboard-kpi-card h5 {
   margin: 0;
   color: #4a6076;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.35;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
+  min-height: 28px;
+  display: flex;
+  align-items: flex-start;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .dashboard-kpi-card .muted {
@@ -1175,12 +1196,174 @@ a.dashboard-kpi-card:focus-visible {
   font-size: 10px;
 }
 
-.compact-kpi-card strong,
-.compact-kpi-card.currency strong {
-  margin-top: 8px;
-  font-size: 21px;
+.compact-kpi-card strong {
+  margin-top: 4px;
+  font-size: 20px;
+  white-space: nowrap !important;
 }
 
+.compact-kpi-card.currency strong {
+  margin-top: 4px;
+  font-size: 16.5px;
+  white-space: nowrap !important;
+}
+
+/* Small / Standard Laptops (1025px to 1366px, like 1366x768 and 1280x800) */
+@media (max-width: 1366px) {
+  .sidebar {
+    width: 260px;
+    padding: 18px 12px;
+  }
+
+  .main {
+    margin-left: 260px;
+    padding: 18px 20px;
+  }
+
+  body.sidebar-collapsed .main {
+    margin-left: 84px;
+  }
+
+  .nav a {
+    padding: 10px 12px;
+    gap: 10px;
+    font-size: 13.5px;
+  }
+
+  .hero {
+    padding: 14px 20px;
+    margin-bottom: 14px;
+  }
+
+  .hero h2 {
+    font-size: 24px;
+  }
+
+  body[data-page="dashboard"] .screen:first-of-type {
+    padding: 16px 18px 18px;
+  }
+
+  .dashboard-kpi-groups {
+    gap: 14px;
+  }
+
+  .dashboard-kpi-group {
+    padding-bottom: 12px;
+  }
+
+  .dashboard-kpi-group h4 {
+    min-height: 30px;
+    padding: 5px 11px;
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+
+  .dashboard-kpi-grid {
+    gap: 10px;
+  }
+
+  .dashboard-kpi-card {
+    min-height: 76px;
+    padding: 9px 12px;
+  }
+
+  .compact-kpi-card {
+    min-height: 74px;
+    padding: 9px 12px;
+  }
+
+  .dashboard-kpi-card h5 {
+    font-size: 10.5px;
+    min-height: 26px;
+  }
+
+  .dashboard-kpi-card strong,
+  .compact-kpi-card strong {
+    font-size: 18.5px;
+    white-space: nowrap !important;
+  }
+
+  .dashboard-kpi-card.currency strong,
+  .compact-kpi-card.currency strong {
+    font-size: 15px;
+    letter-spacing: -0.015em;
+    white-space: nowrap !important;
+  }
+
+  .compact-kpi-caption {
+    font-size: 10px;
+  }
+
+  .accounts-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Two Pay Stats on laptop */
+  .two-pay-stats {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .two-pay-stat-card {
+    min-height: 78px;
+    padding: 10px 14px;
+  }
+
+  .two-pay-stat-card strong {
+    font-size: 18px;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Form grids on laptop */
+  .form-grid {
+    gap: 12px;
+  }
+
+  .field.quarter {
+    grid-column: span 4;
+  }
+}
+
+/* Tablets and medium screens (721px to 1024px) */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 235px;
+    padding: 18px 12px;
+  }
+
+  .main {
+    margin-left: 235px;
+    padding: 16px;
+  }
+
+  body.sidebar-collapsed .main {
+    margin-left: 84px;
+  }
+
+  .booking-kpi-grid,
+  .truck-kpi-grid,
+  .equipment-kpi-grid,
+  .accounts-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .two-pay-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .two-pay-stats .span-3 {
+    grid-column: span 1;
+  }
+
+  .field,
+  .field.quarter {
+    grid-column: span 6;
+  }
+}
+
+/* Mobile screens (up to 720px) */
 @media (max-width: 720px) {
   body[data-page="dashboard"] .screen:first-of-type {
     padding: 16px;
@@ -1192,60 +1375,41 @@ a.dashboard-kpi-card:focus-visible {
   }
 
   .dashboard-kpi-card {
-    min-height: 112px;
-    padding: 12px;
+    min-height: 74px;
+    padding: 10px 12px;
   }
 
-  .dashboard-kpi-card strong {
-    margin-top: 10px;
-    font-size: 24px;
-  }
-
-  .dashboard-kpi-card.currency strong {
+  .dashboard-kpi-card strong,
+  .compact-kpi-card strong {
+    margin-top: 6px;
     font-size: 18px;
   }
 
-  .booking-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .dashboard-kpi-card.currency strong,
+  .compact-kpi-card.currency strong {
+    font-size: 15px;
   }
 
-  .truck-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .equipment-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+  .booking-kpi-grid,
+  .truck-kpi-grid,
+  .equipment-kpi-grid,
   .accounts-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .compact-kpi-card {
-    min-height: 76px;
-    padding: 10px 12px;
+    min-height: 72px;
+    padding: 9px 11px;
   }
 }
 
-@media (min-width: 721px) and (max-width: 1120px) {
-  .dashboard-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .booking-kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .truck-kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .equipment-kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
+@media (max-width: 480px) {
+  .dashboard-kpi-grid,
+  .booking-kpi-grid,
+  .truck-kpi-grid,
+  .equipment-kpi-grid,
   .accounts-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2786,7 +2950,8 @@ body.confirm-modal-open {
   min-height: 44px;
 }
 
-.equipment-summary-download {
+.equipment-summary-download,
+.maintenance-summary-download {
   height: 44px;
   min-height: 44px;
   white-space: nowrap;
@@ -2822,9 +2987,12 @@ body.confirm-modal-open {
 .two-pay-stat-card {
   position: relative;
   overflow: hidden;
-  min-height: 82px;
-  padding: 10px 14px;
-  border-color: rgba(197, 107, 45, 0.28);
+  min-height: 88px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(24, 48, 77, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .two-pay-stat-card::after {
@@ -2835,20 +3003,126 @@ body.confirm-modal-open {
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: rgba(197, 107, 45, 0.09);
   pointer-events: none;
 }
 
 .two-pay-stat-card:hover,
 .two-pay-stat-card:focus-within {
   transform: translateY(-3px);
-  border-color: rgba(197, 107, 45, 0.58);
-  box-shadow: 0 12px 24px rgba(70, 46, 26, 0.12);
+  box-shadow: 0 12px 24px rgba(24, 48, 77, 0.12);
+}
+
+.two-pay-stat-card strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin: 7px 0 2px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.two-pay-stat-card small {
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.two-pay-stat-card .badge {
+  padding: 4px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+/* Card 1: Billing Amount (Navy / Slate Blue) */
+.two-pay-stat-card.billing {
+  background: linear-gradient(135deg, #ffffff 0%, #eef4fb 100%);
+  border: 1.5px solid #b9cee5;
+  border-left: 5px solid #18304d;
+}
+.two-pay-stat-card.billing::after {
+  background: rgba(24, 48, 77, 0.08);
+}
+.two-pay-stat-card.billing .badge {
+  background: #18304d;
+  color: #ffffff;
+}
+.two-pay-stat-card.billing strong {
+  color: #12243a;
+}
+.two-pay-stat-card.billing small {
+  color: #475e77;
+}
+
+/* Card 2: Global / Receivable (Teal / Emerald) */
+.two-pay-stat-card.receivable {
+  background: linear-gradient(135deg, #ffffff 0%, #edf9f7 100%);
+  border: 1.5px solid #a3ded7;
+  border-left: 5px solid #0d7a6e;
+}
+.two-pay-stat-card.receivable::after {
+  background: rgba(13, 122, 110, 0.08);
+}
+.two-pay-stat-card.receivable .badge {
+  background: #0d7a6e;
+  color: #ffffff;
+}
+.two-pay-stat-card.receivable strong {
+  color: #09544c;
+}
+.two-pay-stat-card.receivable small {
+  color: #316861;
+}
+
+/* Card 3: Receivable Balance (Vibrant Amber / Warm Tangerine) */
+.two-pay-stat-card.balance {
+  background: linear-gradient(135deg, #ffffff 0%, #fff6e8 100%);
+  border: 1.5px solid #f6cca0;
+  border-left: 5px solid #c85a17;
+}
+.two-pay-stat-card.balance::after {
+  background: rgba(200, 90, 23, 0.08);
+}
+.two-pay-stat-card.balance .badge {
+  background: #c85a17;
+  color: #ffffff;
+}
+.two-pay-stat-card.balance strong {
+  color: #933d06;
+}
+.two-pay-stat-card.balance small {
+  color: #7b4f2c;
+}
+
+/* Card 4: Party Collection Pending (Crimson Coral / Danger) */
+.two-pay-stat-card.party-pending {
+  background: linear-gradient(135deg, #ffffff 0%, #fdf0ee 100%);
+  border: 1.5px solid #f5c4be;
+  border-left: 5px solid #ba3a2f;
+}
+.two-pay-stat-card.party-pending::after {
+  background: rgba(186, 58, 47, 0.08);
+}
+.two-pay-stat-card.party-pending .badge {
+  background: #ba3a2f;
+  color: #ffffff;
+}
+.two-pay-stat-card.party-pending strong {
+  color: #8a2219;
+}
+.two-pay-stat-card.party-pending small {
+  color: #7c413c;
 }
 
 .two-pay-download-summary {
-  align-self: end;
-  min-height: 44px;
   background: var(--accent);
   color: #fff;
   border-color: transparent;
@@ -2858,33 +3132,6 @@ body.confirm-modal-open {
 .two-pay-download-summary:focus-visible {
   background: #a95120;
   color: #fff;
-}
-
-.two-pay-stat-card strong {
-  position: relative;
-  z-index: 1;
-  margin: 5px 0 1px;
-  font-size: 19px;
-}
-
-.two-pay-stat-card small {
-  position: relative;
-  z-index: 1;
-  color: #6c7f94;
-  font-size: 11px;
-}
-
-.two-pay-stat-card .badge {
-  padding: 4px 8px;
-  font-size: 10px;
-}
-
-.two-pay-stat-card.balance {
-  background: linear-gradient(135deg, #fffdf9 0%, #fff0dc 100%);
-}
-
-.two-pay-stat-card.party-pending {
-  background: linear-gradient(135deg, #fffdf9 0%, #ffe7d3 100%);
 }
 
 .two-pay-toolbar {

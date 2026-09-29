@@ -2952,31 +2952,42 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
   async function createRegisterPdf(title, headers, row, fileName, imageData = "") {
     if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("l", "pt", "a4");
+    const isWide = headers.length > 11;
+    const pdf = new jsPDF("l", "pt", isWide ? "a3" : "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    const headerWidth = isWide ? 850 : 620;
+    const headerHeight = headerWidth * (270 / 1131);
+    const headerX = (pageWidth - headerWidth) / 2;
     if (letterheadHeader) {
-      const headerWidth = 390;
-      const headerHeight = headerWidth * (270 / 1131);
-      pdf.addImage(letterheadHeader, "JPEG", 28, 10, headerWidth, headerHeight, undefined, "FAST");
+      pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight, undefined, "FAST");
     }
-    pdf.setTextColor(18, 54, 91);
+    pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
-    pdf.text(title.toUpperCase(), 36, 125);
+    pdf.text(title.toUpperCase(), 36, 150);
     const bodyRows = Array.isArray(row) && Array.isArray(row[0]) ? row : [row];
     pdf.autoTable({
-      startY: 142,
-      margin: { left: 36, right: 36, bottom: 62 },
+      startY: 168,
+      margin: { left: 24, right: 24, bottom: 62 },
       head: [headers],
       body: bodyRows,
       theme: "grid",
-      styles: { fontSize: 7.5, cellPadding: 5, halign: "center", valign: "middle", lineColor: [93, 72, 52], lineWidth: 0.55 },
-      headStyles: { fillColor: [240, 225, 208], textColor: [25, 42, 62], fontStyle: "bold" },
+      styles: { fontSize: isWide ? 9.5 : 8.8, cellPadding: 5.5, halign: "center", valign: "middle", lineColor: [93, 72, 52], lineWidth: 0.55, overflow: "linebreak" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontStyle: "bold", fontSize: isWide ? 9.5 : 8.8, minCellHeight: 36, valign: "middle", halign: "center", overflow: "linebreak" },
       alternateRowStyles: { fillColor: [255, 251, 247] }
     });
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
     if (imageData) {
       const y = Math.min((pdf.lastAutoTable?.finalY || 170) + 18, pageHeight - 165);
       pdf.setFontSize(10);
@@ -2984,13 +2995,6 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const imageType = imageData.startsWith("data:image/png") ? "PNG" : "JPEG";
       pdf.addImage(imageData, imageType, 36, y + 8, 120, 90, undefined, "FAST");
     }
-    pdf.setDrawColor(35, 35, 35);
-    pdf.setLineWidth(0.7);
-    pdf.line(36, pageHeight - 48, pageWidth - 36, pageHeight - 48);
-    pdf.setTextColor(18, 54, 91);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8.5);
-    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 44, pageHeight - 30);
     pdf.save(`${safePdfFileName(fileName)}.pdf`);
   }
 
@@ -3187,28 +3191,26 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       summary.totalAmount += Number(item.totalAmount || tax.totalAmount || 0);
       return summary;
     }, { roadHaulage: 0, salesTax: 0, totalAmount: 0 });
+
+    const headerWidth = 620;
+    const headerHeight = headerWidth * (270 / 1131);
+    const headerX = (pageWidth - headerWidth) / 2;
+    if (letterheadHeader) {
+      pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
+    }
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text("CUSTOMER SUMMARY", 36, 150);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text(String(customer || "Unknown Customer"), 36, 170);
+
     pdf.autoTable({
       startY: 184,
-      margin: { top: 184, bottom: 100, left: 28, right: 28 },
+      margin: { top: 36, bottom: 65, left: 28, right: 28 },
       theme: "grid",
       showFoot: "lastPage",
-      rowPageBreak: "avoid",
-      didDrawPage: () => {
-        if (letterheadHeader) pdf.addImage(letterheadHeader, "JPEG", 20, 10, 520, 124);
-        pdf.setTextColor(24, 48, 77);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(15);
-        pdf.text("CUSTOMER SUMMARY", 36, 150);
-        pdf.setFontSize(12);
-        pdf.text(String(customer || "Unknown Customer"), 36, 170);
-        pdf.setDrawColor(0, 0, 0);
-        pdf.setLineWidth(0.8);
-        pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(10);
-        pdf.setTextColor(32, 32, 32);
-        pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
-      },
       head: [["S.No", "Date", "Booking No", "BL No", "Invoice No", "Customer", "Container", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "Remarks"]],
       body: bookings.map((item, index) => {
         const tax = calculateBookingTaxBreakdown(item.rate, item.detention, item.salesTaxAuthority);
@@ -3227,9 +3229,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ];
       }),
       foot: [["", "", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
-      styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
-      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold" },
+      styles: { fontSize: 9.5, cellPadding: 5.5, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 9.5, fontStyle: "bold" },
+      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 9.5 },
       columnStyles: {
         0: { cellWidth: 26, halign: "center" },
         1: { cellWidth: 54, halign: "center" },
@@ -3244,6 +3246,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         10: { cellWidth: 130 }
       }
     });
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(24, 48, 77);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
     pdf.save(`${String(customer || "customer").replace(/[^\w-]+/g, "_")}_summary.pdf`);
   }
 
@@ -3252,6 +3263,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("l", "pt", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
     const totalAmount = bookings.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
@@ -3264,8 +3276,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const netProfitLoss = calculateBookingNetProfitLoss(brokerEntries, item.receivableAmount);
       return sum + (netProfitLoss != null ? Number(netProfitLoss) : 0);
     }, 0);
+    const headerWidth = 620;
+    const headerHeight = headerWidth * (270 / 1131);
+    const headerX = (pageWidth - headerWidth) / 2;
     if (letterheadHeader) {
-      pdf.addImage(letterheadHeader, "JPEG", 20, 10, 520, 124);
+      pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
@@ -3276,7 +3291,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     pdf.text(`Generated: ${formatShortDate(new Date())}`, 36, 170);
     pdf.autoTable({
       startY: 184,
-      margin: { left: 28, right: 28 },
+      margin: { top: 36, bottom: 65, left: 28, right: 28 },
       theme: "grid",
       showFoot: "lastPage",
       head: [["S.No", "Date", "NTN", "Customer / Payer", "Invoice", "Road Haulage Charges", "15% Sales Tax", "Total Amount", "P&L", "Remarks"]],
@@ -3298,19 +3313,31 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         ];
       }),
       foot: [["", "", "", "", "", "Total", money(totalSalesTax), money(totalAmount), money(totalNetPnL), ""]],
-      styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
-      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold" },
+      styles: { fontSize: 9.5, cellPadding: { top: 5.5, bottom: 5.5, left: 3, right: 3 }, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak", valign: "middle" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 9.5, fontStyle: "bold", halign: "center", valign: "middle" },
+      footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 9.5, valign: "middle" },
       columnStyles: {
-        0: { cellWidth: 30 }, 1: { cellWidth: 58 }, 2: { cellWidth: 66 }, 3: { cellWidth: 120 },
-        4: { cellWidth: 72 }, 5: { cellWidth: 90, halign: "right" }, 6: { cellWidth: 84, halign: "right" },
-        7: { cellWidth: 84, halign: "right" }, 8: { cellWidth: 76, halign: "right" }, 9: { cellWidth: 110 }
+        0: { cellWidth: 30, halign: "center" },
+        1: { cellWidth: 70, halign: "center" },
+        2: { cellWidth: 64, halign: "center" },
+        3: { cellWidth: 116 },
+        4: { cellWidth: 68, halign: "center" },
+        5: { cellWidth: 90, halign: "right" },
+        6: { cellWidth: 82, halign: "right" },
+        7: { cellWidth: 84, halign: "right" },
+        8: { cellWidth: 74, halign: "right" },
+        9: { cellWidth: 108 }
       }
     });
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+    pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9);
-    pdf.setTextColor(32, 32, 32);
-    pdf.text("Global Transport & Logistics Services", pageWidth - 28, pdf.lastAutoTable.finalY + 28, { align: "right" });
+    pdf.setFontSize(9.5);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
     pdf.save("booking-summary-filtered.pdf");
   }
 
@@ -4371,12 +4398,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function syncBookingSummaryDownloadState() {
       if (!downloadSummaryButton) return;
-      const hasSelectedFilter = Boolean(String(customerFilter?.value || "").trim() ||
-        String(startDateFilter?.value || "").trim() || String(endDateFilter?.value || "").trim());
-      downloadSummaryButton.disabled = !hasSelectedFilter;
-      downloadSummaryButton.title = hasSelectedFilter
-        ? "Download the filtered booking summary"
-        : "Select a customer or date range to enable download";
+      downloadSummaryButton.disabled = !currentFilteredBookings.length;
+      downloadSummaryButton.title = currentFilteredBookings.length
+        ? "Download the booking summary PDF"
+        : "No booking records available to download";
     }
 
     function render() {
@@ -5081,23 +5106,35 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     return ref || "-";
   }
 
-  async function buildBrokerSummaryPdf(rows, statusLabel = "Payable", fileName = "") {
+  async function buildBrokerSummaryPdf(rows, statusLabel = "Payable", fileName = "", selectedBroker = "") {
     if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("l", "pt", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    const headerWidth = 620;
+    const headerHeight = headerWidth * (270 / 1131);
+    const headerX = (pageWidth - headerWidth) / 2;
     if (letterheadHeader) {
-      pdf.addImage(letterheadHeader, "JPEG", 20, 10, 520, 124);
+      pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
-    const truckerNames = [...new Set(rows.map((row) => String(row.entry.truckerBroker || "").trim()).filter(Boolean))];
-    const truckerTitle = truckerNames.length === 1
-      ? `TRUCKER / BROKER: ${truckerNames[0].toUpperCase()}`
-      : (truckerNames.length > 1 ? `TRUCKER / BROKER: ${truckerNames.join(", ").toUpperCase()}` : "TRUCKER / BROKER SUMMARY");
+    const cleanBroker = String(selectedBroker || "").trim();
+    let truckerTitle = "TRUCKER / BROKER: ALL TRUCKERS / BROKERS";
+    if (cleanBroker && cleanBroker.toLowerCase() !== "all") {
+      truckerTitle = `TRUCKER / BROKER: ${cleanBroker.toUpperCase()}`;
+    } else {
+      const truckerNames = [...new Set(rows.map((row) => String(row.entry.truckerBroker || "").trim()).filter(Boolean))];
+      if (truckerNames.length === 1) {
+        truckerTitle = `TRUCKER / BROKER: ${truckerNames[0].toUpperCase()}`;
+      } else {
+        truckerTitle = "TRUCKER / BROKER: ALL TRUCKERS / BROKERS";
+      }
+    }
     pdf.text(truckerTitle, 36, 150);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
@@ -5105,7 +5142,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const totalAmount = rows.reduce((sum, r) => sum + Number(r.entry.amount || 0), 0);
     pdf.autoTable({
       startY: 184,
-      margin: { left: 28, right: 28 },
+      margin: { top: 36, left: 28, right: 28, bottom: 65 },
       theme: "grid",
       head: [["Booking No", "Booking Date", "Truck No", "Container No", "Container Size", "Amount", "Route"]],
       body: rows.map((row) => [
@@ -5119,9 +5156,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       ]),
       foot: [["Total", "", "", "", "", `PKR ${money(totalAmount)}`, ""]],
       showFoot: "lastPage",
-      styles: { fontSize: 8, cellPadding: 5, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
-      footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold" },
+      styles: { fontSize: 10, cellPadding: 6, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
+      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10.5, fontStyle: "bold" },
+      footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 10.5 },
       columnStyles: {
         0: { cellWidth: 85 },
         1: { cellWidth: 80 },
@@ -5132,10 +5169,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         6: { cellWidth: 190 }
       }
     });
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+    pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9);
-    pdf.setTextColor(32, 32, 32);
-    pdf.text("Global Transport & Logistics Services", pageWidth - 28, pdf.lastAutoTable.finalY + 28, { align: "right" });
+    pdf.setFontSize(9.5);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
     const safeStatus = String(statusLabel || "all").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
     pdf.save(fileName || `trucker-broker-summary-${safeStatus}.pdf`);
   }
@@ -5247,7 +5289,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         }
         return;
       }
-      buildBrokerSummaryPdf(rows, statusFilter?.value || "All").catch((error) => {
+      const selectedBroker = String(brokerFilter?.value || "").trim();
+      const customFileName = selectedBroker ? `${safePdfFileName(selectedBroker)}_broker_summary.pdf` : "trucker-broker-summary-all.pdf";
+      buildBrokerSummaryPdf(rows, statusFilter?.value || "All", customFileName, selectedBroker).catch((error) => {
         if (notice) {
           notice.hidden = false;
           notice.classList.add("error");
@@ -5266,8 +5310,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const entry = entries[brokerIndex];
       if (!entry) return;
       const row = { booking, entry, brokerIndex, brokerProfitLoss: entry.profitLoss, date: entry.paymentDate || booking.date };
-      const safeBooking = String(booking.bookingNo || booking.id || "booking").replace(/[^a-z0-9_-]+/gi, "-");
-      buildBrokerSummaryPdf([row], entry.paymentStatus, `broker-${safeBooking}-${brokerIndex + 1}.pdf`).catch((error) => {
+      const safeBooking = String(booking.bookingNo || booking.id || "").trim().replace(/[^a-z0-9_-]+/gi, "-");
+      const truckerBrokerName = safePdfFileName(entry.truckerBroker || entry.name || "broker");
+      const singleFileName = entries.length > 1
+        ? `${truckerBrokerName}_${safeBooking || "booking"}_${brokerIndex + 1}.pdf`
+        : (safeBooking ? `${truckerBrokerName}_${safeBooking}.pdf` : `${truckerBrokerName}.pdf`);
+      buildBrokerSummaryPdf([row], entry.paymentStatus, singleFileName, entry.truckerBroker).catch((error) => {
         if (notice) {
           notice.hidden = false;
           notice.classList.add("error");
@@ -5476,10 +5524,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const pageHeight = pdf.internal.pageSize.getHeight();
     const letterhead = await loadInvoiceTemplateDataUrl();
     const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    const headerWidth = 620;
+    const headerHeight = headerWidth * (270 / 1131);
+    const headerX = (pageWidth - headerWidth) / 2;
     if (letterheadHeader) {
-      const headerWidth = 520;
-      const headerHeight = 124;
-      pdf.addImage(letterheadHeader, "JPEG", 20, 10, headerWidth, headerHeight);
+      pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
     }
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
@@ -5614,7 +5663,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     pdf.autoTable({
       startY: 182,
       theme: "grid",
-      margin: { left: 20, right: 20, bottom: 72 },
+      margin: { top: 36, left: 20, right: 20, bottom: 72 },
       showFoot: "lastPage",
       head: [[
         "S.No", "Job No", "Type", "Date", "Registration No", "Origin", "Destination", "Size",
@@ -5623,8 +5672,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       body: rows.map((row) => row.cells),
       foot: [["", "", "", "", "", "", "", "", "", "Total", money(totalReceivable), "", ""]],
       styles: {
-        fontSize: 8,
-        cellPadding: 4,
+        fontSize: 9.2,
+        cellPadding: 5.5,
         lineColor: [0, 0, 0],
         lineWidth: 0.65,
         textColor: [0, 0, 0],
@@ -5636,41 +5685,43 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         textColor: [0, 0, 0],
         fontStyle: "bold",
         halign: "center",
-        minCellHeight: 34
+        minCellHeight: 32,
+        fontSize: 9.5
       },
-      bodyStyles: { minCellHeight: 34, halign: "center" },
+      bodyStyles: { minCellHeight: 28, halign: "center" },
       footStyles: {
         fillColor: [255, 247, 239],
         textColor: [24, 48, 77],
         fontStyle: "bold",
         halign: "center",
-        minCellHeight: 28
+        minCellHeight: 26,
+        fontSize: 9.2
       },
       columnStyles: {
-        0: { cellWidth: 28, halign: "center" },
-        1: { cellWidth: 48, halign: "center" },
-        2: { cellWidth: 42, halign: "center" },
-        3: { cellWidth: 52, halign: "center" },
-        4: { cellWidth: 72, halign: "center" },
-        5: { cellWidth: 47, halign: "center" },
-        6: { cellWidth: 58, halign: "center" },
-        7: { cellWidth: 36, halign: "center" },
-        8: { cellWidth: 43, halign: "center" },
-        9: { cellWidth: 68, halign: "center" },
-        10: { cellWidth: 74, halign: "center" },
-        11: { cellWidth: 106, halign: "center" },
-        12: { cellWidth: 84, halign: "center" }
-      },
-      didDrawPage: () => {
-        pdf.setDrawColor(0, 0, 0);
-        pdf.setLineWidth(0.7);
-        pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
-        pdf.setTextColor(24, 48, 77);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(9);
-        pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
+        0: { cellWidth: 30, halign: "center" },
+        1: { cellWidth: 52, halign: "center" },
+        2: { cellWidth: 46, halign: "center" },
+        3: { cellWidth: 56, halign: "center" },
+        4: { cellWidth: 76, halign: "center" },
+        5: { cellWidth: 52, halign: "center" },
+        6: { cellWidth: 62, halign: "center" },
+        7: { cellWidth: 38, halign: "center" },
+        8: { cellWidth: 45, halign: "center" },
+        9: { cellWidth: 80, halign: "center" },
+        10: { cellWidth: 82, halign: "center" },
+        11: { cellWidth: 95, halign: "center" },
+        12: { cellWidth: 86, halign: "center" }
       }
     });
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
 
     const safeTruckNo = String(summaryTruckNo || "truck").replace(/[^\w-]+/g, "_");
     pdf.save(`${safeTruckNo}_pending_summary.pdf`);
@@ -5796,9 +5847,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     pdf.setTextColor(32, 32, 32);
     pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
 
-    const safeJobNo = safePdfFileName(trip.jobNo || "truck");
-    const clientName = safePdfFileName(details.customer || details.broker || "client");
-    pdf.save(`${clientName}_${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
+    const rawCustomer = String(
+      (isImport ? (details.customer || trip.customer) : (details.customer || trip.exportCustomer || trip.customer)) || ""
+    ).trim();
+    const customerName = safePdfFileName(rawCustomer || "customer");
+    const safeJobNo = trip.jobNo ? `_${safePdfFileName(trip.jobNo)}` : "";
+    pdf.save(`${customerName}${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
   }
 
   function calculateTruckTripFinancials(trip = {}) {
@@ -6170,9 +6224,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF("l", "pt", "a3");
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
         const letterhead = await loadInvoiceTemplateDataUrl();
         const header = await cropImageDataUrl(letterhead, 0, 270);
-        if (header) pdf.addImage(header, "JPEG", 24, 10, 730, 132);
+        const headerWidth = 850;
+        const headerHeight = 136;
+        const headerX = (pageWidth - headerWidth) / 2;
+        if (header) pdf.addImage(header, "JPEG", headerX, 10, headerWidth, headerHeight);
         pdf.setTextColor(24, 48, 77);
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(15);
@@ -6184,21 +6243,106 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           sum.profit += financials.profitLoss;
           return sum;
         }, { grand: 0, expense: 0, profit: 0 });
+        const amountColumnIndices = [7, 8, 9, 10, 11, 12, 13, 14];
         pdf.autoTable({
           startY: 174,
-          margin: { left: 24, right: 24, top: 36, bottom: 40 },
+          margin: { left: 24, right: 24, top: 36, bottom: 65 },
           theme: "grid",
           showFoot: "lastPage",
-          head: [["S.No", "Job No", "Import Date", "Import Truck", "Customer / Payer", "Export Date", "Export Truck", "Import Freight", "Export Freight", "Import Receivable", "Export Receivable", "MTY Freight", "Grand Total", "Round Trip Expense", "P&L"]],
+          head: [[
+            "S.No",
+            "Job No",
+            "Import\nDate",
+            "Import\nTruck",
+            "Customer /\nPayer",
+            "Export\nDate",
+            "Export\nTruck",
+            "Import\nFreight",
+            "Export\nFreight",
+            "Import\nReceivable",
+            "Export\nReceivable",
+            "MTY\nFreight",
+            "Grand\nTotal",
+            "Round Trip\nExpense",
+            "P&L"
+          ]],
           body: rows.map((item, index) => {
             const financials = calculateTruckTripFinancials(item);
             return [String(index + 1), item.jobNo || "-", formatShortDate(item.date), item.truckNo || "-", item.customer || "-", formatShortDate(item.exportLoadDate), item.exportTruckNo || item.truckNo || "-", money(item.importFreight), money(item.exportFreight), money(item.importReceivedAmount), money(item.exportReceivedAmount), money(Number(item.mtyBoxFreight || 0) + Number(item.exportMtyBoxFreight || 0)), money(financials.grandTotal), Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing", money(financials.profitLoss)];
           }),
           foot: [["", "", "", "", "", "", "", "", "", "", "", "Total", money(totals.grand), money(totals.expense), money(totals.profit)]],
-          styles: { fontSize: 7, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
-          headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
-          footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold" }
+          styles: {
+            fontSize: 10,
+            cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
+            lineColor: [40, 40, 40],
+            lineWidth: 0.65,
+            textColor: [0, 0, 0],
+            valign: "middle",
+            overflow: "linebreak"
+          },
+          headStyles: {
+            fillColor: [24, 48, 77],
+            textColor: [255, 255, 255],
+            fontSize: 9.5,
+            fontStyle: "bold",
+            minCellHeight: 46,
+            valign: "middle",
+            halign: "center",
+            overflow: "linebreak"
+          },
+          bodyStyles: {
+            minCellHeight: 38,
+            valign: "middle"
+          },
+          footStyles: {
+            fillColor: [248, 234, 220],
+            textColor: [24, 48, 77],
+            fontStyle: "bold",
+            fontSize: 10,
+            minCellHeight: 34,
+            valign: "middle"
+          },
+          columnStyles: {
+            0: { cellWidth: 34, halign: "center" },
+            1: { cellWidth: 58, halign: "center" },
+            2: { cellWidth: 66, halign: "center" },
+            3: { cellWidth: 80, halign: "center" },
+            4: { cellWidth: 140 },
+            5: { cellWidth: 66, halign: "center" },
+            6: { cellWidth: 80, halign: "center" },
+            7: { cellWidth: 72, halign: "right" },
+            8: { cellWidth: 72, halign: "right" },
+            9: { cellWidth: 78, halign: "right" },
+            10: { cellWidth: 78, halign: "right" },
+            11: { cellWidth: 68, halign: "right" },
+            12: { cellWidth: 80, halign: "right" },
+            13: { cellWidth: 80, halign: "right" },
+            14: { cellWidth: 74, halign: "right" }
+          },
+          didParseCell: (data) => {
+            if (data.section === "head") {
+              data.cell.styles.overflow = "linebreak";
+              data.cell.styles.halign = "center";
+              data.cell.styles.valign = "middle";
+            } else if (data.section === "body" || data.section === "foot") {
+              if (amountColumnIndices.includes(data.column.index)) {
+                data.cell.styles.halign = "right";
+                data.cell.styles.overflow = "visible";
+              } else {
+                data.cell.styles.overflow = "linebreak";
+              }
+            }
+          }
         });
+        const totalPages = pdf.internal.getNumberOfPages();
+        pdf.setPage(totalPages);
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.8);
+        pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+        pdf.setTextColor(24, 48, 77);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
         pdf.save("truck-trip-ledger-summary.pdf");
       } catch (error) {
         notice.textContent = `Truck ledger download failed: ${error.message}`;
@@ -6616,15 +6760,23 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF("p", "pt", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       const letterhead = await loadInvoiceTemplateDataUrl();
-      const header = await cropImageDataUrl(letterhead, 0, 270);
-      if (header) pdf.addImage(header, "JPEG", 28, 10, 535, 128);
+      if (letterhead) {
+        pdf.addImage(letterhead, "JPEG", 0, 0, pageWidth, pageHeight);
+      }
+
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(22, 118, pageWidth - 44, pageHeight - 172, "F");
+
       pdf.setTextColor(24, 48, 77);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(15);
-      pdf.text("TWO PAY RECORD", 36, 158);
+      pdf.setFontSize(13);
+      pdf.text("TWO PAY RECORD", 36, 140);
       pdf.autoTable({
-        startY: 174,
+        startY: 148,
+        margin: { left: 32, right: 32, bottom: 75 },
         theme: "grid",
         showHead: "firstPage",
         head: [["Field", "Value"]],
@@ -6639,25 +6791,42 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           ["Party Collection", money(item.partyCollection)], ["Party Collection Paid Amount", money(item.partyCollectionPaidAmount)],
           ["Party Collection Paid Date", item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"],
           ["Party Balance", money(getPartyBalance(item))], ["Party Remarks", item.partyRemarks || "-"],
-          ["Received Amount", money(item.receivedAmount)], ["Received Balance", money(item.receivedBalance)],
+          ["Received Amount", money(item.receivedAmount)], ["Receivable Balance", money(item.receivedBalance)],
           ["Received Date", item.receivedDate ? formatShortDate(item.receivedDate) : "-"], ["Received ID", item.receivedId || "-"],
           ["Received Remarks", item.remarks || "-"]
         ],
-        styles: { fontSize: 9, cellPadding: 6, lineColor: [226, 210, 193], textColor: [25, 40, 58] },
-        headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255] },
-        columnStyles: { 0: { cellWidth: 190, fontStyle: "bold" }, 1: { cellWidth: 330 } }
+        styles: { fontSize: 8.6, cellPadding: { top: 3.5, bottom: 3.5, left: 6, right: 6 }, lineColor: [226, 210, 193], textColor: [25, 40, 58] },
+        headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 9, fontStyle: "bold", cellPadding: { top: 4, bottom: 4, left: 6, right: 6 } },
+        columnStyles: { 0: { cellWidth: 185, fontStyle: "bold" }, 1: { cellWidth: 345 } }
       });
-      const fileKey = String(item.blNo || item.containerNo || item.id || "record").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
-      pdf.save(`two-pay-record-${fileKey || "record"}.pdf`);
+
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.8);
+      pdf.line(28, pageHeight - 68, pageWidth - 28, pageHeight - 68);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(32, 32, 32);
+      pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 48);
+
+      const customerName = safePdfFileName(item.customerName || item.consigneeName || "customer");
+      const fileKey = safePdfFileName(item.containerNo || item.blNo || item.id || "record");
+      pdf.save(`${customerName}_${fileKey}_two_pay_invoice.pdf`);
     }
 
     async function buildTwoPaySummaryPdf(rows) {
       if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF("l", "pt", "a3");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       const letterhead = await loadInvoiceTemplateDataUrl();
       const header = await cropImageDataUrl(letterhead, 0, 270);
-      if (header) pdf.addImage(header, "JPEG", 24, 10, 730, 132);
+      const headerWidth = 850;
+      const headerHeight = 136;
+      const headerX = (pageWidth - headerWidth) / 2;
+      if (header) pdf.addImage(header, "JPEG", headerX, 10, headerWidth, headerHeight);
       pdf.setTextColor(24, 48, 77);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(15);
@@ -6667,25 +6836,140 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         receivable: total.receivable + Number(item.globalReceivable || 0),
         balance: total.balance + Number(item.receivedBalance || 0)
       }), { billing: 0, receivable: 0, balance: 0 });
-      const headers = ["S.No", "Date", "Customer Name", "Origin", "BL No", "Container No", "Lot Of", "Destination", "Consignee Name", "Size", "Description", "Truck No", "Road Freight / Paid", "Road Freight / Two Pay", "Tax Amount", "Detention Charges", "Billing Amount", "Global / Receivable", "Bill No", "Party Collection", "Party Paid Amount", "Party Paid Date", "Party Balance", "Party Remarks", "Received Amount", "Received Balance", "Received Date", "Received ID", "Received Remarks"];
+      const headers = [
+        "S.No",
+        "Date",
+        "Customer\nName",
+        "Origin",
+        "BL No",
+        "Container\nNo",
+        "Lot\nOf",
+        "Desti-\nnation",
+        "Consignee\nName",
+        "Size",
+        "Descrip-\ntion",
+        "Truck\nNo",
+        "Road\nFreight\n/ Paid",
+        "Road\nFreight\n/ Two Pay",
+        "Tax\nAmount",
+        "Detention\nCharges",
+        "Billing\nAmount",
+        "Global /\nReceivable",
+        "Bill\nNo",
+        "Party\nCollection",
+        "Party Paid\nAmount",
+        "Party Paid\nDate",
+        "Party\nBalance",
+        "Party\nRemarks",
+        "Received\nAmount",
+        "Receivable\nBalance",
+        "Received\nDate",
+        "Received\nID",
+        "Received\nRemarks"
+      ];
       const footer = Array(headers.length).fill("");
-      footer[headers.indexOf("Detention Charges")] = "Total";
-      footer[headers.indexOf("Billing Amount")] = money(totals.billing);
-      footer[headers.indexOf("Global / Receivable")] = money(totals.receivable);
-      footer[headers.indexOf("Received Amount")] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
-      footer[headers.indexOf("Received Balance")] = money(totals.balance);
+      footer[15] = "Total";
+      footer[16] = money(totals.billing);
+      footer[17] = money(totals.receivable);
+      footer[24] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
+      footer[25] = money(totals.balance);
+
+      const amountColumnIndices = [12, 13, 14, 15, 16, 17, 19, 20, 22, 24, 25];
+
       pdf.autoTable({
         startY: 174,
-        margin: { left: 20, right: 20 },
+        margin: { left: 12, right: 12, bottom: 65 },
         theme: "grid",
         showFoot: "lastPage",
         head: [headers],
         body: rows.map((item, index) => [String(index + 1), ...getTwoPayPdfValues(item)]),
         foot: [footer],
-        styles: { fontSize: 6.5, cellPadding: 3, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak" },
-        headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 6.5 },
-        footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold" }
+        styles: {
+          fontSize: 8.5,
+          cellPadding: { top: 6, bottom: 6, left: 2, right: 2 },
+          lineColor: [40, 40, 40],
+          lineWidth: 0.65,
+          textColor: [0, 0, 0],
+          valign: "middle",
+          overflow: "linebreak"
+        },
+        headStyles: {
+          fillColor: [24, 48, 77],
+          textColor: [255, 255, 255],
+          fontSize: 8.5,
+          fontStyle: "bold",
+          minCellHeight: 46,
+          valign: "middle",
+          halign: "center",
+          overflow: "linebreak"
+        },
+        bodyStyles: {
+          minCellHeight: 34,
+          valign: "middle"
+        },
+        footStyles: {
+          fillColor: [248, 234, 220],
+          textColor: [24, 48, 77],
+          fontStyle: "bold",
+          fontSize: 8.5,
+          minCellHeight: 32,
+          valign: "middle"
+        },
+        columnStyles: {
+          0: { cellWidth: 20, halign: "center" },
+          1: { cellWidth: 38, halign: "center" },
+          2: { cellWidth: 48 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 42 },
+          5: { cellWidth: 48 },
+          6: { cellWidth: 24, halign: "center" },
+          7: { cellWidth: 42 },
+          8: { cellWidth: 48 },
+          9: { cellWidth: 20, halign: "center" },
+          10: { cellWidth: 46 },
+          11: { cellWidth: 42, halign: "center" },
+          12: { cellWidth: 48, halign: "right" },
+          13: { cellWidth: 48, halign: "right" },
+          14: { cellWidth: 36, halign: "right" },
+          15: { cellWidth: 36, halign: "right" },
+          16: { cellWidth: 48, halign: "right" },
+          17: { cellWidth: 48, halign: "right" },
+          18: { cellWidth: 32, halign: "center" },
+          19: { cellWidth: 46, halign: "right" },
+          20: { cellWidth: 46, halign: "right" },
+          21: { cellWidth: 36, halign: "center" },
+          22: { cellWidth: 46, halign: "right" },
+          23: { cellWidth: 42 },
+          24: { cellWidth: 46, halign: "right" },
+          25: { cellWidth: 48, halign: "right" },
+          26: { cellWidth: 36, halign: "center" },
+          27: { cellWidth: 30, halign: "center" },
+          28: { cellWidth: 48 }
+        },
+        didParseCell: (data) => {
+          if (data.section === "head") {
+            data.cell.styles.overflow = "linebreak";
+            data.cell.styles.halign = "center";
+            data.cell.styles.valign = "middle";
+          } else if (data.section === "body" || data.section === "foot") {
+            if (amountColumnIndices.includes(data.column.index)) {
+              data.cell.styles.halign = "right";
+              data.cell.styles.overflow = "visible";
+            } else {
+              data.cell.styles.overflow = "linebreak";
+            }
+          }
+        }
       });
+      const totalPages = pdf.internal.getNumberOfPages();
+      pdf.setPage(totalPages);
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.8);
+      pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+      pdf.setTextColor(24, 48, 77);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
       pdf.save("two-pay-records-summary.pdf");
     }
 
@@ -7145,6 +7429,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const truckFilter = document.querySelector("[data-maintenance-truck-filter]");
     const dateOrder = document.querySelector("[data-maintenance-date-order]");
     const count = document.querySelector("[data-maintenance-count]");
+    const downloadSummaryButton = document.querySelector("[data-download-maintenance-summary]");
     const notice = document.querySelector("[data-notice]");
     const truckOptions = document.querySelector("[data-maintenance-truck-options]");
     const imageInput = document.querySelector("[data-maintenance-image-input]");
@@ -7471,6 +7756,37 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       }
       if (editId) fillForm(store.maintenanceJobs.find((item) => item.id === editId));
       if (imageId) openImageModal(store.maintenanceJobs.find((item) => item.id === imageId)?.image);
+    });
+
+    downloadSummaryButton?.addEventListener("click", async () => {
+      const rows = getFilteredRows();
+      if (!rows.length) {
+        setNotice("No maintenance records match the current filters.", true);
+        return;
+      }
+      try {
+        const headers = [
+          "S.No", "Job No", "Truck No", "Complaint Date", "Repair Date", "Part Name",
+          "Old Serial No", "New Serial No", "Part Cost", "Warranty Period",
+          "Warranty Expiry", "Warranty Status", "Driver Name", "Approved By"
+        ];
+        const pdfRows = rows.map((item, index) => [
+          String(index + 1), item.id || "-", item.truckNo || "-",
+          formatShortDate(item.complaintDate), formatShortDate(item.repairDate),
+          item.partName || "-", item.oldSerialNumber || "-", item.newSerialNumber || "-",
+          `PKR ${money(item.partCost)}`, item.warrantyPeriod || "-",
+          formatShortDate(item.warrantyExpiry), getWarrantyState(item.warrantyExpiry).label,
+          item.driverName || "-", item.approvedBy || "-"
+        ]);
+        await createRegisterPdf(
+          "Fleet Maintenance History Summary",
+          headers,
+          pdfRows,
+          "fleet-maintenance-history-summary"
+        );
+      } catch (error) {
+        setNotice(error.message, true);
+      }
     });
 
     search?.addEventListener("input", render);

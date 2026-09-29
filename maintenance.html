@@ -6,7 +6,7 @@
   <title>GTLS Transport - Fleet Maintenance</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20260925-3" />
+  <link rel="stylesheet" href="styles.css?v=20260929-1" />
 </head>
 <body data-page="maintenance">
   <div class="app">
@@ -110,6 +110,7 @@
             <label><span>Truck No</span><select data-maintenance-truck-filter><option value="">All Trucks</option></select></label>
             <label><span>Date Order</span><select data-maintenance-date-order><option value="desc">Descending (Newest First)</option><option value="asc">Ascending (Oldest First)</option></select></label>
             <span class="ledger-count" data-maintenance-count>0 record(s)</span>
+            <button class="btn maintenance-summary-download" type="button" data-download-maintenance-summary>Download Summary</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -153,7 +154,7 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20260926-3"></script>
+<script src="app.js?v=20260928-10"></script>
 </body>
 </html>
 

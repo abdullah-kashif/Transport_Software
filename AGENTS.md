@@ -23,19 +23,19 @@
 | **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2240) |
 | **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3792) |
 | **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 3964) |
-| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5283) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5816) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6227) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6227) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6527) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 6790) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7140) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7493) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 7722) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 7752) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8000) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8152) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8152) |
+| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5331) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5870) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6371) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6371) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6671) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7074) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7424) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7809) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8038) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8068) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8316) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8468) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8468) |
 
 ---
 
@@ -60,7 +60,54 @@
 4. **Refer to Documentation**: For comprehensive data structures and database schema, read [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md).
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
 
-## 5. Changelog
+- **2026-09-29**: Small Laptop Responsive Layout & Dashboard Typography & Text Wrap Overhaul:
+  1. **Dashboard KPI Layout & Digit Wrap Elimination**: Removed restrictive 6-column desktop override and established symmetrical 3-column grids (`repeat(3, minmax(0, 1fr))`) for Booking Form (2 rows of 3), Truck Summary (2 rows of 3), and Equipment Fleet (3 rows of 3). Enforced `white-space: nowrap !important;`, `tabular-nums`, and balanced font sizing (`16.5px` desktop, `15px` laptop) on currency amounts (`PKR 599,044,792.38`), eliminating mid-number breaks and orphaned digits across all screen resolutions. Added non-breaking spaces `&nbsp;` between `PKR` and numerical values in `dashboard.html`.
+  2. **Uniform Title Alignment & Natural Wrapping**: Standardized `.dashboard-kpi-card h5` to `min-height: 28px` with clean vertical flex alignment and normal word wrapping, guaranteeing perfectly matching card baselines and preventing text truncation across multi-word headings (`Awaiting Payment Bookings`, `Third Party Insurance Expiry`).
+  3. **Small Laptop Viewport Optimization (<=1366px)**: Streamlined desktop sidebar from 290px to 260px and compact main content padding to `16px 20px`, freeing substantial horizontal width. Adjusted `.nav a` padding and font size (13.5px) so all navigation labels (`Completed Truck Summary`, `Equipment & Handling Fleet`) fit seamlessly without ellipsis cut-off.
+  4. **Styles Cache-Busting Bump**: Updated `styles.css?v=20260929-1` across all 17 HTML files for immediate client refresh.
+
+- **2026-09-28**: All Summaries Letterhead on Page 1 Only, Address Footer on Last Page Only, Two Pay Record Larger Text & Truck Details Customer PDF Filename:
+  1. **All Summaries Single-Time Header & Footer Rule**: In all summary exports (`buildBookingFilteredSummaryPdf`, `buildSummaryRecordPdf`, `buildBrokerSummaryPdf`, `buildPendingTruckSummaryPdf`, `truckPage` Truck Trip Ledger Summary, `buildTwoPaySummaryPdf`, and `createRegisterPdf`), the letterhead logo renders strictly once on Page 1 at the top, and the company address footer (`Office # 15, Ayub Shopping Center, Keamari, Karachi`) renders strictly once on the final page (`totalPages`), eliminating multi-page repetitive footers and blank gaps.
+  2. **Two Pay Record Invoice Text Enlargement**: Elevated font size from 7.2 pt to **8.6 pt** (`headStyles: 9 pt`) with balanced padding (`3.5 pt`), guaranteeing high readability while strictly fitting all 28 rows on a single page without spilling over.
+  3. **Summary Text Enlargement**: Elevated text size across summaries: Booking Summary (9.5 pt), Customer Summary (9.5 pt), Trucker/Broker Summary (10 pt), Pending Truck Summary (9.2 pt), Two Pay Summary (8.5 pt head & body), and Register PDFs (9.5 / 8.8 pt).
+  4. **Truck Details Invoice Customer PDF Filename**: In `buildTruckDetailsInvoicePdf`, filenames now strictly prioritize Customer Name (`${customerName}${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`) and never fall back to broker or "client".
+  5. **Cache-Busting Bump**: Updated `app.js?v=20260928-10` across all 17 HTML files.
+
+- **2026-09-28**: Trucker / Broker Summary Title Normalization & Customer Booking Summary First-Page Letterhead:
+  1. **Trucker / Broker Summary Title Fix**: In `buildBrokerSummaryPdf`, when downloading general summary or when no specific broker is selected, the title now strictly reads `TRUCKER / BROKER: ALL TRUCKERS / BROKERS` instead of concatenating every broker's name into a long cut-off header. When a specific trucker/broker is selected or a single-row payment is downloaded, it displays `TRUCKER / BROKER: [NAME]`.
+  2. **Booking Summary First-Page Letterhead Enforcement**: In `buildSummaryRecordPdf` (Customer Booking Summary PDF), the company letterhead logo, `CUSTOMER SUMMARY` title, and customer name now render strictly on Page 1 before the table (`startY: 184`), while subsequent pages flow from the top (`margin.top: 36`) without blank letterhead spacing, keeping the official Keamari address footer on every page.
+  3. **Cache-Busting Bump**: Updated `app.js?v=20260928-9` across all 17 HTML files.
+
+- **2026-09-28**: Booking Summary PDF Date Column Alignment & Width Expansion:
+  1. **Date Column Single-Line Alignment**: Expanded Date column width to 70 pt with centered alignment in `buildBookingFilteredSummaryPdf`, ensuring May (e.g. `22 May 2024`) and all month strings fit cleanly on a single line matching all other months.
+  2. **Cache-Busting Bump**: Updated `app.js?v=20260928-8` across all 17 HTML files.
+
+- **2026-09-28**: Booking Summary & Broker Summary `pageHeight` ReferenceError Fix:
+  1. **PageHeight Declaration**: Resolved `ReferenceError: pageHeight is not defined` in `buildBookingFilteredSummaryPdf` and `buildBrokerSummaryPdf` by declaring `const pageHeight = pdf.internal.pageSize.getHeight();` before `didDrawPage` footer positioning.
+  2. **Cache-Busting Bump**: Updated `app.js?v=20260928-7` across all 17 HTML files.
+
+- **2026-09-28**: Cross-Module General Summary Download Restored & High-Legibility Font Expansion:
+  1. **Truck Details Summary PDF Fix**: Resolved critical `ReferenceError: Cannot access 'pdf' before initialization` in `truckPage()` by initializing `const pdf = new jsPDF("l", "pt", "a3");` prior to measuring dimensions.
+  2. **Font Size & Row Height Expansion**:
+     - **Truck Trip Ledger Summary**: Elevated font size from 8.5 pt to **10 pt** (`headStyles: 9.5 pt`, `bodyStyles.minCellHeight: 38 pt`, `headStyles.minCellHeight: 46 pt`) for crystal-clear readability on A3 landscape.
+     - **Two Pay Records Summary**: Elevated font size from 7.2 pt to **8.5 pt** (`headStyles: 7.8 pt`, `bodyStyles.minCellHeight: 34 pt`, `headStyles.minCellHeight: 46 pt`), preserving single-line amount rendering without wrapping.
+  3. **Booking Summary Always-Downloadable**: Removed filter-restriction roadblock so users can download Booking Summary PDF at any time (including with General Search or viewing all records).
+  4. **Fleet Maintenance Summary Download**: Added "Download Summary" button to `maintenance.html` toolbar and hooked it up in `maintenancePage()` to export letterhead maintenance history summaries.
+  5. **Dynamic A3 Support in Register PDFs**: Enhanced `createRegisterPdf` to automatically adapt to A3 landscape whenever headers exceed 11 columns, eliminating squeezed layouts.
+  6. **Cache-Busting Bump**: Updated `app.js?v=20260928-6` across all 17 HTML files.
+
+- **2026-09-28**: PDF Header Non-Overlap, Amount Single-Line Protection & Prominent Statement Grid Borders:
+  1. **Header Text Wrapping Fix**: Eliminated column header overlapping in Two Pay Records Summary (`buildTwoPaySummaryPdf`) and Truck Trip Ledger Summary (`truck-trip-ledger-summary.pdf`) by scoping `overflow: "linebreak"` strictly to `data.section === "head"` and adding clean newline break boundaries (`\n`) for composite column names (`Road Freight\n/ Paid`, `Global /\nReceivable`, `Party Paid\nAmount`, etc.).
+  2. **Single-Line Amount Protection**: Enforced `overflow: "visible"` and right alignment strictly in `body` and `foot` sections for amount columns so monetary numbers (e.g. `355,000`, `412,000`) never wrap or drop digits to a second line.
+  3. **Prominent Statement Grid Borders**: Matched the visual style of Pending Truck Summary reference (`All_Trucks_pending_summary.pdf`) with crisp dark borders (`lineColor: [40, 40, 40]`, `lineWidth: 0.65`) and solid black text (`textColor: [0, 0, 0]`) with comfortable row heights (`minCellHeight: 32–34 pt`, `headStyles: 42–44 pt`).
+  4. **Cache-Busting Bump**: Updated `app.js?v=20260928-5` across all 17 HTML files.
+
+- **2026-09-28**: Comprehensive PDF Layout, Medium Box Sizing & Official Letterhead Enforcement Across All Modules:
+  1. **Medium-Level Summary Boxes**: Upgraded Two Pay Records Summary (`buildTwoPaySummaryPdf`), Pending/Completed Truck Summary (`buildPendingTruckSummaryPdf`), and Truck Trip Ledger Summary (`truck-trip-ledger-summary.pdf`) from microscopic font/padding to comfortable medium-sized boxes (`fontSize: 7.8–9.5 pt`, `cellPadding: 4.8–6.0 pt`, `minCellHeight: 24–28 pt`) for high-contrast legibility and clear viewing.
+  2. **Official Letterhead & Address Footer on Every PDF**: Standardized company letterhead banner across all pages and enforced the official bottom address (`Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660`) with black divider line on every page via `didDrawPage` across all summary and register exports (`buildTwoPaySummaryPdf`, `buildPendingTruckSummaryPdf`, `truck-trip-ledger-summary`, `buildBookingFilteredSummaryPdf`, `buildBrokerSummaryPdf`, `buildSummaryRecordPdf`, `createRegisterPdf`).
+  3. **Filename Conventions**: Trucker / Broker single-row summary downloads now strictly use the Trucker / Broker name from the `truckerBroker` field as the PDF filename (`${truckerBrokerName}_${safeBooking}.pdf`). Two Pay Records single-record invoice downloads prefix Customer Name (`${customerName}_${fileKey}_two_pay_invoice.pdf`).
+  4. **Two Pay Records Visual Polish**: Renamed `Received Balance` to `Receivable Balance` across form field labels, top KPI card, and PDF exports. Refined top KPI cards with high-contrast themed accents and solid badges. Single-record invoice PDF (`buildTwoPayRecordPdf`) strictly fits all 28 rows on a single A4 page with full letterhead and address footer.
+  5. **Cache-Busting Bump**: Updated `app.js?v=20260928-4` across all 17 HTML files.
 
 - **2026-09-26**: Two Pay Records now saves Customer Name to Supabase, shows it after Date in the form/register/PDFs, and supports a Customer filter (including Unassigned historical rows). A new filtered Party Collection Pending card sums positive `Party Collection - Paid Amount` balances; pending rows are marked in the register. The form keeps three regular fields per desktop row. Apply `supabase-two-pay-customer-name.sql` before saving with the new field.
 
