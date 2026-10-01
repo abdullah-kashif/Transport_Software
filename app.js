@@ -17,7 +17,7 @@
         enumerable: true
       });
     }
-  } catch (_) {}
+  } catch (_) { }
 
   const KEY = "gtls-transport-live-data-v1";
   const ADMIN_AUTH_KEY = "gtls-admin-auth-v1";
@@ -558,17 +558,17 @@
     const primaryLine = containerLines[0] || normalizeContainerLine();
     const brokerLinesFromRelational = Array.isArray(row.booking_brokers) && row.booking_brokers.length > 0
       ? row.booking_brokers
-          .slice()
-          .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
-          .map((line) => normalizeBrokerLine({
-            truckerBroker: line.trucker_broker,
-            brokerAmount: line.broker_amount,
-            brokerPaymentDetails: line.broker_payment_details,
-            brokerPaymentDate: formatShortDate(line.broker_payment_date),
-            containerRef: line.container_ref || "all",
-            truckNo: line.truck_no || "All Trucks",
-            containerSize: line.container_size || "All Sizes"
-          }))
+        .slice()
+        .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
+        .map((line) => normalizeBrokerLine({
+          truckerBroker: line.trucker_broker,
+          brokerAmount: line.broker_amount,
+          brokerPaymentDetails: line.broker_payment_details,
+          brokerPaymentDate: formatShortDate(line.broker_payment_date),
+          containerRef: line.container_ref || "all",
+          truckNo: line.truck_no || "All Trucks",
+          containerSize: line.container_size || "All Sizes"
+        }))
       : null;
     return normalizeBookingContainers({
       id: row.job_no,
@@ -697,88 +697,88 @@
     return new Blob([bytes], { type: mimeType });
   }
 
-async function getPrivateDocumentUrl(path) {
-  if (!path) return "";
-  const cached = getCachedSignedUrl(path);
-  if (cached) return cached;
-  const client = getSupabaseClient();
-  if (!client) return "";
-  const { data, error } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).createSignedUrl(path, 3600);
-  if (error || !data?.signedUrl) return "";
-  cacheSignedUrl(path, data.signedUrl);
-  return data.signedUrl;
-}
-
-function getBookingBiltyFolder(booking) {
-  const safeJobNo = String(booking.id || "booking").replace(/[^a-z0-9_-]/gi, "-");
-  return `bookings/${safeJobNo}`;
-}
-
-async function removeStaleBookingBiltyFiles(booking, keepPath = "") {
-  const client = getSupabaseClient();
-  if (!client) return;
-
-  const folder = getBookingBiltyFolder(booking);
-  const bucket = client.storage.from(SUPABASE_DOCUMENT_BUCKET);
-  const { data: files, error } = await bucket.list(folder, { limit: 100 });
-  if (error) throw error;
-
-  const paths = (files || [])
-    .filter((file) => file?.name && file.name !== ".emptyFolderPlaceholder")
-    .map((file) => `${folder}/${file.name}`)
-    .filter((path) => path !== keepPath);
-  const previousPath = String(booking.biltyPath || "");
-  if (previousPath && previousPath !== keepPath && !paths.includes(previousPath)) {
-    paths.push(previousPath);
+  async function getPrivateDocumentUrl(path) {
+    if (!path) return "";
+    const cached = getCachedSignedUrl(path);
+    if (cached) return cached;
+    const client = getSupabaseClient();
+    if (!client) return "";
+    const { data, error } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).createSignedUrl(path, 3600);
+    if (error || !data?.signedUrl) return "";
+    cacheSignedUrl(path, data.signedUrl);
+    return data.signedUrl;
   }
-  if (!paths.length) return;
 
-  const { error: removeError } = await bucket.remove(paths);
-  if (removeError) throw removeError;
-}
+  function getBookingBiltyFolder(booking) {
+    const safeJobNo = String(booking.id || "booking").replace(/[^a-z0-9_-]/gi, "-");
+    return `bookings/${safeJobNo}`;
+  }
 
-async function uploadBookingBilty(booking) {
-  const client = getSupabaseClient();
-  if (!client) return booking.biltyPath || "";
+  async function removeStaleBookingBiltyFiles(booking, keepPath = "") {
+    const client = getSupabaseClient();
+    if (!client) return;
 
-  const imageData = String(booking.biltyImage || "");
+    const folder = getBookingBiltyFolder(booking);
+    const bucket = client.storage.from(SUPABASE_DOCUMENT_BUCKET);
+    const { data: files, error } = await bucket.list(folder, { limit: 100 });
+    if (error) throw error;
 
-  // Case 1: Bilty image cleared/removed by the user
-  if (!imageData) {
-    if (booking.biltyPath) {
-      try {
-        const folder = getBookingBiltyFolder(booking);
-        const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(folder, { limit: 100 });
-        const paths = (files || [])
-          .map((file) => `${folder}/${file.name}`)
-          .filter((file) => file !== ".emptyFolderPlaceholder");
-        if (paths.length) {
-          await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(paths);
-        }
-      } catch (err) {
-        console.warn("Failed to clear Bilty files from storage:", err.message);
-      }
+    const paths = (files || [])
+      .filter((file) => file?.name && file.name !== ".emptyFolderPlaceholder")
+      .map((file) => `${folder}/${file.name}`)
+      .filter((path) => path !== keepPath);
+    const previousPath = String(booking.biltyPath || "");
+    if (previousPath && previousPath !== keepPath && !paths.includes(previousPath)) {
+      paths.push(previousPath);
     }
-    return "";
+    if (!paths.length) return;
+
+    const { error: removeError } = await bucket.remove(paths);
+    if (removeError) throw removeError;
   }
 
-  // Case 2: Bilty image is unchanged
-  if (imageData.startsWith("http://") || imageData.startsWith("https://")) {
+  async function uploadBookingBilty(booking) {
+    const client = getSupabaseClient();
+    if (!client) return booking.biltyPath || "";
+
+    const imageData = String(booking.biltyImage || "");
+
+    // Case 1: Bilty image cleared/removed by the user
+    if (!imageData) {
+      if (booking.biltyPath) {
+        try {
+          const folder = getBookingBiltyFolder(booking);
+          const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(folder, { limit: 100 });
+          const paths = (files || [])
+            .map((file) => `${folder}/${file.name}`)
+            .filter((file) => file !== ".emptyFolderPlaceholder");
+          if (paths.length) {
+            await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(paths);
+          }
+        } catch (err) {
+          console.warn("Failed to clear Bilty files from storage:", err.message);
+        }
+      }
+      return "";
+    }
+
+    // Case 2: Bilty image is unchanged
+    if (imageData.startsWith("http://") || imageData.startsWith("https://")) {
+      return booking.biltyPath || "";
+    }
+
+    // Case 3: New Bilty image uploaded
+    if (imageData.startsWith("data:")) {
+      const safeJobNo = String(booking.id || "booking").replace(/[^a-z0-9_-]/gi, "-");
+      const path = `bookings/${safeJobNo}/latest.jpg`;
+      const { error } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET)
+        .upload(path, dataUrlToBlob(imageData), { contentType: "image/jpeg", upsert: true });
+      if (error) throw error;
+      return path;
+    }
+
     return booking.biltyPath || "";
   }
-
-  // Case 3: New Bilty image uploaded
-  if (imageData.startsWith("data:")) {
-    const safeJobNo = String(booking.id || "booking").replace(/[^a-z0-9_-]/gi, "-");
-    const path = `bookings/${safeJobNo}/latest.jpg`;
-    const { error } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET)
-      .upload(path, dataUrlToBlob(imageData), { contentType: "image/jpeg", upsert: true });
-    if (error) throw error;
-    return path;
-  }
-
-  return booking.biltyPath || "";
-}
 
   async function saveBookingToSupabase(booking) {
     const client = getSupabaseClient();
@@ -834,70 +834,70 @@ async function uploadBookingBilty(booking) {
       unit_price: line.unitPrice,
       sort_order: index
     }));
-  if (lines.length) {
-    const { error: linesError } = await client.from("booking_containers").insert(lines);
-    if (linesError) {
-      if (linesError.message && (linesError.message.includes("quantity") || linesError.message.includes("unit_price") || linesError.code === "PGRST204" || linesError.code === "42703")) {
-        console.warn("booking_containers missing quantity/unit_price columns; retrying insert without pricing. Run supabase-container-pricing.sql in Supabase SQL editor.", linesError.message);
-        const fallbackLines = lines.map(({ quantity, unit_price, ...rest }) => rest);
-        const { error: retryError } = await client.from("booking_containers").insert(fallbackLines);
-        if (retryError) throw retryError;
-      } else {
-        throw linesError;
-      }
-    }
-  }
-
-  try {
-    const { error: deleteBrokersError } = await client.from("booking_brokers")
-      .delete()
-      .eq("booking_id", saved.id);
-    if (deleteBrokersError) throw deleteBrokersError;
-    const brokerLines = getBookingBrokerLines(booking)
-      .filter((line) => line.truckerBroker || line.brokerAmount != null || line.brokerPaymentDetails || line.brokerPaymentDate)
-      .map((line, index) => ({
-        booking_id: saved.id,
-        trucker_broker: line.truckerBroker || null,
-        broker_amount: line.brokerAmount == null || line.brokerAmount === "" ? null : Number(line.brokerAmount),
-        broker_payment_details: line.brokerPaymentDetails || null,
-        broker_payment_date: formatIsoDate(line.brokerPaymentDate) || null,
-        container_ref: line.containerRef || "all",
-        truck_no: line.truckNo || null,
-        container_size: line.containerSize || null,
-        sort_order: index
-      }));
-    if (brokerLines.length) {
-      const { error: insertBrokersError } = await client.from("booking_brokers").insert(brokerLines);
-      if (insertBrokersError) {
-        if (insertBrokersError.message && (insertBrokersError.message.includes("truck_no") || insertBrokersError.message.includes("container_size") || insertBrokersError.code === "PGRST204" || insertBrokersError.code === "42703")) {
-          console.warn("booking_brokers missing truck_no/container_size columns; retrying insert without them:", insertBrokersError.message);
-          const fallbackBrokers = brokerLines.map(({ truck_no, container_size, ...rest }) => rest);
-          const { error: fallbackError } = await client.from("booking_brokers").insert(fallbackBrokers);
-          if (fallbackError) throw fallbackError;
+    if (lines.length) {
+      const { error: linesError } = await client.from("booking_containers").insert(lines);
+      if (linesError) {
+        if (linesError.message && (linesError.message.includes("quantity") || linesError.message.includes("unit_price") || linesError.code === "PGRST204" || linesError.code === "42703")) {
+          console.warn("booking_containers missing quantity/unit_price columns; retrying insert without pricing. Run supabase-container-pricing.sql in Supabase SQL editor.", linesError.message);
+          const fallbackLines = lines.map(({ quantity, unit_price, ...rest }) => rest);
+          const { error: retryError } = await client.from("booking_containers").insert(fallbackLines);
+          if (retryError) throw retryError;
         } else {
-          throw insertBrokersError;
+          throw linesError;
         }
       }
     }
-  } catch (brokerErr) {
-    throw new Error(`Booking broker records could not be synchronized: ${brokerErr.message}`);
-  }
 
-  const savedPath = String(saved.bilty_path || biltyPath || "");
-  await removeStaleBookingBiltyFiles(booking, savedPath);
-  return { remoteId: saved.id, biltyPath: savedPath };
-}
+    try {
+      const { error: deleteBrokersError } = await client.from("booking_brokers")
+        .delete()
+        .eq("booking_id", saved.id);
+      if (deleteBrokersError) throw deleteBrokersError;
+      const brokerLines = getBookingBrokerLines(booking)
+        .filter((line) => line.truckerBroker || line.brokerAmount != null || line.brokerPaymentDetails || line.brokerPaymentDate)
+        .map((line, index) => ({
+          booking_id: saved.id,
+          trucker_broker: line.truckerBroker || null,
+          broker_amount: line.brokerAmount == null || line.brokerAmount === "" ? null : Number(line.brokerAmount),
+          broker_payment_details: line.brokerPaymentDetails || null,
+          broker_payment_date: formatIsoDate(line.brokerPaymentDate) || null,
+          container_ref: line.containerRef || "all",
+          truck_no: line.truckNo || null,
+          container_size: line.containerSize || null,
+          sort_order: index
+        }));
+      if (brokerLines.length) {
+        const { error: insertBrokersError } = await client.from("booking_brokers").insert(brokerLines);
+        if (insertBrokersError) {
+          if (insertBrokersError.message && (insertBrokersError.message.includes("truck_no") || insertBrokersError.message.includes("container_size") || insertBrokersError.code === "PGRST204" || insertBrokersError.code === "42703")) {
+            console.warn("booking_brokers missing truck_no/container_size columns; retrying insert without them:", insertBrokersError.message);
+            const fallbackBrokers = brokerLines.map(({ truck_no, container_size, ...rest }) => rest);
+            const { error: fallbackError } = await client.from("booking_brokers").insert(fallbackBrokers);
+            if (fallbackError) throw fallbackError;
+          } else {
+            throw insertBrokersError;
+          }
+        }
+      }
+    } catch (brokerErr) {
+      throw new Error(`Booking broker records could not be synchronized: ${brokerErr.message}`);
+    }
+
+    const savedPath = String(saved.bilty_path || biltyPath || "");
+    await removeStaleBookingBiltyFiles(booking, savedPath);
+    return { remoteId: saved.id, biltyPath: savedPath };
+  }
 
   async function deleteBookingFromSupabase(booking) {
     const client = getSupabaseClient();
     if (!client) return;
     const query = client.from("bookings").delete();
-  const { error } = booking.remoteId
-    ? await query.eq("id", booking.remoteId)
-    : await query.eq("job_no", booking.id);
-  if (error) throw error;
-  await removeStaleBookingBiltyFiles(booking);
-}
+    const { error } = booking.remoteId
+      ? await query.eq("id", booking.remoteId)
+      : await query.eq("job_no", booking.id);
+    if (error) throw error;
+    await removeStaleBookingBiltyFiles(booking);
+  }
 
   async function hydrateBookingsFromSupabase(store) {
     const client = getSupabaseClient();
@@ -933,16 +933,16 @@ async function uploadBookingBilty(booking) {
   async function flushOperationalSyncBeforeMutation() {
     clearTimeout(operationalSyncTimer);
     operationalSyncTimer = null;
-    await operationalSyncQueue.catch(() => {});
+    await operationalSyncQueue.catch(() => { });
   }
 
   async function syncStoreImmediately(store, changed) {
     clearTimeout(operationalSyncTimer);
     operationalSyncTimer = null;
-    await operationalSyncQueue.catch(() => {});
+    await operationalSyncQueue.catch(() => { });
     const snapshot = structuredClone(store);
     operationalSyncQueue = operationalSyncQueue
-      .catch(() => {})
+      .catch(() => { })
       .then(() => syncOperationalStore(snapshot, changed));
     return operationalSyncQueue;
   }
@@ -1009,71 +1009,71 @@ async function uploadBookingBilty(booking) {
     await bucket.remove([...paths]);
   }
 
-async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, options = {}) {
-  const client = getSupabaseClient();
-  if (!client) return currentPath || "";
+  async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, options = {}) {
+    const client = getSupabaseClient();
+    if (!client) return currentPath || "";
 
-  // Case 1: Image cleared/removed by the user
-  if (!dataUrl) {
-    if (currentPath) {
-      try {
-        await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([currentPath]);
-        if (options.replaceFolder) {
-          const recordFolder = getStorageRecordFolder(currentPath, folder, recordId);
-          const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(recordFolder, { limit: 100 });
+    // Case 1: Image cleared/removed by the user
+    if (!dataUrl) {
+      if (currentPath) {
+        try {
+          await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove([currentPath]);
+          if (options.replaceFolder) {
+            const recordFolder = getStorageRecordFolder(currentPath, folder, recordId);
+            const { data: files } = await client.storage.from(SUPABASE_DOCUMENT_BUCKET).list(recordFolder, { limit: 100 });
+            const obsoletePaths = (files || [])
+              .map((file) => `${recordFolder}/${file.name}`)
+              .filter((file) => file !== ".emptyFolderPlaceholder");
+            if (obsoletePaths.length) {
+              await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(obsoletePaths);
+            }
+          }
+        } catch (err) {
+          console.warn("Error deleting cleared image from storage:", err.message);
+        }
+      }
+      return "";
+    }
+
+    // Case 2: Image is unchanged
+    if (String(dataUrl).startsWith("http://") || String(dataUrl).startsWith("https://")) {
+      return currentPath || "";
+    }
+
+    // Case 3: New image uploaded
+    if (String(dataUrl).startsWith("data:")) {
+      const mimeType = String(dataUrl).match(/data:([^;]+)/)?.[1] || "image/jpeg";
+      const extension = mimeType === "application/pdf" ? "pdf" : (mimeType.split("/")[1] || "jpg").replace("jpeg", "jpg");
+      const recordFolder = getStorageRecordFolder(options.replaceFolder ? currentPath : "", folder, recordId);
+      const path = Boolean(options.replaceFolder)
+        ? `${recordFolder}/latest.${extension}`
+        : `${recordFolder}/${Date.now()}.${extension}`;
+      const bucket = client.storage.from(SUPABASE_DOCUMENT_BUCKET);
+      const { error } = await bucket.upload(path, dataUrlToBlob(dataUrl), {
+        contentType: mimeType,
+        upsert: Boolean(options.replaceFolder)
+      });
+      if (error) throw error;
+
+      if (options.replaceFolder) {
+        const { data: files, error: listError } = await bucket.list(recordFolder, { limit: 100 });
+        if (!listError) {
           const obsoletePaths = (files || [])
             .map((file) => `${recordFolder}/${file.name}`)
-            .filter((file) => file !== ".emptyFolderPlaceholder");
+            .filter((filePath) => filePath !== path);
           if (obsoletePaths.length) {
-            await client.storage.from(SUPABASE_DOCUMENT_BUCKET).remove(obsoletePaths);
+            await bucket.remove(obsoletePaths).catch((err) => console.warn("Failed to remove obsolete paths", err.message));
           }
         }
-      } catch (err) {
-        console.warn("Error deleting cleared image from storage:", err.message);
+      } else if (currentPath && currentPath !== path) {
+        await bucket.remove([currentPath]).catch((err) => console.warn("Failed to remove currentPath", err.message));
       }
-    }
-    return "";
-  }
 
-  // Case 2: Image is unchanged
-  if (String(dataUrl).startsWith("http://") || String(dataUrl).startsWith("https://")) {
+      return path;
+    }
+
     return currentPath || "";
   }
-
-  // Case 3: New image uploaded
-  if (String(dataUrl).startsWith("data:")) {
-    const mimeType = String(dataUrl).match(/data:([^;]+)/)?.[1] || "image/jpeg";
-    const extension = mimeType === "application/pdf" ? "pdf" : (mimeType.split("/")[1] || "jpg").replace("jpeg", "jpg");
-    const recordFolder = getStorageRecordFolder(options.replaceFolder ? currentPath : "", folder, recordId);
-    const path = Boolean(options.replaceFolder)
-      ? `${recordFolder}/latest.${extension}`
-      : `${recordFolder}/${Date.now()}.${extension}`;
-    const bucket = client.storage.from(SUPABASE_DOCUMENT_BUCKET);
-    const { error } = await bucket.upload(path, dataUrlToBlob(dataUrl), {
-      contentType: mimeType,
-      upsert: Boolean(options.replaceFolder)
-    });
-    if (error) throw error;
-
-    if (options.replaceFolder) {
-      const { data: files, error: listError } = await bucket.list(recordFolder, { limit: 100 });
-      if (!listError) {
-        const obsoletePaths = (files || [])
-          .map((file) => `${recordFolder}/${file.name}`)
-          .filter((filePath) => filePath !== path);
-        if (obsoletePaths.length) {
-          await bucket.remove(obsoletePaths).catch((err) => console.warn("Failed to remove obsolete paths", err.message));
-        }
-      }
-    } else if (currentPath && currentPath !== path) {
-      await bucket.remove([currentPath]).catch((err) => console.warn("Failed to remove currentPath", err.message));
-    }
-
-    return path;
-  }
-
-  return currentPath || "";
-}
 
   const TABLE_IMAGE_COLUMNS = {
     truck_jobs: { col: "image_path", folder: "trucks" },
@@ -1209,13 +1209,15 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const rows = [];
     for (const item of records || []) {
       const path = await uploadPrivateDataUrl(item.documentData, item.documentPath, "equipment", item.truckNo || item.id, { replaceFolder: true });
-      rows.push({ truck_no: item.truckNo, type_of_body: item.typeOfBody || null, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make,
+      rows.push({
+        truck_no: item.truckNo, type_of_body: item.typeOfBody || null, chassis_no: item.chassisNo, engine_no: item.engineNo, make: item.make,
         ownership: item.ownership || null, third_party_insurance_date: formatIsoDate(item.thirdPartyInsuranceDate) || null, model: item.model,
         mra: item.mra || null, banker: item.banker || null, fitness_expiry: formatIsoDate(item.fitnessExpiry) || null,
         balochistan_permit_expiry: formatIsoDate(item.balochistanPermitExpiry) || null, sindh_permit_expiry: formatIsoDate(item.sindhPermitExpiry) || null,
         kpk_permit_expiry: formatIsoDate(item.kpkPermitExpiry) || null, punjab_permit_expiry: formatIsoDate(item.punjabPermitExpiry) || null,
         tax_paid_up_to: formatIsoDate(item.taxPaidUpTo) || null, original_documents: item.documentName || item.originalDocs || null,
-        original_documents_path: path || null, updated_at: new Date().toISOString() });
+        original_documents_path: path || null, updated_at: new Date().toISOString()
+      });
     }
     try {
       await syncRows("equipment_fleet", "truck_no", rows);
@@ -1241,11 +1243,13 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const rows = [];
     for (const item of records || []) {
       const path = await uploadPrivateDataUrl(item.image, item.imagePath, "maintenance", item.id, { replaceFolder: true });
-      rows.push({ maintenance_job_no: item.id, truck_no: item.truckNo, complaint_date: formatIsoDate(item.complaintDate),
+      rows.push({
+        maintenance_job_no: item.id, truck_no: item.truckNo, complaint_date: formatIsoDate(item.complaintDate),
         repair_date: formatIsoDate(item.repairDate), part_name: item.partName, old_serial_number: item.oldSerialNumber || null,
         new_serial_number: item.newSerialNumber, part_cost: Number(item.partCost || 0), warranty_period: item.warrantyPeriod || null,
         warranty_expiry: formatIsoDate(item.warrantyExpiry) || null, driver_name: item.driverName, image_path: path || null,
-        approved_by: item.approvedBy, updated_at: new Date().toISOString() });
+        approved_by: item.approvedBy, updated_at: new Date().toISOString()
+      });
     }
     await syncRows("maintenance_jobs", "maintenance_job_no", rows);
   }
@@ -1254,9 +1258,11 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const rows = [];
     for (const item of records || []) {
       const path = await uploadPrivateDataUrl(item.image, item.imagePath, "employees", item.id, { replaceFolder: true });
-      rows.push({ employee_no: item.id, name: item.name, designation: item.designation, department: item.department || null,
+      rows.push({
+        employee_no: item.id, name: item.name, designation: item.designation, department: item.department || null,
         salary: Number(item.salary || 0), joining_date: formatIsoDate(item.joiningDate), status: item.status === "Inactive" ? "Inactive" : "Active",
-        phone: item.phone || null, image_path: path || null, updated_at: new Date().toISOString() });
+        phone: item.phone || null, image_path: path || null, updated_at: new Date().toISOString()
+      });
     }
     await syncRows("employees", "employee_no", rows);
   }
@@ -1422,7 +1428,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     let syncedIds = new Set();
     try {
       syncedIds = new Set(JSON.parse(localStorage.getItem(syncedKey) || "[]"));
-    } catch (_) {}
+    } catch (_) { }
     const newLogs = (logs || []).filter((log) => !syncedIds.has(log.id));
     if (!newLogs.length) return;
     const sessionUser = getAdminSession();
@@ -2036,14 +2042,14 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     }
     progressBar.style.width = "0%";
     progressBar.style.opacity = "1";
-    
+
     mainEl.innerHTML = getSkeletonLoader(targetPage);
     mainEl.style.transform = "translateY(0)";
     mainEl.style.opacity = "1";
-    
+
     const panel = document.querySelector("[data-notification-panel]");
     if (panel) panel.hidden = true;
-    
+
     document.body.dataset.page = targetPage;
     setActiveNav();
 
@@ -2075,7 +2081,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       history.pushState({ page: targetPage, url }, "", url);
 
       const store = loadStore();
-      
+
       if (!await enforceSoftwareAccess(targetPage)) {
         return;
       }
@@ -2102,7 +2108,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
   function navigateWithTransition(url, options = {}) {
     if (!url) return;
-    
+
     const cleanUrl = url.split("?")[0].split("#")[0];
     let targetPage = cleanUrl.replace(".html", "").split("/").pop();
     if (targetPage === "employees") targetPage = "employee";
@@ -2862,8 +2868,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     const day = date.getDate();
     const suffix = day % 10 === 1 && day !== 11 ? "st"
       : day % 10 === 2 && day !== 12 ? "nd"
-      : day % 10 === 3 && day !== 13 ? "rd"
-      : "th";
+        : day % 10 === 3 && day !== 13 ? "rd"
+          : "th";
     const month = date.toLocaleString("en-US", { month: "short" });
     const year = date.toLocaleString("en-US", { year: "2-digit" });
     return `${day}${suffix} ${month}, ${year}`;
@@ -3664,7 +3670,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
   function bindPaymentNotifications(bookingsSource) {
     const center = document.querySelector("[data-payment-notifications]");
-    if (!center) return () => {};
+    if (!center) return () => { };
     const trigger = center.querySelector("[data-notification-trigger]");
     const panel = center.querySelector("[data-notification-panel]");
     const closeButton = center.querySelector("[data-notification-close]");
@@ -3801,7 +3807,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               <span class="payment-notification-due">${dateLabel}: ${formatShortDate(dueDate)}</span>
             </span>
           </a>
-        `; }).join("")
+        `;
+        }).join("")
         : `
           <div class="notification-empty">
             <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -4458,8 +4465,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
               entry.paymentStatus, entry.profitLoss, entry.profitLoss ? money(entry.profitLoss) : ""
             ]),
             ...[item.rate, item.detention, item.salesTaxAmount, item.totalAmount,
-              item.incomeTaxAmount, item.salesTaxWithheldAmount, item.salesTaxByUsAmount,
-              item.receivableAmount].flatMap((amount) => [amount, money(amount)]),
+            item.incomeTaxAmount, item.salesTaxWithheldAmount, item.salesTaxByUsAmount,
+            item.receivableAmount].flatMap((amount) => [amount, money(amount)]),
             ...getBookingContainerLines(item).flatMap((line) => [
               line.containerNo, line.size, line.truckNo, line.quantity, line.unitPrice,
               line.unitPrice ? money(line.unitPrice) : ""
@@ -5267,8 +5274,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         .filter((row) => {
           if (!terms.length) return true;
           const searchable = [row.booking.id, row.booking.bookingNo, row.booking.invoiceNo, row.booking.customer,
-            row.booking.date, row.entry.truckerBroker, row.entry.containerRef, row.entry.amount,
-            row.entry.paymentDetails, row.entry.paymentDate, row.entry.paymentStatus, row.brokerProfitLoss]
+          row.booking.date, row.entry.truckerBroker, row.entry.containerRef, row.entry.amount,
+          row.entry.paymentDetails, row.entry.paymentDate, row.entry.paymentStatus, row.brokerProfitLoss]
             .join(" ").toLowerCase();
           return terms.every((term) => searchable.includes(term));
         })
@@ -5538,7 +5545,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       const customer = downloadBtn.getAttribute("data-download-summary");
       if (!customer) return;
       const bookings = getPendingBookings().filter((item) => (String(item.customer || "").trim() || "Unknown Customer") === customer);
-      buildSummaryRecordPdf(customer, bookings).catch(() => {});
+      buildSummaryRecordPdf(customer, bookings).catch(() => { });
     });
 
     renderCustomerOptions();
@@ -6640,8 +6647,8 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                 </thead>
                 <tbody>
                   ${legs.map((leg) => {
-                    serialNumber += 1;
-                    return `<tr>
+          serialNumber += 1;
+          return `<tr>
                       <td>${serialNumber}</td>
                       <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${leg.type}</span></td>
                       <td>${leg.date ? formatShortDate(leg.date) : "-"}</td>
@@ -6655,7 +6662,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
                       <td>${text(leg.broker)}</td>
                       <td>${text(leg.remarks)}</td>
                     </tr>`;
-                  }).join("")}
+        }).join("")}
                 </tbody>
               </table>
             </div>
@@ -6695,7 +6702,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           currentPendingSummaryTrips,
           currentPendingSummaryTruckNo || "All Trucks",
           brokerFilter
-        ).catch(() => {});
+        ).catch(() => { });
       });
     }
     window.activePageRender = render;
@@ -6780,11 +6787,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
 
     function getTwoPayPdfValues(item) {
       return [
-        formatShortDate(item.date), item.blNo || "-", item.destination || "-", item.consigneeName || "-",
-        item.size || "-", item.description || "-", money(item.roadFreightPaid), money(item.roadFreightTwoPay), money(item.detentionCharges),
+        formatShortDate(item.date), item.blNo || "-", item.consigneeName || "-",
+        money(item.roadFreightPaid), money(item.roadFreightTwoPay), money(item.detentionCharges),
         money(item.billingAmount), money(item.globalReceivable), item.billNo || "-", money(item.partyCollection),
-        money(getPartyBalance(item)), money(item.receivedAmount), money(item.receivedBalance),
-        item.receivedDate ? formatShortDate(item.receivedDate) : "-", item.receivedId || "-", item.remarks || "-"
+        money(item.receivedAmount), money(item.receivedBalance), item.remarks || "-"
       ];
     }
 
@@ -6850,7 +6856,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
     async function buildTwoPaySummaryPdf(rows) {
       if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF("l", "pt", "a2");
+      const pdf = new jsPDF("l", "pt", "a3");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const letterhead = await loadInvoiceTemplateDataUrl();
@@ -6879,10 +6885,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         "S.No",
         "Date",
         "BL No",
-        "Destination",
         "Consignee Name",
-        "Size",
-        "Description",
         "Road\nFreight\n/ Paid",
         "Road\nFreight\n/ Two Pay",
         "Detention\nCharges",
@@ -6890,21 +6893,18 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         "Global /\nReceivable",
         "Bill No",
         "Party\nCollection",
-        "Party Balance",
         "Received\nAmount",
         "Receivable\nBalance",
-        "Received\nDate",
-        "Received ID",
         "Received\nRemarks"
       ];
       const footer = Array(headers.length).fill("");
-      footer[9] = "Total";
-      footer[10] = money(totals.billing);
-      footer[11] = money(totals.receivable);
-      footer[15] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
-      footer[16] = money(totals.balance);
+      footer[6] = "Total";
+      footer[7] = money(totals.billing);
+      footer[8] = money(totals.receivable);
+      footer[11] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
+      footer[12] = money(totals.balance);
 
-      const amountColumnIndices = [7, 8, 9, 10, 11, 13, 14, 15, 16];
+      const amountColumnIndices = [4, 5, 6, 7, 8, 10, 11, 12];
 
       pdf.autoTable({
         startY: titleY + 20 + customerLines.length * 15 + 9,
@@ -6949,23 +6949,17 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           0: { cellWidth: 26, halign: "center" },
           1: { cellWidth: 54, halign: "center" },
           2: { cellWidth: 60 },
-          3: { cellWidth: 58 },
-          4: { cellWidth: 74 },
-          5: { cellWidth: 28, halign: "center" },
-          6: { cellWidth: 69 },
-          7: { cellWidth: 60, halign: "right" },
-          8: { cellWidth: 66, halign: "right" },
-          9: { cellWidth: 60, halign: "right" },
-          10: { cellWidth: 66, halign: "right" },
-          11: { cellWidth: 68, halign: "right" },
-          12: { cellWidth: 55, halign: "center" },
-          13: { cellWidth: 60, halign: "right" },
-          14: { cellWidth: 60, halign: "right" },
-          15: { cellWidth: 64, halign: "right" },
-          16: { cellWidth: 64, halign: "right" },
-          17: { cellWidth: 54, halign: "center" },
-          18: { cellWidth: 48, halign: "center" },
-          19: { cellWidth: 72 }
+          3: { cellWidth: 74 },
+          4: { cellWidth: 60, halign: "right" },
+          5: { cellWidth: 66, halign: "right" },
+          6: { cellWidth: 60, halign: "right" },
+          7: { cellWidth: 66, halign: "right" },
+          8: { cellWidth: 68, halign: "right" },
+          9: { cellWidth: 55, halign: "center" },
+          10: { cellWidth: 60, halign: "right" },
+          11: { cellWidth: 64, halign: "right" },
+          12: { cellWidth: 64, halign: "right" },
+          13: { cellWidth: 72 }
         }, pageWidth - 24),
         didParseCell: (data) => {
           if (data.section === "head") {
@@ -7241,10 +7235,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <td>${expiryCell(item.punjabPermitExpiry)}</td>
           <td>${expiryCell(item.taxPaidUpTo)}</td>
           <td class="equipment-docs">${item.documentData
-            ? `<button class="equipment-thumbnail" type="button" data-view-equipment-document="${item.id}" aria-label="View document for ${escapeHtml(item.id)}">
+          ? `<button class="equipment-thumbnail" type="button" data-view-equipment-document="${item.id}" aria-label="View document for ${escapeHtml(item.id)}">
                 <img src="${item.documentData}" alt="" />
                </button>`
-            : item.documentPath ? `
+          : item.documentPath ? `
               <button class="equipment-thumbnail" type="button" data-view-equipment-document="${item.id}" data-lazy-equipment-doc="${escapeHtml(item.documentPath)}" aria-label="View document for ${escapeHtml(item.id)}">
                 <span class="loading-placeholder">...</span>
               </button>`
@@ -7594,9 +7588,9 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
         .filter((item) => {
           if (!terms.length) return true;
           const searchable = [item.id, item.truckNo, item.complaintDate, item.repairDate, item.partName,
-            item.oldSerialNumber, item.newSerialNumber, item.partCost, item.warrantyPeriod,
-            item.warrantyExpiry, getWarrantyState(item.warrantyExpiry).label, item.driverName,
-            item.approvedBy].join(" ").toLowerCase();
+          item.oldSerialNumber, item.newSerialNumber, item.partCost, item.warrantyPeriod,
+          item.warrantyExpiry, getWarrantyState(item.warrantyExpiry).label, item.driverName,
+          item.approvedBy].join(" ").toLowerCase();
           return terms.every((term) => searchable.includes(term));
         })
         .sort((left, right) => compareDateValues(left.repairDate || left.complaintDate, right.repairDate || right.complaintDate, dateOrder?.value || "desc"));
@@ -8540,7 +8534,7 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
       for (let index = accounts.length - 1; index >= 0; index -= 1) {
         const candidate = accounts[index];
         if (String(candidate?.id || "") === accountId ||
-            (accountName && String(candidate?.customer || "").trim().toLowerCase() === accountName)) {
+          (accountName && String(candidate?.customer || "").trim().toLowerCase() === accountName)) {
           accounts.splice(index, 1);
         }
       }
@@ -8896,10 +8890,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             <td>${money(totals.debit)}</td>
             <td>${money(totals.credit)}</td>
             <td class="${totals.closingBalance > 0 ? "debit-text" : totals.closingBalance < 0 ? "credit-text" : ""}">${money(Math.abs(totals.closingBalance))}${totals.closingBalance > 0
-              ? (isPayable ? " Outstanding" : " (-)")
-              : totals.closingBalance < 0
-                ? (isPayable ? " Advance Paid" : " (+)")
-                : ""}</td>
+            ? (isPayable ? " Outstanding" : " (-)")
+            : totals.closingBalance < 0
+              ? (isPayable ? " Advance Paid" : " (+)")
+              : ""}</td>
             <td>${(account.entries || []).length}</td>
             <td>
               <div class="table-actions">
@@ -8968,12 +8962,12 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
           <span>${balanceLabel}</span>
           <strong>Rs ${money(Math.abs(totals.closingBalance))}</strong>
           <small>${totals.hasEntries
-            ? (totals.closingBalance > 0
-              ? (isPayable ? "Outstanding" : "Debit (-)")
-              : totals.closingBalance < 0
-                ? (isPayable ? "Advance Paid" : "Credit (+)")
-                : "Settled")
-            : "-"}</small>
+          ? (totals.closingBalance > 0
+            ? (isPayable ? "Outstanding" : "Debit (-)")
+            : totals.closingBalance < 0
+              ? (isPayable ? "Advance Paid" : "Credit (+)")
+              : "Settled")
+          : "-"}</small>
         </div>
       `;
 
@@ -9009,10 +9003,10 @@ async function uploadPrivateDataUrl(dataUrl, currentPath, folder, recordId, opti
             </td>
             <td class="st-cell-balance amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}" data-label="${isPayable ? "Outstanding" : "Balance"}">
               <span class="st-amount-value">${runningBalance === 0
-                ? "0"
-                : `${money(Math.abs(runningBalance))} ${runningBalance > 0
-                  ? (isPayable ? "Outstanding" : "(-)")
-                  : (isPayable ? "Advance" : "(+)")}`}</span>
+            ? "0"
+            : `${money(Math.abs(runningBalance))} ${runningBalance > 0
+              ? (isPayable ? "Outstanding" : "(-)")
+              : (isPayable ? "Advance" : "(+)")}`}</span>
             </td>
             <td class="st-cell-actions" data-label="Actions">
               <div class="table-actions">

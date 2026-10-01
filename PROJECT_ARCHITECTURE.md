@@ -324,6 +324,8 @@ P&L example: a Receivable Amount of 257.90 with two broker rows of 100 each give
 
 ### Recent Changes Log
 
+| **2026-10-01** | Two Pay Summary A3 and Column Reduction | Removed Destination, Size, Description, Party Balance, Received Date, and Received ID from the Two Pay Records general summary PDF. Its remaining 14 columns, amount alignment, and totals fit A3 landscape. The screen register, individual record PDF, and Supabase schema are unchanged. Bumped `app.js?v=20261001-1` across 17 HTML pages. | `app.js`, HTML files, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
+
 | **2026-09-29** | Large-Format Summary PDF Layout | Customer Booking, filtered Booking, Trucker/Broker, and Pending Truck summaries use A3 landscape with left-aligned proportioned letterheads, full-width fitted columns, readable 10+ pt text, and high-contrast grids matching Truck Trip Ledger. Equipment summary remains A3, while dense Fleet Maintenance and Two Pay summaries use A2 landscape to preserve legibility across 14 and 20 columns. Headers remain on one line where widths allow and wrap at word boundaries otherwise. Individual invoices and account statements are unchanged. Bumped `app.js?v=20260929-8` across 17 HTML pages; no schema change. | `app.js`, HTML files, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 
 | **2026-09-29** | Truck Trip Ledger Summary Left Letterhead | Positioned the proportion-preserving A3 letterhead at the 36 pt left margin to align with the summary title; table and vertical positions are unchanged. Bumped `app.js?v=20260929-7` on all 17 HTML pages. | `app.js`, HTML files, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
