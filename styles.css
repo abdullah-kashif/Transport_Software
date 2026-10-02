@@ -1494,6 +1494,42 @@ a.dashboard-kpi-card:focus-visible {
   grid-column: span 12;
 }
 
+.truck-financial-fields {
+  grid-column: span 12;
+  display: grid;
+  grid-template-columns: minmax(155px, .88fr) repeat(4, minmax(135px, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.truck-financial-fields > .field {
+  grid-column: auto;
+  min-width: 0;
+}
+
+.truck-financial-image input[type="file"] {
+  min-width: 0;
+  padding: 5px 38px 5px 5px;
+  font-size: 12px;
+}
+
+.truck-financial-image input[type="file"]::file-selector-button {
+  margin-right: 6px;
+  padding: 6px 9px;
+}
+
+@media (max-width: 1100px) {
+  .truck-financial-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .truck-financial-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 label {
   display: block;
   margin-bottom: 8px;
@@ -2970,6 +3006,14 @@ body.confirm-modal-open {
 .two-pay-table th,
 .two-pay-table td {
   white-space: nowrap;
+}
+
+.two-pay-table th:nth-child(4),
+.two-pay-table td:nth-child(4) {
+  min-width: 220px;
+  max-width: 320px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .two-pay-title {

@@ -18,6 +18,7 @@ alter table public.truck_jobs add column if not exists export_payment_term text;
 alter table public.truck_jobs add column if not exists export_customer_collection numeric default 0;
 alter table public.truck_jobs add column if not exists import_payment_received_date date;
 alter table public.truck_jobs add column if not exists export_payment_received_date date;
+alter table public.truck_jobs add column if not exists diesel_expense numeric default 0;
 alter table public.equipment_fleet add column if not exists original_documents_path text;
 alter table public.equipment_fleet add column if not exists type_of_body text;
 alter table public.equipment_fleet add column if not exists ownership text;
@@ -30,6 +31,7 @@ alter table public.booking_brokers add column if not exists truck_no text;
 alter table public.booking_brokers add column if not exists container_size text;
 alter table public.bookings add column if not exists broker_entries jsonb default '[]'::jsonb;
 alter table public.two_pay_records add column if not exists customer_name text;
+alter table public.two_pay_records add column if not exists customer_address text;
 
 -- Allow authenticated and anon users to persist and
 -- reload Booking, Container, Broker, Equipment & Handling Fleet, and Fleet Maintenance records.

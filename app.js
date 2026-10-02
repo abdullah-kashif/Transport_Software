@@ -1168,7 +1168,8 @@
         export_mty_payment_date: formatIsoDate(item.exportMtyPaymentDate) || null,
         export_mty_payment_status: item.exportMtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
         export_remarks: item.exportRemarks || null, grand_total: Number(item.grandTotal || 0),
-        round_trip_expense: Number(item.roundTripExpense || 0), profit_loss: Number(item.profitLoss || 0), image_path: imagePath || null,
+        round_trip_expense: Number(item.roundTripExpense || 0), diesel_expense: Number(item.dieselExpense || 0),
+        profit_loss: Number(item.profitLoss || 0), image_path: imagePath || null,
         updated_at: new Date().toISOString()
       });
     }
@@ -1272,6 +1273,7 @@
       id: item.id,
       date: formatIsoDate(item.date) || null,
       customer_name: item.customerName || null,
+      customer_address: item.customerAddress || null,
       origin: item.origin || null,
       bl_no: item.blNo || null,
       container_no: item.containerNo || null,
@@ -1309,6 +1311,7 @@
       id: row.id || local.id,
       date: row.date || local.date || "",
       customerName: row.customer_name ?? local.customerName ?? "",
+      customerAddress: row.customer_address ?? local.customerAddress ?? "",
       origin: row.origin ?? local.origin ?? "",
       blNo: row.bl_no ?? local.blNo ?? "",
       containerNo: row.container_no ?? local.containerNo ?? "",
@@ -1543,7 +1546,8 @@
             exportMtyPaymentDate: r.export_mty_payment_date || local.exportMtyPaymentDate || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || local.exportMtyPaymentStatus || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-            roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || local.imagePath || "",
+            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense ?? local.dieselExpense ?? 0),
+            profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || local.imagePath || "",
             image: local.image || getCachedSignedUrl(r.image_path)
           });
         } else {
@@ -1586,7 +1590,8 @@
             exportMtyPaymentDate: r.export_mty_payment_date || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-            roundTripExpense: Number(r.round_trip_expense || 0), profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
+            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense || 0),
+            profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
             image: getCachedSignedUrl(r.image_path)
           });
         }
@@ -5935,7 +5940,7 @@
     let tripImageData = "";
     let tripImagePromise = Promise.resolve("");
 
-    const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "profitLoss"];
+    const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "dieselExpense", "profitLoss"];
 
     function calculateTrip() {
       const importReceived = (Number(form.elements.importFreight?.value || 0) + Number(form.elements.importDetention?.value || 0)) - Number(form.elements.importBrokerCommission?.value || 0);
@@ -6129,6 +6134,7 @@
       Object.keys(item).forEach((key) => {
         if (form.elements[key]) form.elements[key].value = item[key] !== null && item[key] !== undefined ? item[key] : "";
       });
+      if (form.elements.dieselExpense) form.elements.dieselExpense.value = String(item.dieselExpense ?? 0);
       if (form.elements.importDetention) {
         form.elements.importDetention.value = item.importDetention !== undefined && item.importDetention !== null ? String(item.importDetention) : "0";
       }
@@ -6777,7 +6783,7 @@
           : String(item.customerName || "").trim().toLowerCase() === selectedCustomer))
         .filter((item) => !from || String(item.date || "") >= from)
         .filter((item) => !to || String(item.date || "") <= to)
-        .filter((item) => !query || [item.date, item.customerName, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks]
+        .filter((item) => !query || [item.date, item.customerName, item.customerAddress, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks]
           .some((value) => String(value || "").toLowerCase().includes(query)))
         .sort((left, right) => {
           const result = String(left.date || "").localeCompare(String(right.date || ""));
@@ -6811,9 +6817,16 @@
       pdf.setTextColor(24, 48, 77);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(13);
-      pdf.text("TWO PAY RECORD", 36, 140);
+      const invoiceCustomer = String(item.customerName || "").trim() || "-";
+      const invoiceAddress = String(item.customerAddress || "").trim() || "-";
+      const customerLines = pdf.splitTextToSize(`Customer Name: ${invoiceCustomer}`, pageWidth - 72);
+      pdf.text(customerLines, 36, 140);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10.5);
+      const addressLines = pdf.splitTextToSize(`Customer Address: ${invoiceAddress}`, pageWidth - 72);
+      pdf.text(addressLines, 36, 140 + customerLines.length * 15);
       pdf.autoTable({
-        startY: 148,
+        startY: 148 + (customerLines.length - 1) * 15 + addressLines.length * 17,
         margin: { left: 32, right: 32, bottom: 75 },
         theme: "grid",
         showHead: "firstPage",
@@ -6872,15 +6885,16 @@
       pdf.text("TWO PAY RECORDS SUMMARY", 36, titleY);
       const customerNames = [...new Set(rows.map((item) => String(item.customerName || "").trim() || "Unassigned"))];
       const customerLabel = customerNames.length === 1 ? customerNames[0] : "All Customers";
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(15);
       const customerLines = pdf.splitTextToSize(`Customer Name: ${customerLabel}`, pageWidth - 72);
-      pdf.text(customerLines, 36, titleY + 20);
+      pdf.text(customerLines, 36, titleY + 25);
       const totals = rows.reduce((total, item) => ({
         billing: total.billing + Number(item.billingAmount || 0),
         receivable: total.receivable + Number(item.globalReceivable || 0),
+        partyCollection: total.partyCollection + Number(item.partyCollection || 0),
         balance: total.balance + Number(item.receivedBalance || 0)
-      }), { billing: 0, receivable: 0, balance: 0 });
+      }), { billing: 0, receivable: 0, partyCollection: 0, balance: 0 });
       const headers = [
         "S.No",
         "Date",
@@ -6901,13 +6915,14 @@
       footer[6] = "Total";
       footer[7] = money(totals.billing);
       footer[8] = money(totals.receivable);
+      footer[10] = money(totals.partyCollection);
       footer[11] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
       footer[12] = money(totals.balance);
 
       const amountColumnIndices = [4, 5, 6, 7, 8, 10, 11, 12];
 
       pdf.autoTable({
-        startY: titleY + 20 + customerLines.length * 15 + 9,
+        startY: titleY + 25 + customerLines.length * 19 + 9,
         margin: { left: 12, right: 12, bottom: 65 },
         theme: "grid",
         showFoot: "lastPage",
@@ -7010,11 +7025,11 @@
       if (totalPartyPending) totalPartyPending.textContent = `PKR ${money(partyPending)}`;
       body.innerHTML = rows.length ? rows.map((item, index) => `
         <tr>
-          <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.customerName || "-")}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td><td>${text(item.containerNo || "-")}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${text(item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${text(item.truckNo || "-")}</td>
+          <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.customerName || "-")}</td><td>${text(item.customerAddress || "-")}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td><td>${text(item.containerNo || "-")}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${text(item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${text(item.truckNo || "-")}</td>
           <td>${money(item.roadFreightPaid)}</td><td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td><td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(getPartyBalance(item))}${getPartyPending(item) > 0 ? ' <span class="badge warn">Pending</span>' : ""}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
-          <td><div class="table-actions"><button class="btn small" type="button" data-download-two-pay="${escapeHtml(item.id)}">Download</button><button class="btn small" type="button" data-edit-two-pay="${escapeHtml(item.id)}">Edit</button></div></td>
+          <td><div class="table-actions"><button class="btn small" type="button" data-download-two-pay="${escapeHtml(item.id)}">Invoice</button><button class="btn small" type="button" data-edit-two-pay="${escapeHtml(item.id)}">Edit</button></div></td>
         </tr>
-      `).join("") : `<tr><td colspan="30" class="empty-state">No Two Pay records available.</td></tr>`;
+      `).join("") : `<tr><td colspan="31" class="empty-state">No Two Pay records available.</td></tr>`;
     }
 
     [search, customerFilter, startDate, endDate, order].filter(Boolean).forEach((control) => {

@@ -6,7 +6,7 @@
   <title>GTLS Transport - Truck Details</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20260929-1" />
+  <link rel="stylesheet" href="styles.css?v=20261002-2" />
 </head>
 <body data-page="truck">
   <div class="app">
@@ -99,10 +99,13 @@
           <div class="field quarter"><label>Cheque / IBFT</label><input name="exportChequeDetails2" placeholder="IBFT / Cheque No" /></div>
           <div class="field full"><label>Export Remarks</label><textarea name="exportRemarks" placeholder="Export remarks..."></textarea></div>
 
-          <div class="field quarter"><label>Truck Details Image</label><div class="maintenance-image-field"><input name="tripImageFile" type="file" accept="image/*" data-truck-image-input /><button class="maintenance-image-remove" type="button" data-remove-truck-image hidden aria-label="Remove selected image" title="Remove image">&times;</button></div><div class="maintenance-image-preview" data-truck-image-preview hidden></div></div>
-          <div class="field quarter"><label>Grand Total</label><input name="grandTotal" type="text" readonly /></div>
-          <div class="field quarter"><label>Round Trip Expense</label><input name="roundTripExpense" type="number" value="0" min="0" /></div>
-          <div class="field quarter"><label>P&amp;L</label><input name="profitLoss" type="text" readonly /></div>
+          <div class="truck-financial-fields">
+            <div class="field truck-financial-image"><label>Truck Details Image</label><div class="maintenance-image-field"><input name="tripImageFile" type="file" accept="image/*" data-truck-image-input /><button class="maintenance-image-remove" type="button" data-remove-truck-image hidden aria-label="Remove selected image" title="Remove image">&times;</button></div><div class="maintenance-image-preview" data-truck-image-preview hidden></div></div>
+            <div class="field"><label>Grand Total</label><input name="grandTotal" type="text" readonly /></div>
+            <div class="field"><label>Round Trip Expense</label><input name="roundTripExpense" type="number" value="0" min="0" /></div>
+            <div class="field"><label>Diesel Expense</label><input name="dieselExpense" type="number" value="0" min="0" step="0.01" /></div>
+            <div class="field"><label>P&amp;L</label><input name="profitLoss" type="text" readonly /></div>
+          </div>
           <div class="field full actions"><button class="btn primary" type="submit" data-submit-label>Save Trip</button><button class="btn" type="button" data-reset-form>Clear Form</button></div>
         </form>
         <div class="notice" data-notice hidden></div>
@@ -136,6 +139,6 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261001-1"></script>
+<script src="app.js?v=20261002-5"></script>
 </body>
 </html>

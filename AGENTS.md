@@ -24,18 +24,18 @@
 | **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3847) |
 | **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 4019) |
 | **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5364) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5907) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6405) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6405) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6705) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7082) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7427) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7812) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8041) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8071) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8319) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8471) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8471) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5919) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6418) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6418) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6718) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7104) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7449) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7834) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8063) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8093) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8341) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8493) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8493) |
 
 ---
 
@@ -59,6 +59,18 @@
 3. **No Build Step Required**: Never install bundlers (webpack, vite, rollup) unless explicitly asked. The app runs directly by opening any `.html` file or via a static web server.
 4. **Refer to Documentation**: For comprehensive data structures and database schema, read [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md).
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
+
+- **2026-10-02**: Truck Details final form row now uses a scoped five-column responsive grid so the smaller Image control, Grand Total, Round Trip Expense, Diesel Expense, and P&L fit together on desktop. The row wraps to two columns on narrower screens and one on mobile. Bumped `styles.css?v=20261002-2` across 17 HTML pages. No calculation or schema change.
+
+- **2026-10-02**: Truck Details now has an optional Diesel Expense numeric field immediately after Round Trip Expense. It is saved and hydrated through `public.truck_jobs.diesel_expense` but does not affect Grand Total, Round Trip Expense, or P&L calculations. Added `supabase-truck-diesel-expense.sql` and the idempotent column to `MASTER_SUPABASE_SETUP.sql`; run the migration before saving diesel values. Bumped `app.js?v=20261002-5` across 17 HTML pages.
+
+- **2026-10-02**: Two Pay individual invoice heading now explicitly prints `Customer Name: <name>` and directly underneath `Customer Address: <address>`; missing historical values show `-`. Both lines are bold and the table follows the wrapped address. Bumped `app.js?v=20261002-4` across 17 HTML pages. No schema change.
+
+- **2026-10-02**: Two Pay Register now displays Customer Address immediately after Customer Name, with wrapped address cells and a corrected 31-column empty state. Bumped `app.js?v=20261002-3` and `styles.css?v=20261002-1` across 17 HTML pages. The existing address Supabase mapping and invoice remain unchanged.
+
+- **2026-10-02**: Two Pay Records invoice and Customer Address: Added optional Customer Address directly after Customer Name in the form and persisted it through Supabase `customer_address` mapping and hydration. The individual invoice now uses Customer Name as its heading and prints Customer Address directly below it; the register action is labeled Invoice. Added `supabase-two-pay-customer-address.sql` and the idempotent column to `MASTER_SUPABASE_SETUP.sql`. Run the migration before saving addresses. Updated `app.js?v=20261002-2` on all 17 HTML pages.
+
+- **2026-10-02**: Two Pay Records summary PDF now prints Customer Name in 15 pt bold below the title with extra spacing before the table, and totals the Party Collection column across the exported rows in the final footer. Updated `app.js?v=20261002-1` across 17 HTML pages. No form, register, or schema change.
 
 - **2026-10-01**: Two Pay Records general summary PDF: Removed Destination, Size, Description, Party Balance, Received Date, and Received ID from the exported table, switched its page to A3 landscape, and realigned amount columns and totals. The on-screen register, individual record PDF, and database fields are unchanged. Updated `app.js?v=20261001-1` across 17 HTML pages. No schema change.
 
