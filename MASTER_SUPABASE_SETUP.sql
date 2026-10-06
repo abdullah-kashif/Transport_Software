@@ -24,6 +24,11 @@ alter table public.equipment_fleet add column if not exists type_of_body text;
 alter table public.equipment_fleet add column if not exists ownership text;
 alter table public.equipment_fleet add column if not exists third_party_insurance_date date;
 alter table public.employees add column if not exists image_path text;
+alter table public.employees add column if not exists registration_no text;
+alter table public.employees add column if not exists cnic text;
+alter table public.employees add column if not exists dob date;
+alter table public.employees add column if not exists resignation_date date;
+alter table public.employees add column if not exists reference_details text;
 alter table public.booking_containers add column if not exists quantity numeric;
 alter table public.booking_containers add column if not exists unit_price numeric;
 alter table public.booking_brokers add column if not exists container_ref text default 'all';
@@ -61,12 +66,37 @@ for all to authenticated
 using (public.is_active_user() and public.has_module_access('maintenance'))
 with check (public.is_active_user() and public.has_module_access('maintenance'));
 
+create table if not exists public.payment_vouchers (
+  id text primary key,
+  pv_no text not null,
+  voucher_date date not null,
+  pay_to text not null,
+  pay_by text,
+  account_no text,
+  prepared_by text,
+  received_by text,
+  total_amount numeric default 0,
+  amount_in_words text,
+  items jsonb default '[]'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+grant select, insert, update, delete on table public.payment_vouchers to authenticated, anon, service_role;
+
 alter table public.two_pay_records enable row level security;
 drop policy if exists "two_pay_records_module_access" on public.two_pay_records;
 create policy "two_pay_records_module_access" on public.two_pay_records
 for all to authenticated
 using (public.is_active_user() and public.has_module_access('two-pay-records'))
 with check (public.is_active_user() and public.has_module_access('two-pay-records'));
+
+alter table public.payment_vouchers enable row level security;
+drop policy if exists "payment_vouchers_module_access" on public.payment_vouchers;
+create policy "payment_vouchers_module_access" on public.payment_vouchers
+for all to authenticated
+using (public.is_active_user() and public.has_module_access('payment-voucher'))
+with check (public.is_active_user() and public.has_module_access('payment-voucher'));
 
 -- Keep new generated IDs readable: Job-1, Job-2 and MNT-1, MNT-2.
 alter table public.bookings

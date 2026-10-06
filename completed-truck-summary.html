@@ -6,7 +6,7 @@
   <title>GTLS Transport - Completed Truck Summary</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261002-2" />
+  <link rel="stylesheet" href="styles.css?v=20261007-3" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -18,7 +18,8 @@
       <div class="sidebar-mobile-head"><strong>Menu</strong><button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button></div>
       <div class="brand"><h1>GTLS Transport</h1></div>
       <nav class="nav">
-        <a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="booking.html" data-page="booking">Booking Form</a><a href="ledger.html" data-page="ledger">Booking Summary</a><a href="truck.html" data-page="truck">Truck Details</a><a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a><a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a><a href="employees.html" data-page="employee">Employees</a><a href="khata.html" data-page="khata">Accounts Receivable</a><a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a><a href="admin.html" data-page="admin">Admin</a>
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="booking.html" data-page="booking">Booking Form</a><a href="ledger.html" data-page="ledger">Booking Summary</a><a href="truck.html" data-page="truck">Truck Details</a><a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a><a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a><a href="employees.html" data-page="employee">Employees</a><a href="khata.html" data-page="khata">Accounts Receivable</a><a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="payment-voucher.html" data-page="payment-voucher">Payment Voucher</a><a href="admin.html" data-page="admin">Admin</a>
       </nav><div class="tip"></div>
     </aside>
     <main class="main">
@@ -52,6 +53,7 @@
             <div class="ledger-total" aria-live="polite"><span>Total Work Amount</span><strong data-completed-total-work>PKR 0</strong></div>
           </div>
           <div class="truck-summary-controls">
+            <div class="ledger-filter-control"><label for="completed-truck-search">General Filter</label><input id="completed-truck-search" type="search" placeholder="Search trips..." data-truck-summary-search /></div>
             <div class="ledger-filter-control"><label for="truck-summary-customer-filter">Truck No</label><select id="truck-summary-customer-filter" data-truck-summary-customer-filter><option value="">All Trucks</option></select></div>
             <div class="ledger-filter-control"><label for="completed-truck-start-date">Start Date</label><input id="completed-truck-start-date" type="date" data-truck-summary-start-date /></div>
             <div class="ledger-filter-control"><label for="completed-truck-end-date">End Date</label><input id="completed-truck-end-date" type="date" data-truck-summary-end-date /></div>
@@ -73,7 +75,7 @@
   </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
-<script src="app.js?v=20261002-5"></script>
+<script src="app.js?v=20261007-3"></script>
 </body>
 </html>
 

@@ -36,18 +36,19 @@
 | **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8341) |
 | **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8493) |
 | **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8493) |
+| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10070) |
 
 ---
 
 ## 3. Core Engine Functions in `app.js`
 
-- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 166) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`.
+- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 166) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`, `PV-1`.
 - **State Store**: `loadStore()` (~Line 176) & `saveStore(store, options)` (~Line 381).
 - **Audit Logging**: `collectAuditChanges()` (~Line 339), `appendAuditLog()` (~Line 321), `pruneActivityLogs()` (~Line 263).
 - **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 475), `signInWithSupabase()` (~Line 506), `enforceSoftwareAccess(page)` (~Line 2269).
-- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 5895).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 5767).
-- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1447), `hydrateOperationalStore()` (~Line 1469), `syncTruckJobs()` (~Line 1129).
+- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 5895), `convertNumberToWords(amount)` (~Line 9650).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 5767), `buildPaymentVoucherPdf()` (~Line 9690), `buildPaymentVoucherSummaryPdf()` (~Line 9850).
+- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1447), `hydrateOperationalStore()` (~Line 1469), `syncTruckJobs()` (~Line 1129), `syncPaymentVouchers()` (~Line 1354).
 - **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
 
 ---
@@ -59,6 +60,28 @@
 3. **No Build Step Required**: Never install bundlers (webpack, vite, rollup) unless explicitly asked. The app runs directly by opening any `.html` file or via a static web server.
 4. **Refer to Documentation**: For comprehensive data structures and database schema, read [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md).
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
+
+- **2026-10-07 (Update 3)**: New Payment Voucher Module with Dynamic Multi-Row Line Items, Auto Words Conversion, 1-to-1 PDF & Remote Supabase Persistence:
+  1. **New Module (`payment-voucher.html`)**: Added dedicated Payment Voucher module with header metadata (`PV No.`, `Date`, `Pay To`, `Pay By`, `A/C No.`, `Prepared By`, `Received By`), dynamic multi-item line matrix (`Serial No.`, `Payment Method`, `Description`, `Unit Price`, `Amount`), real-time Total Amount & Words conversion (`The Sum of: Rupees ... Only`), top KPI summary counters, and full Voucher Register with search, payee filter, date range, date order, and edit/delete actions.
+  2. **1-to-1 Template PDF Export (`buildPaymentVoucherPdf`)**: Generates an exact single-page A4 PDF mirroring the user's template: light green tint (`#e3eee0`), outer double border, solid black top banner "Payment Voucher", company header, underlined metadata lines, black-headed table padded to 7+ grid rows, black total bar, A/C No. & Words underline, and dual signature lines for Prepared By & Received By. Also added `buildPaymentVoucherSummaryPdf` for filtered landscape summary reports.
+  3. **Remote Persistence & Security**: Created `public.payment_vouchers` table in `supabase-payment-vouchers.sql` and `MASTER_SUPABASE_SETUP.sql` with RLS policies, permissions, bidirectional sync (`syncPaymentVouchers`), and background hydration.
+  4. **RBAC & Navigation**: Added `payment-voucher` to `ACCESS_OPTIONS`, `appPages`, `getNavigationIcon`, `ensurePaymentVoucherNavigation()`, and updated all 18 HTML files with sidebar links and cache bump (`v=20261007-3`).
+
+- **2026-10-07 (Update 2)**: Employee Action/Image Column Overlap Fix, Fleet Maintenance Header UI Overhaul, Equipment Single PDF Third Party Insurance Date Removal, & Universal General Filters:
+  1. **Employee Register Table Column Layout**: Resolved column overlapping where Actions (Edit, Download PDF), Image, and profile details collided. Removed restrictive `table-layout: fixed` and legacy 9-column constraints in `styles.css`. Increased table min-width to `1980px`, set `table-layout: auto`, enforced clean padding and `white-space: nowrap` across all 15 columns, added Action table header in `employees.html`, and added horizontal scroll container support (`.employee-register-table-wrap`).
+  2. **Fleet Maintenance UI Overlap**: Converted `.maintenance-register-head` to a stacked block layout (`display: block; margin-bottom: 16px;`) and restructured `.maintenance-toolbar` with responsive wrapping (`display: flex; flex-wrap: wrap; gap: 12px; width: 100%;`) and 38px aligned controls. Removed restrictive `@media (min-width: 1161px)` `flex-wrap: nowrap` rule that forced toolbar controls to collide with "Maintenance History" heading on laptop viewports.
+  3. **Equipment & Handling Fleet PDF Third Party Insurance Date Removal**: Removed `Third Party Insurance Date` from single equipment record PDF export (`data-download-equipment`) in `app.js`, ensuring all Equipment PDF exports (both summary and single record) omit this date while keeping it fully intact in form inputs, table register, and dashboard expiry alerts.
+  4. **Universal General Search Filters**:
+     - **Booking Summary (`ledger.html`)**: Added responsive General Filter search input (`data-summary-search`) to `.ledger-filter`, filtering bookings across bookingNo, customer, BL, CRO, invoice, containers, routes, and remarks.
+     - **Completed Truck Summary (`completed-truck-summary.html`) & Pending Truck Summary (`truck-summary.html`)**: Added responsive General Filter search input (`data-truck-summary-search`), filtering trips across jobNo, truckNo, customer, parties, brokers, routes, containers, cargo descriptions, and remarks.
+     - **Employee Register (`employees.html`)**: Added responsive General Filter search input (`data-employee-search`) and wired it in `employeePage()` for live table rendering and filtered summary PDF downloads.
+  5. **Cache-Busting Bump**: Updated cache strings to `app.js?v=20261007-2` and `styles.css?v=20261007-2` across all 17 HTML files.
+
+- **2026-10-07**: Trucker/Broker Summary Truck No in UI & Employee Fields, Fleet Driver & Salary-Free PDF Exports:
+  1. **Trucker/Broker Summary Truck No**: Added `Truck No` column to the on-screen table header (`broker-summary.html`) and row rendering in `brokerSummaryPage()` (`app.js`), positioned immediately after Trucker/Broker and before Container No. Empty state colspan updated to 9, and `truckNo` included in the General Filter search.
+  2. **Employee Module New Fields & Fleet Driver**: Added `Fleet Driver` to the Department dropdown options in `employees.html`. Added `Registration / License No` (`registrationNo`), `CNIC` (`cnic`), `Date of Birth` (`dob`), `Resignation Date` (`resignationDate`), and `Reference Details` (`referenceDetails`) form fields and register table columns. Fields persist and hydrate through Supabase `public.employees`. Created migration `supabase-employee-fields.sql` and added idempotent columns to `MASTER_SUPABASE_SETUP.sql`.
+  3. **Employee PDF Exports Omit Salary**: Both the single-employee record PDF (`data-download-employee`) and the full Employee Register summary PDF (`data-download-employee-summary`) omit the `Salary` column while exporting all other employee profile fields.
+  4. **Styles & Cache-Busting Bump**: Added horizontal scroll protection for `.employee-register-table` in `styles.css`. Bumped `app.js?v=20261007-1` and `styles.css?v=20261007-1` across all 17 HTML pages.
 
 - **2026-10-02**: Truck Details final form row now uses a scoped five-column responsive grid so the smaller Image control, Grand Total, Round Trip Expense, Diesel Expense, and P&L fit together on desktop. The row wraps to two columns on narrower screens and one on mobile. Bumped `styles.css?v=20261002-2` across 17 HTML pages. No calculation or schema change.
 

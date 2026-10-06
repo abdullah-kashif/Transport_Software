@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Voucher - GTLS Transport</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="alternate icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20261007-3" />
+</head>
+<body data-page="payment-voucher">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand">
+        <h1>GTLS Transport</h1>
+      </div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
+        <a href="two-pay-records.html" data-page="two-pay-records">Two Pay Records</a>
+        <a href="equipment.html" data-page="equipment">Equipment &amp; Handling Fleet</a>
+        <a href="maintenance.html" data-page="maintenance">Fleet Maintenance</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Accounts Receivable</a>
+        <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="payment-voucher.html" data-page="payment-voucher" class="active">Payment Voucher</a>
+        <a href="admin.html" data-page="admin">Admin</a>
+      </nav>
+      <div class="tip"></div>
+    </aside>
+
+    <main class="main">
+      <section class="hero dashboard-hero">
+        <h2>Payment Voucher</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head">
+              <div>
+                <strong>Payment Alerts</strong>
+                <span data-notification-summary>No expired payments</span>
+              </div>
+              <button class="notification-close" type="button" data-notification-close aria-label="Close notifications">&times;</button>
+            </div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen">
+        <div class="grid voucher-stats" aria-label="Payment Voucher totals">
+          <div class="card span-3 two-pay-stat-card billing">
+            <span class="badge neutral">Total Vouchers</span>
+            <strong data-voucher-total-count>0</strong>
+            <small>Total records created</small>
+          </div>
+          <div class="card span-3 two-pay-stat-card receivable">
+            <span class="badge neutral">Total Amount Disbursed</span>
+            <strong data-voucher-total-amount>PKR 0</strong>
+            <small>Cumulative voucher sum</small>
+          </div>
+          <div class="card span-3 two-pay-stat-card balance">
+            <span class="badge warn">Cash Vouchers</span>
+            <strong data-voucher-cash-count>0</strong>
+            <small>Cash disbursement count</small>
+          </div>
+          <div class="card span-3 two-pay-stat-card party-pending">
+            <span class="badge warn">Bank / Online Vouchers</span>
+            <strong data-voucher-bank-count>0</strong>
+            <small>Cheque / IBFT / Transfer</small>
+          </div>
+        </div>
+
+        <div class="screen-head">
+          <div>
+            <h3>Create / Update Payment Voucher</h3>
+          </div>
+        </div>
+
+        <form class="form-grid" data-voucher-form autocomplete="off">
+          <div class="field quarter">
+            <label>PV No. <span class="required-star">*</span></label>
+            <input name="pvNo" placeholder="e.g. PV-1" readonly required />
+          </div>
+          <div class="field quarter">
+            <label>Date <span class="required-star">*</span></label>
+            <input name="voucherDate" type="date" required />
+          </div>
+          <div class="field quarter">
+            <label>Pay To <span class="required-star">*</span></label>
+            <input name="payTo" placeholder="Recipient / Payee Name" required />
+          </div>
+          <div class="field quarter">
+            <label>Pay By</label>
+            <input name="payBy" placeholder="GTLS Logistics" value="GTLS Logistics" />
+          </div>
+
+          <div class="field quarter">
+            <label>A/C No.</label>
+            <input name="accountNo" placeholder="Account / Cheque No" />
+          </div>
+          <div class="field quarter">
+            <label>Prepared By</label>
+            <input name="preparedBy" placeholder="Accountant / Cashier Name" />
+          </div>
+          <div class="field half">
+            <label>Received By</label>
+            <input name="receivedBy" placeholder="Receiver Name / Signature" />
+          </div>
+
+          <div class="field full voucher-items-section">
+            <div class="voucher-items-head">
+              <label style="margin-bottom: 0;">Line Items</label>
+              <button class="btn small primary" type="button" data-add-voucher-item>+ Add Item Row</button>
+            </div>
+            <div class="table-wrap voucher-items-table-wrap">
+              <table class="voucher-items-table">
+                <thead>
+                  <tr>
+                    <th style="width: 60px;">S.No</th>
+                    <th style="width: 170px;">Payment Method</th>
+                    <th>Description / Particulars</th>
+                    <th style="width: 130px;">Unit Price</th>
+                    <th style="width: 150px;">Amount <span class="required-star">*</span></th>
+                    <th style="width: 50px;"></th>
+                  </tr>
+                </thead>
+                <tbody data-voucher-items-body></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="field full voucher-summary-box">
+            <div class="voucher-summary-left">
+              <span>The Sum of:</span>
+              <strong class="voucher-words" data-voucher-form-words>Zero Rupees Only</strong>
+            </div>
+            <div class="voucher-summary-right">
+              <span>Total Amount:</span>
+              <strong class="voucher-total" data-voucher-form-total>PKR 0</strong>
+            </div>
+          </div>
+
+          <div class="field full actions">
+            <button class="btn primary" type="submit" data-submit-label>Save Payment Voucher</button>
+            <button class="btn" type="button" data-reset-form>Clear Form</button>
+          </div>
+        </form>
+        <div class="notice" data-notice hidden></div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head voucher-register-head">
+          <div>
+            <h3>Payment Voucher Register</h3>
+          </div>
+          <div class="ledger-filter voucher-toolbar">
+            <div class="ledger-filter-control ledger-filter-search">
+              <label for="voucher-search">General Filter</label>
+              <input id="voucher-search" type="search" placeholder="Search vouchers..." data-voucher-search />
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-payee-filter">Pay To</label>
+              <select id="voucher-payee-filter" data-voucher-payee-filter>
+                <option value="">All Payees</option>
+              </select>
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-start-date">Start Date</label>
+              <input id="voucher-start-date" type="date" data-voucher-start-date />
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-end-date">End Date</label>
+              <input id="voucher-end-date" type="date" data-voucher-end-date />
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-date-order">Date Order</label>
+              <select id="voucher-date-order" data-voucher-date-order>
+                <option value="desc" selected>Descending (Newest First)</option>
+                <option value="asc">Ascending (Oldest First)</option>
+              </select>
+            </div>
+            <span class="ledger-count" data-voucher-count>0 voucher(s)</span>
+            <button class="btn primary voucher-summary-download" type="button" data-download-voucher-summary>Download Summary</button>
+          </div>
+        </div>
+
+        <div class="table-wrap voucher-register-table-wrap">
+          <table class="statement-table payment-voucher-table">
+            <thead>
+              <tr>
+                <th>S.No</th>
+                <th>PV No.</th>
+                <th>Date</th>
+                <th>Pay To</th>
+                <th>Pay By</th>
+                <th>A/C No.</th>
+                <th>Payment Method</th>
+                <th>Particulars / Description</th>
+                <th>Amount</th>
+                <th>The Sum of</th>
+                <th>Prepared By</th>
+                <th>Received By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody data-voucher-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="app.js?v=20261007-3"></script>
+</body>
+</html>

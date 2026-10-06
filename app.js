@@ -36,6 +36,7 @@
     { value: "khata", label: "Accounts Receivable" },
     { value: "accounts-payable", label: "Accounts Payable" },
     { value: "two-pay-records", label: "Two Pay Records" },
+    { value: "payment-voucher", label: "Payment Voucher" },
     { value: "admin", label: "Admin" },
     { value: "activity-logs", label: "Activity Logs" }
   ];
@@ -77,7 +78,8 @@
     ],
     customerKhatas: [],
     vendorKhatas: [],
-    twoPayRecords: []
+    twoPayRecords: [],
+    paymentVouchers: []
   };
 
   function assignSequentialIds(items = [], prefix, field = "id") {
@@ -228,6 +230,10 @@
       store.twoPayRecords = [];
     }
 
+    if (!Array.isArray(store.paymentVouchers)) {
+      store.paymentVouchers = [];
+    }
+
     if (!Array.isArray(store.activityLogs)) {
       store.activityLogs = [];
     }
@@ -278,7 +284,8 @@
     { key: "employees", module: "Employees" },
     { key: "adminUsers", module: "Admin Users" },
     { key: "customerKhatas", module: "Accounts Receivable", nested: true },
-    { key: "vendorKhatas", module: "Accounts Payable", nested: true }
+    { key: "vendorKhatas", module: "Accounts Payable", nested: true },
+    { key: "paymentVouchers", module: "Payment Voucher" }
   ];
 
   function getAuditRecords(store, source) {
@@ -968,6 +975,7 @@
       twoPayRecords: collectionChanged(previousStore, store, "twoPayRecords"),
       customerKhatas: collectionChanged(previousStore, store, "customerKhatas"),
       vendorKhatas: collectionChanged(previousStore, store, "vendorKhatas"),
+      paymentVouchers: collectionChanged(previousStore, store, "paymentVouchers"),
       activityLogs: collectionChanged(previousStore, store, "activityLogs")
     };
     if (!Object.values(changed).some(Boolean)) return;
@@ -1261,8 +1269,10 @@
       const path = await uploadPrivateDataUrl(item.image, item.imagePath, "employees", item.id, { replaceFolder: true });
       rows.push({
         employee_no: item.id, name: item.name, designation: item.designation, department: item.department || null,
-        salary: Number(item.salary || 0), joining_date: formatIsoDate(item.joiningDate), status: item.status === "Inactive" ? "Inactive" : "Active",
-        phone: item.phone || null, image_path: path || null, updated_at: new Date().toISOString()
+        registration_no: item.registrationNo || null, cnic: item.cnic || null, dob: formatIsoDate(item.dob) || null,
+        salary: Number(item.salary || 0), joining_date: formatIsoDate(item.joiningDate),
+        resignation_date: formatIsoDate(item.resignationDate) || null, status: item.status === "Inactive" ? "Inactive" : "Active",
+        phone: item.phone || null, reference_details: item.referenceDetails || null, image_path: path || null, updated_at: new Date().toISOString()
       });
     }
     await syncRows("employees", "employee_no", rows);
@@ -1338,6 +1348,41 @@
       receivedDate: row.received_date ?? local.receivedDate ?? "",
       receivedId: row.received_id ?? local.receivedId ?? "",
       remarks: row.remarks ?? local.remarks ?? ""
+    };
+  }
+
+  async function syncPaymentVouchers(records) {
+    const rows = (records || []).map((item) => ({
+      id: String(item.id || item.pvNo || "").trim(),
+      pv_no: String(item.pvNo || item.id || "").trim(),
+      voucher_date: formatIsoDate(item.voucherDate) || getTodayIsoDate(),
+      pay_to: String(item.payTo || "").trim(),
+      pay_by: item.payBy ? String(item.payBy).trim() : null,
+      account_no: item.accountNo ? String(item.accountNo).trim() : null,
+      prepared_by: item.prepared_by ? String(item.prepared_by).trim() : (item.preparedBy ? String(item.preparedBy).trim() : null),
+      received_by: item.received_by ? String(item.received_by).trim() : (item.receivedBy ? String(item.receivedBy).trim() : null),
+      total_amount: Number(item.totalAmount || 0),
+      amount_in_words: item.amountInWords ? String(item.amountInWords).trim() : null,
+      items: Array.isArray(item.items) ? item.items : [],
+      updated_at: new Date().toISOString()
+    })).filter((row) => row.id && row.pay_to);
+    await syncRows("payment_vouchers", "id", rows, { pruneMissing: true });
+  }
+
+  function mapPaymentVoucherFromSupabase(row = {}, local = {}) {
+    return {
+      ...local,
+      id: row.id || local.id || row.pv_no,
+      pvNo: row.pv_no || local.pvNo || row.id,
+      voucherDate: row.voucher_date || local.voucherDate || "",
+      payTo: row.pay_to ?? local.payTo ?? "",
+      payBy: row.pay_by ?? local.payBy ?? "GTLS Logistics",
+      accountNo: row.account_no ?? local.accountNo ?? "",
+      preparedBy: row.prepared_by ?? local.preparedBy ?? "",
+      receivedBy: row.received_by ?? local.receivedBy ?? "",
+      totalAmount: Number(row.total_amount ?? local.totalAmount ?? 0),
+      amountInWords: row.amount_in_words ?? local.amountInWords ?? "",
+      items: Array.isArray(row.items) ? row.items : (Array.isArray(local.items) ? local.items : [])
     };
   }
 
@@ -1469,6 +1514,7 @@
       const records = Array.isArray(changed.vendorKhataRecords) ? changed.vendorKhataRecords : store.vendorKhatas;
       jobs.push(syncAccounts(records, "payable", { pruneMissing: !Array.isArray(changed.vendorKhataRecords) }));
     }
+    if (changed.paymentVouchers && hasModuleAccessForSync("payment-voucher")) jobs.push(syncPaymentVouchers(store.paymentVouchers));
     if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs || []));
     const results = await Promise.allSettled(jobs);
     const failed = results.find((result) => result.status === "rejected");
@@ -1490,14 +1536,15 @@
       }
       return data || [];
     };
-    const [trucks, equipment, maintenance, employees, twoPayRecords, accounts, logs] = await Promise.all([
+    const [trucks, equipment, maintenance, employees, twoPayRecords, accounts, logs, paymentVouchers] = await Promise.all([
       load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
       load("equipment_fleet", hasModuleAccessForSync("equipment") || hasModuleAccessForSync("maintenance"), "truck_no"),
       load("maintenance_jobs", hasModuleAccessForSync("maintenance"), "repair_date"),
       load("employees", hasModuleAccessForSync("employee"), "joining_date"),
       load("two_pay_records", hasModuleAccessForSync("two-pay-records"), "date"),
       load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
-      load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at")
+      load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at"),
+      load("payment_vouchers", hasModuleAccessForSync("payment-voucher"), "voucher_date")
     ]);
     if (hydrationVersion !== operationalMutationVersion) return;
     if (Array.isArray(trucks)) {
@@ -1750,10 +1797,15 @@
             name: r.name || local.name,
             designation: r.designation || local.designation,
             department: r.department ?? local.department ?? "",
+            registrationNo: r.registration_no ?? local.registrationNo ?? "",
+            cnic: r.cnic ?? local.cnic ?? "",
+            dob: r.dob ?? local.dob ?? "",
             salary: Number(r.salary ?? local.salary ?? 0),
             joiningDate: r.joining_date || local.joiningDate,
+            resignationDate: r.resignation_date ?? local.resignationDate ?? "",
             status: r.status || local.status,
             phone: r.phone ?? local.phone ?? "",
+            referenceDetails: r.reference_details ?? local.referenceDetails ?? "",
             imagePath: r.image_path || local.imagePath || "",
             image: local.image || getCachedSignedUrl(r.image_path)
           });
@@ -1770,10 +1822,15 @@
             name: r.name,
             designation: r.designation,
             department: r.department || "",
+            registrationNo: r.registration_no || "",
+            cnic: r.cnic || "",
+            dob: r.dob || "",
             salary: Number(r.salary || 0),
             joiningDate: r.joining_date,
+            resignationDate: r.resignation_date || "",
             status: r.status,
             phone: r.phone || "",
+            referenceDetails: r.reference_details || "",
             imagePath: r.image_path || "",
             image: getCachedSignedUrl(r.image_path)
           });
@@ -1828,6 +1885,10 @@
       replaceArrayContents(store.activityLogs, mappedLogs);
     }
 
+    if (Array.isArray(paymentVouchers)) {
+      replaceArrayContents(store.paymentVouchers, paymentVouchers.map((remote) => mapPaymentVoucherFromSupabase(remote)));
+    }
+
     saveStore(store, { skipAudit: true, skipRemote: true });
     if (typeof window.activePageRender === "function") {
       window.activePageRender();
@@ -1840,7 +1901,7 @@
   const appPages = new Set([
     "dashboard", "booking", "ledger", "broker-summary", "truck", "truck-summary",
     "completed-truck-summary", "equipment", "maintenance", "two-pay-records",
-    "employees", "employee", "khata", "accounts-payable", "admin", "activity-logs"
+    "payment-voucher", "employees", "employee", "khata", "accounts-payable", "admin", "activity-logs"
   ]);
 
   function isAppPage(page) {
@@ -3483,6 +3544,7 @@
       truck: '<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7z"></path><circle cx="7" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle>',
       "truck-summary": '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
       "two-pay-records": '<path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
+      "payment-voucher": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>',
       "completed-truck-summary": '<circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path>',
       equipment: '<path d="M4 14h11v5H4zM15 11h4l2 3v5h-6z"></path><path d="M7 14V8h6M13 8l3-3M3 19h19"></path><circle cx="8" cy="20" r="1.5"></circle><circle cx="18" cy="20" r="1.5"></circle>',
       maintenance: '<path d="m14.7 6.3 3-3a4.2 4.2 0 0 1-5.5 5.5l-6.8 6.8a2.1 2.1 0 0 0 3 3l6.8-6.8a4.2 4.2 0 0 0 5.5-5.5l-3 3z"></path><circle cx="7" cy="17" r=".8"></circle>',
@@ -3644,12 +3706,34 @@
     });
   }
 
+  function ensurePaymentVoucherNavigation() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      if (nav.querySelector('[data-page="payment-voucher"]')) return;
+      const link = document.createElement("a");
+      link.href = "payment-voucher.html";
+      link.dataset.page = "payment-voucher";
+      link.textContent = "Payment Voucher";
+      const adminLink = nav.querySelector('[data-page="admin"], [data-page="admin-login"]');
+      if (adminLink) {
+        nav.insertBefore(link, adminLink);
+      } else {
+        nav.appendChild(link);
+      }
+    });
+  }
+
   function ensureOperationalNavigationOrder() {
     document.querySelectorAll(".nav").forEach((nav) => {
       const twoPayLink = nav.querySelector('[data-page="two-pay-records"]');
       const equipmentLink = nav.querySelector('[data-page="equipment"]');
-      if (!twoPayLink || !equipmentLink || twoPayLink.nextElementSibling === equipmentLink) return;
-      twoPayLink.insertAdjacentElement("afterend", equipmentLink);
+      if (twoPayLink && equipmentLink && twoPayLink.nextElementSibling !== equipmentLink) {
+        twoPayLink.insertAdjacentElement("afterend", equipmentLink);
+      }
+      const pvLink = nav.querySelector('[data-page="payment-voucher"]');
+      const adminLink = nav.querySelector('[data-page="admin"], [data-page="admin-login"]');
+      if (pvLink && adminLink && pvLink.nextElementSibling !== adminLink) {
+        adminLink.insertAdjacentElement("beforebegin", pvLink);
+      }
     });
   }
 
@@ -5278,8 +5362,9 @@
         })
         .filter((row) => {
           if (!terms.length) return true;
+          const truckNo = row.entry.truckNo && row.entry.truckNo !== "All Trucks" ? row.entry.truckNo : (row.booking.truckNo || "");
           const searchable = [row.booking.id, row.booking.bookingNo, row.booking.invoiceNo, row.booking.customer,
-          row.booking.date, row.entry.truckerBroker, row.entry.containerRef, row.entry.amount,
+          row.booking.date, row.entry.truckerBroker, truckNo, row.entry.containerRef, getBrokerRowContainerNo(row), row.entry.amount,
           row.entry.paymentDetails, row.entry.paymentDate, row.entry.paymentStatus, row.brokerProfitLoss]
             .join(" ").toLowerCase();
           return terms.every((term) => searchable.includes(term));
@@ -5303,7 +5388,7 @@
       countElement.textContent = `${rows.length} broker payment(s) • ${new Set(rows.map((row) => row.booking.id)).size} booking(s)`;
 
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="8" class="empty-state">No broker payment records match the selected filters.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" class="empty-state">No broker payment records match the selected filters.</td></tr>`;
         return;
       }
 
@@ -5312,6 +5397,7 @@
           <td>${text(row.booking.bookingNo || row.booking.id)}</td>
           <td>${formatShortDate(row.booking.date)}</td>
           <td>${text(row.entry.truckerBroker)}</td>
+          <td>${text(row.entry.truckNo && row.entry.truckNo !== "All Trucks" ? row.entry.truckNo : (row.booking.truckNo || "-"))}</td>
           <td>${text(getBrokerRowContainerNo(row))}</td>
           <td>${text(row.entry.paymentDetails)}</td>
           <td>${row.entry.paymentDate ? formatShortDate(row.entry.paymentDate) : "-"}</td>
@@ -5379,6 +5465,7 @@
     const countElement = document.querySelector("[data-summary-count]");
     const customerFilter = document.querySelector("[data-summary-customer-filter]");
     const dateSort = document.querySelector("[data-summary-date-sort]");
+    const searchInput = document.querySelector("[data-summary-search]");
     if (!body || !countElement) return;
 
     function getPendingBookings() {
@@ -5401,8 +5488,33 @@
 
     function render() {
       const selectedCustomer = customerFilter ? String(customerFilter.value || "").trim() : "";
+      const searchQuery = String(searchInput?.value || "").trim().toLowerCase();
       const debitBookings = getPendingBookings()
-        .filter((item) => !selectedCustomer || String(item.customer || "").trim() === selectedCustomer);
+        .filter((item) => !selectedCustomer || String(item.customer || "").trim() === selectedCustomer)
+        .filter((item) => {
+          if (!searchQuery) return true;
+          const containerSummary = formatContainerSizeSummary(item);
+          const containerNumbers = Array.isArray(item.containers)
+            ? item.containers.map((c) => `${c.containerNo || ""} ${c.size || ""} ${c.weight || ""}`).join(" ")
+            : "";
+          const haystack = [
+            item.bookingNo,
+            item.id,
+            item.customer,
+            item.date,
+            item.blNo,
+            item.croNo,
+            item.invoiceNo,
+            item.origin,
+            item.destination,
+            item.status,
+            item.accountFlow,
+            containerSummary,
+            containerNumbers,
+            item.notes
+          ].map((val) => String(val || "").toLowerCase()).join(" ");
+          return haystack.includes(searchQuery);
+        });
 
       const grouped = new Map();
       debitBookings.forEach((item) => {
@@ -5543,6 +5655,7 @@
       customerFilter.addEventListener("change", render);
     }
     if (dateSort) dateSort.addEventListener("change", render);
+    if (searchInput) searchInput.addEventListener("input", render);
 
     body.addEventListener("click", async (event) => {
       const downloadBtn = event.target.closest("[data-download-summary]");
@@ -6426,6 +6539,7 @@
     const jobSort = document.querySelector("[data-truck-summary-job-sort]");
     const startDateFilter = document.querySelector("[data-truck-summary-start-date]");
     const endDateFilter = document.querySelector("[data-truck-summary-end-date]");
+    const searchFilter = document.querySelector("[data-truck-summary-search]");
     const importReceivableTotal = document.querySelector("[data-truck-summary-import-receivable]");
     const exportReceivableTotal = document.querySelector("[data-truck-summary-export-receivable]");
     const mtyReceivableTotal = document.querySelector("[data-truck-summary-mty-receivable]");
@@ -6503,7 +6617,34 @@
 
       const startDate = parseDateValue(startDateFilter?.value);
       const endDate = parseDateValue(endDateFilter?.value);
+      const searchQuery = String(searchFilter?.value || "").trim().toLowerCase();
       const filteredTrips = candidateTripsForBrokers
+        .filter((item) => {
+          if (!searchQuery) return true;
+          const haystack = [
+            item.jobNo,
+            item.truckNo,
+            item.date,
+            item.partyName,
+            item.customer,
+            item.importParty,
+            item.exportParty,
+            item.importBroker,
+            item.exportBroker,
+            item.mtyBroker,
+            item.exportMtyBroker,
+            item.importOrigin,
+            item.importDestination,
+            item.exportOrigin,
+            item.exportDestination,
+            item.importContainerNo,
+            item.exportContainerNo,
+            item.cargoDescription,
+            item.importRemarks,
+            item.exportRemarks
+          ].map((val) => String(val || "").toLowerCase()).join(" ");
+          return haystack.includes(searchQuery);
+        })
         .filter((item) => {
           if (!startDate && !endDate) return true;
           const completedDate = parseDateValue(item.exportLoadDate || item.date);
@@ -6685,6 +6826,7 @@
     if (jobSort) jobSort.addEventListener("change", render);
     if (startDateFilter) startDateFilter.addEventListener("change", render);
     if (endDateFilter) endDateFilter.addEventListener("change", render);
+    if (searchFilter) searchFilter.addEventListener("input", render);
     if (resetFiltersButton) {
       resetFiltersButton.addEventListener("click", () => {
         if (customerFilter) customerFilter.value = "";
@@ -6694,6 +6836,7 @@
         if (jobSort) jobSort.value = "desc";
         if (startDateFilter) startDateFilter.value = "";
         if (endDateFilter) endDateFilter.value = "";
+        if (searchFilter) searchFilter.value = "";
         render();
       });
     }
@@ -7379,8 +7522,8 @@
           try {
             await createRegisterPdf(
               "Equipment & Handling Fleet",
-              ["S.No", "Registration No", "Type of Body", "Chassis No", "Engine No", "Maker", "Ownership", "Third Party Insurance Date", "Model", "MRA"],
-              ["1", item.truckNo, item.typeOfBody || "-", item.chassisNo, item.engineNo, item.make, item.ownership || "-", item.thirdPartyInsuranceDate ? formatShortDate(item.thirdPartyInsuranceDate) : "-", item.model, item.mra],
+              ["S.No", "Registration No", "Type of Body", "Chassis No", "Engine No", "Maker", "Ownership", "Model", "MRA"],
+              ["1", item.truckNo, item.typeOfBody || "-", item.chassisNo, item.engineNo, item.make, item.ownership || "-", item.model, item.mra],
               `${safePdfFileName(item.truckNo || item.id)}_equipment_fleet`
             );
           } catch (error) {
@@ -7891,6 +8034,11 @@
       form.elements.joiningDate.value = getTodayIsoDate();
       form.elements.status.value = "Active";
       form.elements.department.value = "Operations";
+      if (form.elements.registrationNo) form.elements.registrationNo.value = "";
+      if (form.elements.cnic) form.elements.cnic.value = "";
+      if (form.elements.dob) form.elements.dob.value = "";
+      if (form.elements.resignationDate) form.elements.resignationDate.value = "";
+      if (form.elements.referenceDetails) form.elements.referenceDetails.value = "";
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Employee";
       if (imageInput) imageInput.value = "";
@@ -7898,16 +8046,51 @@
       setEmployeeImage("");
     }
 
+    const employeeSearchInput = document.querySelector("[data-employee-search]");
+
+    function getFilteredEmployees() {
+      const query = String(employeeSearchInput?.value || "").trim().toLowerCase();
+      if (!query) return store.employees;
+      return store.employees.filter((item) => {
+        const haystack = [
+          item.id,
+          item.name,
+          item.designation,
+          item.department,
+          item.registrationNo,
+          item.cnic,
+          item.dob,
+          item.joiningDate,
+          item.resignationDate,
+          item.phone,
+          item.referenceDetails,
+          item.status
+        ].map((val) => String(val || "").toLowerCase()).join(" ");
+        return haystack.includes(query);
+      });
+    }
+
     function render() {
-      body.innerHTML = store.employees.map((item) => `
+      const visibleEmployees = getFilteredEmployees();
+      if (!visibleEmployees.length) {
+        body.innerHTML = `<tr><td colspan="15" class="empty-state">No employee records found.</td></tr>`;
+        updateSummary();
+        return;
+      }
+      body.innerHTML = visibleEmployees.map((item) => `
         <tr>
           <td>${text(item.id)}</td>
           <td>${text(item.name)}</td>
           <td>${text(item.designation)}</td>
           <td>${text(item.department)}</td>
+          <td>${text(item.registrationNo || "-")}</td>
+          <td>${text(item.cnic || "-")}</td>
+          <td>${item.dob ? formatShortDate(item.dob) : "-"}</td>
           <td>${money(item.salary)}</td>
           <td>${formatShortDate(item.joiningDate)}</td>
-          <td>${text(item.phone)}</td>
+          <td>${item.resignationDate ? formatShortDate(item.resignationDate) : "-"}</td>
+          <td>${text(item.phone || "-")}</td>
+          <td>${text(item.referenceDetails || "-")}</td>
           <td><div class="employee-status-actions"><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span><button class="btn small" type="button" data-download-employee="${item.id}">Download PDF</button></div></td>
           <td>${item.image ? `
             <button class="maintenance-thumbnail" type="button" data-view-employee-image="${item.id}" aria-label="View image for ${escapeHtml(item.name || item.id)}">
@@ -7942,7 +8125,7 @@
     function fillForm(item) {
       if (!item) return;
       Object.keys(item).forEach((key) => {
-        if (form.elements[key]) form.elements[key].value = item[key];
+        if (form.elements[key]) form.elements[key].value = item[key] ?? "";
       });
       editingId = item.id;
       if (item.image) {
@@ -7990,7 +8173,14 @@
       const existingItem = editingId ? store.employees.find((item) => item.id === editingId) : null;
       const normalized = {
         ...data,
+        registrationNo: String(data.registrationNo || "").trim(),
+        cnic: String(data.cnic || "").trim(),
+        dob: formatIsoDate(data.dob) || "",
         salary: Number(data.salary || 0),
+        joiningDate: formatIsoDate(data.joiningDate) || "",
+        resignationDate: formatIsoDate(data.resignationDate) || "",
+        referenceDetails: String(data.referenceDetails || "").trim(),
+        phone: String(data.phone || "").trim(),
         image: employeeImageData,
         imagePath: existingItem?.imagePath || ""
       };
@@ -8033,10 +8223,23 @@
           try {
             await createRegisterPdf(
               "Employee Record",
-              ["Employee ID", "Name", "Designation", "Department", "Salary", "Joining Date", "Phone", "Status"],
-              [item.id, item.name, item.designation, item.department, `PKR ${money(item.salary)}`, formatShortDate(item.joiningDate), item.phone, item.status],
+              ["Employee ID", "Name", "Designation", "Department", "Reg / License No", "CNIC", "Date of Birth", "Joining Date", "Resignation Date", "Phone", "Status", "Reference Details"],
+              [
+                item.id,
+                item.name,
+                item.designation,
+                item.department,
+                item.registrationNo || "-",
+                item.cnic || "-",
+                item.dob ? formatShortDate(item.dob) : "-",
+                formatShortDate(item.joiningDate),
+                item.resignationDate ? formatShortDate(item.resignationDate) : "-",
+                item.phone || "-",
+                item.status,
+                item.referenceDetails || "-"
+              ],
               `${safePdfFileName(item.name || item.id)}_employee_record`,
-              ""
+              item.image || ""
             );
           } catch (error) {
             notice.textContent = error.message;
@@ -8051,10 +8254,46 @@
       }
     });
 
+    const downloadSummaryButton = document.querySelector("[data-download-employee-summary]");
+    downloadSummaryButton?.addEventListener("click", async () => {
+      const visibleEmployees = getFilteredEmployees();
+      if (!visibleEmployees.length) {
+        notice.textContent = "No employee records to download.";
+        return;
+      }
+      try {
+        const headers = ["Employee ID", "Name", "Designation", "Department", "Reg / License No", "CNIC", "Date of Birth", "Joining Date", "Resignation Date", "Phone", "Status", "Reference Details"];
+        const pdfRows = visibleEmployees.map((item) => [
+          item.id,
+          item.name,
+          item.designation,
+          item.department,
+          item.registrationNo || "-",
+          item.cnic || "-",
+          item.dob ? formatShortDate(item.dob) : "-",
+          formatShortDate(item.joiningDate),
+          item.resignationDate ? formatShortDate(item.resignationDate) : "-",
+          item.phone || "-",
+          item.status,
+          item.referenceDetails || "-"
+        ]);
+        await createRegisterPdf(
+          "Employee Register Summary",
+          headers,
+          pdfRows,
+          "employee_register_summary",
+          ""
+        );
+      } catch (error) {
+        notice.textContent = error.message;
+      }
+    });
+
     closeImageModalButton?.addEventListener("click", closeImageModal);
     imageModal?.addEventListener("click", (event) => { if (event.target === imageModal) closeImageModal(); });
     addPageDocumentListener("keydown", (event) => { if (event.key === "Escape" && imageModal && !imageModal.hidden) closeImageModal(); });
     document.querySelector("[data-reset-form]").addEventListener("click", resetForm);
+    if (employeeSearchInput) employeeSearchInput.addEventListener("input", render);
     window.activePageRender = render;
     render();
     resetForm();
@@ -9408,6 +9647,755 @@
     resetCustomerForm();
   }
 
+  function convertNumberToWords(amount) {
+    const num = Math.round(Number(amount) || 0);
+    if (num <= 0) return "Zero Rupees Only";
+    if (num > 999999999) return `Rupees ${num.toLocaleString("en-US")} Only`;
+
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+      "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+    function numToWordsUnder1000(n) {
+      let str = "";
+      if (n >= 100) {
+        str += ones[Math.floor(n / 100)] + " Hundred ";
+        n %= 100;
+      }
+      if (n >= 20) {
+        str += tens[Math.floor(n / 10)] + " ";
+        n %= 10;
+      }
+      if (n > 0) {
+        str += ones[n] + " ";
+      }
+      return str.trim();
+    }
+
+    let words = "";
+    const crore = Math.floor(num / 10000000);
+    let remainder = num % 10000000;
+    const lakh = Math.floor(remainder / 100000);
+    remainder = remainder % 100000;
+    const thousand = Math.floor(remainder / 1000);
+    const underThousand = remainder % 1000;
+
+    if (crore > 0) words += numToWordsUnder1000(crore) + " Crore ";
+    if (lakh > 0) words += numToWordsUnder1000(lakh) + " Lakh ";
+    if (thousand > 0) words += numToWordsUnder1000(thousand) + " Thousand ";
+    if (underThousand > 0) words += numToWordsUnder1000(underThousand) + " ";
+
+    return `Rupees ${words.trim()} Only`;
+  }
+
+  async function buildPaymentVoucherPdf(voucher) {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error("The PDF library could not be loaded.");
+    }
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("p", "pt", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // Background tint matching uploaded template (#e3eee0)
+    pdf.setFillColor(227, 238, 224);
+    pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+    // Outer double border
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(2.5);
+    pdf.rect(18, 18, pageWidth - 36, pageHeight - 36, "S");
+    pdf.setLineWidth(0.8);
+    pdf.rect(22, 22, pageWidth - 44, pageHeight - 44, "S");
+
+    // Header banner: solid black box with white text
+    const bannerX = 26;
+    const bannerY = 26;
+    const bannerW = pageWidth - 52;
+    const bannerH = 46;
+    pdf.setFillColor(0, 0, 0);
+    pdf.rect(bannerX, bannerY, bannerW, bannerH, "F");
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(24);
+    pdf.text("Payment Voucher", pageWidth / 2, bannerY + 31, { align: "center" });
+
+    // Company Information
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text("GTLS LOGISTICS (PVT) LTD", pageWidth / 2, bannerY + 76, { align: "center" });
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi", pageWidth / 2, bannerY + 93, { align: "center" });
+    pdf.text("Contact No. 021-328 62660 / 0300-1234567", pageWidth / 2, bannerY + 107, { align: "center" });
+    pdf.text("E-mail ID: info@gtls.com.pk", pageWidth / 2, bannerY + 121, { align: "center" });
+
+    // Metadata lines: Pay To, PV No., Pay By, Date
+    const metaStartY = bannerY + 148;
+    const leftLabelX = 36;
+    const leftValX = 84;
+    const leftLineEnd = 290;
+
+    const rightLabelX = 320;
+    const rightValX = 370;
+    const rightLineEnd = pageWidth - 36;
+
+    // Row 1: Pay To & Pay By
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10.5);
+    pdf.text("Pay To", leftLabelX, metaStartY);
+    pdf.setLineWidth(0.8);
+    pdf.line(leftValX, metaStartY + 2, leftLineEnd, metaStartY + 2);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(String(voucher.payTo || "-"), leftValX + 4, metaStartY);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Pay By", rightLabelX, metaStartY);
+    pdf.line(rightValX, metaStartY + 2, rightLineEnd, metaStartY + 2);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(String(voucher.payBy || "GTLS Logistics"), rightValX + 4, metaStartY);
+
+    // Row 2: PV No. & Date
+    pdf.setFont("helvetica", "bold");
+    pdf.text("PV No.", leftLabelX, metaStartY + 24);
+    pdf.line(leftValX, metaStartY + 26, leftLineEnd, metaStartY + 26);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(String(voucher.pvNo || voucher.id || "-"), leftValX + 4, metaStartY + 24);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Date", rightLabelX, metaStartY + 24);
+    pdf.line(rightValX, metaStartY + 26, rightLineEnd, metaStartY + 26);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(formatShortDate(voucher.voucherDate) || "-", rightValX + 4, metaStartY + 24);
+
+    // Table rows: Pad to at least 7 rows to match template image
+    const rawItems = Array.isArray(voucher.items) && voucher.items.length ? voucher.items : [
+      { serialNo: 1, paymentMethod: "Cash", unitPrice: voucher.totalAmount, description: "Payment", amount: voucher.totalAmount }
+    ];
+    const totalRowCount = Math.max(7, rawItems.length);
+    const tableBody = [];
+    for (let i = 0; i < totalRowCount; i++) {
+      const item = rawItems[i];
+      if (item) {
+        tableBody.push([
+          String(item.serialNo || i + 1),
+          item.paymentMethod || "-",
+          item.unitPrice ? money(item.unitPrice) : "-",
+          item.description || "-",
+          money(item.amount)
+        ]);
+      } else {
+        tableBody.push([String(i + 1), "", "", "", ""]);
+      }
+    }
+
+    const footTotalAmount = money(voucher.totalAmount);
+
+    pdf.autoTable({
+      startY: metaStartY + 42,
+      margin: { left: 26, right: 26 },
+      theme: "grid",
+      head: [["Serial No.", "Payment Method", "Unit Price", "Description", "Amount"]],
+      body: tableBody,
+      foot: [["", "", "", "Total", footTotalAmount]],
+      headStyles: {
+        fillColor: [0, 0, 0],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 10,
+        halign: "center",
+        valign: "middle",
+        minCellHeight: 25,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.8
+      },
+      bodyStyles: {
+        fillColor: [227, 238, 224],
+        textColor: [0, 0, 0],
+        fontSize: 9.5,
+        minCellHeight: 24,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.8,
+        valign: "middle"
+      },
+      footStyles: {
+        fillColor: [0, 0, 0],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 10.5,
+        minCellHeight: 25,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.8,
+        valign: "middle"
+      },
+      columnStyles: {
+        0: { cellWidth: 65, halign: "center" },
+        1: { cellWidth: 105, halign: "center" },
+        2: { cellWidth: 85, halign: "right" },
+        3: { cellWidth: "auto", halign: "left" },
+        4: { cellWidth: 95, halign: "right" }
+      },
+      didParseCell: (data) => {
+        if (data.section === "foot") {
+          if (data.column.index === 3) data.cell.styles.halign = "center";
+          if (data.column.index === 4) data.cell.styles.halign = "right";
+        }
+      }
+    });
+
+    const finalY = pdf.lastAutoTable?.finalY || (metaStartY + 260);
+
+    // Bottom Fields: A/C No. & The Sum of
+    const bottomY = finalY + 36;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10.5);
+    pdf.text("A/C No.", 36, bottomY);
+    pdf.line(84, bottomY + 2, 230, bottomY + 2);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(String(voucher.accountNo || "-"), 88, bottomY);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("The Sum of", 240, bottomY);
+    pdf.line(308, bottomY + 2, pageWidth - 36, bottomY + 2);
+    pdf.setFont("helvetica", "normal");
+    const words = voucher.amountInWords || convertNumberToWords(voucher.totalAmount);
+    pdf.text(String(words), 312, bottomY);
+
+    // Signatures at bottom: Prepared By & Received By
+    const signY = Math.min(pageHeight - 65, bottomY + 75);
+    const sigLineW = 160;
+
+    // Prepared By
+    pdf.setLineWidth(0.8);
+    pdf.line(50, signY, 50 + sigLineW, signY);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10.5);
+    pdf.text("Prepared By", 50 + (sigLineW / 2), signY + 16, { align: "center" });
+    if (voucher.preparedBy) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9.5);
+      pdf.text(voucher.preparedBy, 50 + (sigLineW / 2), signY - 5, { align: "center" });
+    }
+
+    // Received By
+    const rxX = pageWidth - 50 - sigLineW;
+    pdf.line(rxX, signY, rxX + sigLineW, signY);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10.5);
+    pdf.text("Received By", rxX + (sigLineW / 2), signY + 16, { align: "center" });
+    if (voucher.receivedBy) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9.5);
+      pdf.text(voucher.receivedBy, rxX + (sigLineW / 2), signY - 5, { align: "center" });
+    }
+
+    pdf.save(`${safePdfFileName(voucher.pvNo || "PV")}_payment_voucher.pdf`);
+  }
+
+  async function buildPaymentVoucherSummaryPdf(vouchers, filterTitle = "All Vouchers") {
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("l", "pt", "a3");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const letterhead = await loadInvoiceTemplateDataUrl();
+    const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    const headerHeight = 136;
+    const headerWidth = headerHeight * (1131 / 270);
+    const headerX = 36;
+    const titleY = summaryTitleY(headerHeight);
+    if (letterheadHeader) {
+      pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
+    }
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text("PAYMENT VOUCHER SUMMARY", 36, titleY);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text(String(filterTitle || "All Records"), 36, titleY + 20);
+
+    const totalDisbursed = vouchers.reduce((sum, v) => sum + Number(v.totalAmount || 0), 0);
+    const headers = ["S.No", "PV No.", "Date", "Pay To", "Pay By", "A/C No.", "Payment Method", "Description / Particulars", "Amount (PKR)", "Prepared By", "Received By"];
+    const body = vouchers.map((v, index) => {
+      const methods = (v.items || []).map((i) => i.paymentMethod).filter(Boolean).join(", ") || "-";
+      const desc = (v.items || []).map((i) => i.description).filter(Boolean).join("; ") || "-";
+      return [
+        String(index + 1),
+        v.pvNo || v.id || "-",
+        formatShortDate(v.voucherDate),
+        v.payTo || "-",
+        v.payBy || "-",
+        v.accountNo || "-",
+        methods,
+        desc,
+        money(v.totalAmount),
+        v.preparedBy || "-",
+        v.receivedBy || "-"
+      ];
+    });
+    const foot = ["", "", "", "", "", "", "", "Total Disbursed", money(totalDisbursed), "", ""];
+
+    pdf.autoTable({
+      startY: titleY + 34,
+      margin: { top: 36, bottom: 65, left: 28, right: 28 },
+      theme: "grid",
+      showFoot: "lastPage",
+      head: [headers],
+      body,
+      foot: [foot],
+      styles: {
+        fontSize: 9.5,
+        cellPadding: { top: 6, bottom: 6, left: 4, right: 4 },
+        lineColor: [40, 40, 40],
+        lineWidth: 0.65,
+        textColor: [0, 0, 0],
+        valign: "middle"
+      },
+      headStyles: {
+        fillColor: [24, 48, 77],
+        textColor: [255, 255, 255],
+        fontSize: 9.5,
+        fontStyle: "bold",
+        minCellHeight: 38,
+        halign: "center",
+        valign: "middle"
+      },
+      footStyles: {
+        fillColor: [248, 234, 220],
+        textColor: [24, 48, 77],
+        fontStyle: "bold",
+        fontSize: 10,
+        minCellHeight: 28,
+        valign: "middle"
+      },
+      columnStyles: {
+        0: { cellWidth: 35, halign: "center" },
+        1: { cellWidth: 70, halign: "center" },
+        2: { cellWidth: 75, halign: "center" },
+        3: { cellWidth: 140 },
+        4: { cellWidth: 100 },
+        5: { cellWidth: 85 },
+        6: { cellWidth: 110, halign: "center" },
+        7: { cellWidth: "auto" },
+        8: { cellWidth: 95, halign: "right" },
+        9: { cellWidth: 90 },
+        10: { cellWidth: 90 }
+      },
+      didParseCell: (data) => {
+        if (data.section === "foot") {
+          if (data.column.index === 7) data.cell.styles.halign = "center";
+          if (data.column.index === 8) data.cell.styles.halign = "right";
+        }
+      }
+    });
+
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
+
+    pdf.save("payment-voucher-summary.pdf");
+  }
+
+  function paymentVoucherPage(store) {
+    const form = document.querySelector("[data-voucher-form]");
+    const itemsBody = document.querySelector("[data-voucher-items-body]");
+    const addItemBtn = document.querySelector("[data-add-voucher-item]");
+    const wordsDisplay = document.querySelector("[data-voucher-form-words]");
+    const totalDisplay = document.querySelector("[data-voucher-form-total]");
+    const notice = document.querySelector("[data-notice]");
+    const submitBtn = form?.querySelector("[data-submit-label]");
+    const resetBtn = form?.querySelector("[data-reset-form]");
+
+    const totalCountEl = document.querySelector("[data-voucher-total-count]");
+    const totalAmountEl = document.querySelector("[data-voucher-total-amount]");
+    const cashCountEl = document.querySelector("[data-voucher-cash-count]");
+    const bankCountEl = document.querySelector("[data-voucher-bank-count]");
+
+    const searchInput = document.querySelector("[data-voucher-search]");
+    const payeeFilter = document.querySelector("[data-voucher-payee-filter]");
+    const startDateInput = document.querySelector("[data-voucher-start-date]");
+    const endDateInput = document.querySelector("[data-voucher-end-date]");
+    const dateOrderSelect = document.querySelector("[data-voucher-date-order]");
+    const countBadge = document.querySelector("[data-voucher-count]");
+    const downloadSummaryBtn = document.querySelector("[data-download-voucher-summary]");
+    const tableBody = document.querySelector("[data-voucher-rows]");
+
+    if (!form || !tableBody) return;
+
+    let editingId = "";
+
+    function setNotice(message = "", isError = false) {
+      if (!notice) return;
+      notice.textContent = message;
+      notice.hidden = !message;
+      notice.classList.toggle("error", isError);
+    }
+
+    function createItemRow(item = {}) {
+      const tr = document.createElement("tr");
+      tr.dataset.voucherItemRow = "";
+      const method = item.paymentMethod || "Cash";
+      tr.innerHTML = `
+        <td class="text-center" data-item-sno>1</td>
+        <td>
+          <select name="itemPaymentMethod">
+            <option value="Cash"${method === "Cash" ? " selected" : ""}>Cash</option>
+            <option value="Cheque"${method === "Cheque" ? " selected" : ""}>Cheque</option>
+            <option value="Online / IBFT"${method === "Online / IBFT" ? " selected" : ""}>Online / IBFT</option>
+            <option value="Bank Transfer"${method === "Bank Transfer" ? " selected" : ""}>Bank Transfer</option>
+            <option value="Pay Order"${method === "Pay Order" ? " selected" : ""}>Pay Order</option>
+            <option value="Other"${method === "Other" ? " selected" : ""}>Other</option>
+          </select>
+        </td>
+        <td>
+          <input type="text" name="itemDescription" placeholder="Description / Particulars" value="${escapeHtml(item.description || "")}" />
+        </td>
+        <td>
+          <input type="number" step="any" min="0" name="itemUnitPrice" placeholder="0" value="${item.unitPrice ? item.unitPrice : ""}" />
+        </td>
+        <td>
+          <input type="number" step="any" min="0" name="itemAmount" placeholder="0" value="${item.amount ? item.amount : ""}" required />
+        </td>
+        <td class="text-center">
+          <button class="voucher-item-remove-btn" type="button" title="Remove row" aria-label="Remove row">&times;</button>
+        </td>
+      `;
+
+      tr.querySelector(".voucher-item-remove-btn").addEventListener("click", () => {
+        const rows = itemsBody.querySelectorAll("tr");
+        if (rows.length <= 1) {
+          tr.querySelector('[name="itemDescription"]').value = "";
+          tr.querySelector('[name="itemUnitPrice"]').value = "";
+          tr.querySelector('[name="itemAmount"]').value = "";
+        } else {
+          tr.remove();
+        }
+        reindexItems();
+        calculateFormTotals();
+      });
+
+      const amountInput = tr.querySelector('[name="itemAmount"]');
+      const unitPriceInput = tr.querySelector('[name="itemUnitPrice"]');
+
+      amountInput.addEventListener("input", calculateFormTotals);
+      unitPriceInput.addEventListener("input", () => {
+        if (!amountInput.value || Number(amountInput.value) === 0) {
+          amountInput.value = unitPriceInput.value;
+        }
+        calculateFormTotals();
+      });
+
+      return tr;
+    }
+
+    function reindexItems() {
+      const rows = itemsBody.querySelectorAll("tr");
+      rows.forEach((row, index) => {
+        const snoEl = row.querySelector("[data-item-sno]");
+        if (snoEl) snoEl.textContent = String(index + 1);
+      });
+    }
+
+    function calculateFormTotals() {
+      let total = 0;
+      itemsBody.querySelectorAll('[name="itemAmount"]').forEach((input) => {
+        total += Number(input.value || 0);
+      });
+      if (totalDisplay) totalDisplay.textContent = `PKR ${money(total)}`;
+      if (wordsDisplay) wordsDisplay.textContent = convertNumberToWords(total);
+      return total;
+    }
+
+    function populateItems(items) {
+      itemsBody.innerHTML = "";
+      if (Array.isArray(items) && items.length) {
+        items.forEach((it) => itemsBody.appendChild(createItemRow(it)));
+      } else {
+        itemsBody.appendChild(createItemRow());
+      }
+      reindexItems();
+      calculateFormTotals();
+    }
+
+    function resetForm() {
+      form.reset();
+      editingId = "";
+      form.elements.pvNo.value = getNextSequentialId(store.paymentVouchers || [], "PV", "pvNo");
+      form.elements.voucherDate.value = getTodayIsoDate();
+      form.elements.payBy.value = "GTLS Logistics";
+      if (form.elements.payTo) form.elements.payTo.value = "";
+      if (form.elements.accountNo) form.elements.accountNo.value = "";
+      if (form.elements.preparedBy) form.elements.preparedBy.value = "";
+      if (form.elements.receivedBy) form.elements.receivedBy.value = "";
+      populateItems([]);
+      if (submitBtn) submitBtn.textContent = "Save Payment Voucher";
+      setNotice("");
+    }
+
+    function fillForm(item) {
+      if (!item) return;
+      editingId = item.id;
+      form.elements.pvNo.value = item.pvNo || item.id || "";
+      form.elements.voucherDate.value = item.voucherDate || getTodayIsoDate();
+      form.elements.payTo.value = item.payTo || "";
+      form.elements.payBy.value = item.payBy || "GTLS Logistics";
+      form.elements.accountNo.value = item.accountNo || "";
+      form.elements.preparedBy.value = item.preparedBy || "";
+      form.elements.receivedBy.value = item.receivedBy || "";
+      populateItems(item.items || []);
+      if (submitBtn) submitBtn.textContent = "Update Payment Voucher";
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    addItemBtn?.addEventListener("click", () => {
+      itemsBody.appendChild(createItemRow());
+      reindexItems();
+      calculateFormTotals();
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const rows = itemsBody.querySelectorAll("tr");
+      const items = Array.from(rows).map((tr, index) => {
+        const paymentMethod = tr.querySelector('[name="itemPaymentMethod"]')?.value || "Cash";
+        const description = tr.querySelector('[name="itemDescription"]')?.value || "";
+        const unitPrice = Number(tr.querySelector('[name="itemUnitPrice"]')?.value || 0);
+        const amount = Number(tr.querySelector('[name="itemAmount"]')?.value || 0);
+        return {
+          serialNo: index + 1,
+          paymentMethod,
+          description,
+          unitPrice,
+          amount
+        };
+      });
+
+      const totalAmount = items.reduce((sum, it) => sum + Number(it.amount || 0), 0);
+      if (totalAmount <= 0) {
+        setNotice("Please enter an amount greater than zero for at least one line item.", true);
+        return;
+      }
+
+      const amountInWords = convertNumberToWords(totalAmount);
+      const pvNo = form.elements.pvNo.value.trim() || getNextSequentialId(store.paymentVouchers || [], "PV", "pvNo");
+
+      const normalized = {
+        id: editingId || pvNo,
+        pvNo,
+        voucherDate: form.elements.voucherDate.value || getTodayIsoDate(),
+        payTo: form.elements.payTo.value.trim(),
+        payBy: form.elements.payBy.value.trim() || "GTLS Logistics",
+        accountNo: form.elements.accountNo.value.trim(),
+        preparedBy: form.elements.preparedBy.value.trim(),
+        receivedBy: form.elements.receivedBy.value.trim(),
+        totalAmount,
+        amountInWords,
+        items,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (!editingId) {
+        store.paymentVouchers.unshift(normalized);
+        setNotice(`Payment Voucher ${normalized.pvNo} saved successfully.`);
+      } else {
+        const index = store.paymentVouchers.findIndex((item) => item.id === editingId);
+        if (index === -1) {
+          setNotice("Payment Voucher record not found.", true);
+          return;
+        }
+        normalized.id = editingId;
+        store.paymentVouchers[index] = normalized;
+        setNotice(`Payment Voucher ${normalized.pvNo} updated successfully.`);
+      }
+
+      try {
+        saveStore(store, { skipRemote: true });
+        await syncStoreImmediately(store, { paymentVouchers: true, activityLogs: true });
+      } catch (error) {
+        setNotice(`Voucher saved locally, but Supabase sync failed: ${error.message}`, true);
+      }
+
+      render();
+      resetForm();
+    });
+
+    resetBtn?.addEventListener("click", resetForm);
+
+    function getFilteredRows() {
+      const query = String(searchInput?.value || "").trim().toLowerCase();
+      const payee = String(payeeFilter?.value || "").trim().toLowerCase();
+      const start = String(startDateInput?.value || "").trim();
+      const end = String(endDateInput?.value || "").trim();
+      const order = dateOrderSelect?.value || "desc";
+
+      return (store.paymentVouchers || [])
+        .filter((item) => !payee || String(item.payTo || "").trim().toLowerCase() === payee)
+        .filter((item) => !start || String(item.voucherDate || "") >= start)
+        .filter((item) => !end || String(item.voucherDate || "") <= end)
+        .filter((item) => {
+          if (!query) return true;
+          const searchTargets = [
+            item.pvNo,
+            item.payTo,
+            item.payBy,
+            item.accountNo,
+            item.preparedBy,
+            item.receivedBy,
+            item.amountInWords,
+            item.voucherDate,
+            ...(item.items || []).flatMap((i) => [i.paymentMethod, i.description, String(i.amount)])
+          ];
+          return searchTargets.some((val) => String(val || "").toLowerCase().includes(query));
+        })
+        .sort((left, right) => {
+          const comp = String(left.voucherDate || "").localeCompare(String(right.voucherDate || ""));
+          return order === "asc" ? comp : -comp;
+        });
+    }
+
+    function renderPayeeFilter() {
+      if (!payeeFilter) return;
+      const currentPayee = payeeFilter.value;
+      const payees = [...new Set((store.paymentVouchers || [])
+        .map((item) => String(item.payTo || "").trim())
+        .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+      payeeFilter.innerHTML = `<option value="">All Payees</option>${payees.map((p) => `<option value="${escapeHtml(p.toLowerCase())}">${escapeHtml(p)}</option>`).join("")}`;
+      payeeFilter.value = payees.map((p) => p.toLowerCase()).includes(currentPayee) ? currentPayee : "";
+    }
+
+    function render() {
+      renderPayeeFilter();
+      const rows = getFilteredRows();
+
+      const totalDisbursed = rows.reduce((sum, v) => sum + Number(v.totalAmount || 0), 0);
+      const cashCount = rows.filter((v) => (v.items || []).some((i) => String(i.paymentMethod || "").toLowerCase().includes("cash"))).length;
+      const bankCount = rows.filter((v) => (v.items || []).some((i) => {
+        const m = String(i.paymentMethod || "").toLowerCase();
+        return m.includes("bank") || m.includes("cheque") || m.includes("online") || m.includes("ibft") || m.includes("order");
+      })).length;
+
+      if (totalCountEl) totalCountEl.textContent = rows.length;
+      if (totalAmountEl) totalAmountEl.textContent = `PKR ${money(totalDisbursed)}`;
+      if (cashCountEl) cashCountEl.textContent = cashCount;
+      if (bankCountEl) bankCountEl.textContent = bankCount;
+      if (countBadge) countBadge.textContent = `${rows.length} voucher(s)`;
+
+      if (!rows.length) {
+        tableBody.innerHTML = `<tr><td colspan="13" class="empty-state">No payment vouchers found.</td></tr>`;
+        return;
+      }
+
+      tableBody.innerHTML = rows.map((item, index) => {
+        const methods = (item.items || []).map((i) => i.paymentMethod).filter(Boolean);
+        const descriptions = (item.items || []).map((i) => i.description).filter(Boolean);
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td><strong>${text(item.pvNo || item.id)}</strong></td>
+            <td>${formatShortDate(item.voucherDate)}</td>
+            <td><strong>${text(item.payTo)}</strong></td>
+            <td>${text(item.payBy || "-")}</td>
+            <td>${text(item.accountNo || "-")}</td>
+            <td>${methods.length ? methods.map((m) => `<span class="badge neutral">${escapeHtml(m)}</span>`).join(" ") : "-"}</td>
+            <td>${descriptions.length ? descriptions.map((d) => `<div>${escapeHtml(d)}</div>`).join("") : "-"}</td>
+            <td class="text-right"><strong>${money(item.totalAmount)}</strong></td>
+            <td><small class="muted">${text(item.amountInWords || "-")}</small></td>
+            <td>${text(item.preparedBy || "-")}</td>
+            <td>${text(item.receivedBy || "-")}</td>
+            <td>
+              <div class="table-actions">
+                <button class="btn small primary" type="button" data-download-voucher="${escapeHtml(item.id)}">PDF</button>
+                <button class="btn small" type="button" data-edit-voucher="${escapeHtml(item.id)}">Edit</button>
+                <button class="btn small danger" type="button" data-delete-voucher="${escapeHtml(item.id)}">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    [searchInput, payeeFilter, startDateInput, endDateInput, dateOrderSelect].filter(Boolean).forEach((el) => {
+      el.addEventListener(el === searchInput ? "input" : "change", render);
+    });
+
+    tableBody.addEventListener("click", async (event) => {
+      const downloadId = event.target.closest("[data-download-voucher]")?.dataset.downloadVoucher;
+      const editId = event.target.closest("[data-edit-voucher]")?.dataset.editVoucher;
+      const deleteId = event.target.closest("[data-delete-voucher]")?.dataset.deleteVoucher;
+
+      if (downloadId) {
+        const voucher = (store.paymentVouchers || []).find((v) => String(v.id) === String(downloadId));
+        if (voucher) {
+          try {
+            await buildPaymentVoucherPdf(voucher);
+          } catch (err) {
+            setNotice(`PDF generation failed: ${err.message}`, true);
+          }
+        }
+        return;
+      }
+
+      if (editId) {
+        const voucher = (store.paymentVouchers || []).find((v) => String(v.id) === String(editId));
+        if (voucher) fillForm(voucher);
+        return;
+      }
+
+      if (deleteId) {
+        const voucher = (store.paymentVouchers || []).find((v) => String(v.id) === String(deleteId));
+        if (!voucher) return;
+        const confirmed = await requestDeleteConfirmation({
+          title: "Delete Payment Voucher?",
+          message: `Are you sure you want to permanently delete voucher ${voucher.pvNo || voucher.id}?`
+        });
+        if (!confirmed) return;
+
+        const idx = store.paymentVouchers.findIndex((v) => String(v.id) === String(deleteId));
+        if (idx !== -1) {
+          store.paymentVouchers.splice(idx, 1);
+          saveStore(store, { skipRemote: true });
+          try {
+            await syncStoreImmediately(store, { paymentVouchers: true, activityLogs: true });
+            setNotice(`Payment Voucher ${voucher.pvNo || voucher.id} deleted successfully.`);
+          } catch (err) {
+            setNotice(`Voucher deleted locally, but remote sync failed: ${err.message}`, true);
+          }
+          if (editingId === deleteId) resetForm();
+          render();
+        }
+      }
+    });
+
+    downloadSummaryBtn?.addEventListener("click", async () => {
+      const rows = getFilteredRows();
+      if (!rows.length) {
+        setNotice("No payment vouchers match the selected filters.", true);
+        return;
+      }
+      try {
+        const payeeText = payeeFilter?.value ? payeeFilter.options[payeeFilter.selectedIndex]?.text : "All Vouchers";
+        await buildPaymentVoucherSummaryPdf(rows, payeeText);
+      } catch (err) {
+        setNotice(`Summary download failed: ${err.message}`, true);
+      }
+    });
+
+    window.activePageRender = render;
+    resetForm();
+    render();
+  }
+
   function enhanceFileInputs(root = document) {
     root.querySelectorAll('input[type="file"]:not([data-upload-enhanced])').forEach((input) => {
       input.dataset.uploadEnhanced = "true";
@@ -9471,6 +10459,7 @@
       if (page === "admin") adminPage(store);
       if (page === "activity-logs") activityLogsPage(store);
       if (page === "khata" || page === "accounts-payable") khataPage(store);
+      if (page === "payment-voucher") paymentVoucherPage(store);
       enhanceFileInputs();
     } catch (err) {
       console.error(`Error initializing page "${page}":`, err);
@@ -9482,7 +10471,7 @@
     if (["dashboard", "booking", "ledger", "broker-summary", "khata"].includes(page)) {
       hydrationPromises.push(hydrateBookingsFromSupabase(store));
     }
-    if (["dashboard", "truck", "truck-summary", "completed-truck-summary", "equipment", "two-pay-records", "maintenance", "employee", "khata", "accounts-payable", "activity-logs"].includes(page)) {
+    if (["dashboard", "truck", "truck-summary", "completed-truck-summary", "equipment", "two-pay-records", "maintenance", "employee", "khata", "accounts-payable", "activity-logs", "payment-voucher"].includes(page)) {
       hydrationPromises.push(hydrateOperationalStore(store));
     }
 
@@ -9565,6 +10554,7 @@
     syncAdminNavigationRoute();
     ensureEquipmentNavigation();
     ensureTwoPayRecordsNavigation();
+    ensurePaymentVoucherNavigation();
     ensureMaintenanceNavigation();
     ensureAccountsNavigationOrder();
     ensureBookingSummaryNavigation();

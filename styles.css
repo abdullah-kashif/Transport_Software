@@ -2522,7 +2522,8 @@ th {
 .broker-summary-notice { margin-bottom: 14px; }
 .broker-summary-table-wrap { margin-top: 16px; }
 .broker-summary-table { min-width: 1280px; }
-.broker-summary-table th, .broker-summary-table td { white-space: nowrap; }
+.employee-register-table { min-width: 1980px; }
+.employee-register-table th, .employee-register-table td { white-space: nowrap; }
 .muted-cell { color: var(--muted); font-size: 12px; }
 
 @media (max-width: 1000px) {
@@ -3285,45 +3286,69 @@ body.confirm-modal-open {
 }
 
 .maintenance-register-head {
-  align-items: flex-start;
+  display: block !important;
+  margin-bottom: 16px;
+}
+
+.maintenance-register-head h3 {
+  margin: 0 0 12px;
 }
 
 .maintenance-toolbar {
   display: flex;
   align-items: flex-end;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .equipment-toolbar .ledger-count,
 .maintenance-toolbar .ledger-count {
-  min-height: 44px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fffaf5;
 }
 
 .maintenance-toolbar label {
   display: grid;
-  gap: 6px;
-  min-width: 220px;
+  gap: 5px;
+  min-width: 160px;
+  flex: 1 1 auto;
   margin: 0;
 }
 
 .maintenance-toolbar .maintenance-search {
-  min-width: min(300px, 100%);
+  min-width: 240px;
+  flex: 2 1 auto;
+}
+
+.maintenance-toolbar label input,
+.maintenance-toolbar label select {
+  height: 38px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.maintenance-summary-download {
+  height: 38px;
+  min-height: 38px;
+  white-space: nowrap;
 }
 
 @media (min-width: 1161px) {
-  .maintenance-register-head,
   .equipment-register-head {
     flex-wrap: nowrap;
     align-items: flex-start;
   }
 
-  .maintenance-toolbar,
   .equipment-register-head .equipment-toolbar {
     flex-wrap: nowrap;
     flex: 0 1 auto;
@@ -3335,12 +3360,10 @@ body.confirm-modal-open {
 }
 
 @media (max-width: 1160px) {
-  .maintenance-register-head,
   .equipment-register-head {
     align-items: flex-start;
   }
 
-  .maintenance-toolbar,
   .equipment-register-head .equipment-toolbar {
     width: 100%;
     justify-content: flex-end;
@@ -3531,14 +3554,15 @@ body.confirm-modal-open {
 }
 
 .employee-status-actions {
-  display: grid;
-  grid-template-columns: 76px 118px;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: max-content;
 }
 
 .employee-status-actions .badge {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
   min-width: 76px;
 }
@@ -3549,46 +3573,33 @@ body.confirm-modal-open {
   white-space: nowrap;
 }
 
+.employee-register-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .employee-register-table {
   width: 100%;
-  min-width: 1280px;
-  table-layout: fixed;
+  min-width: 1980px;
+  table-layout: auto;
+  border-collapse: collapse;
 }
 
-.employee-register-table th:nth-child(1) {
-  width: 110px;
+.employee-register-table th,
+.employee-register-table td {
+  white-space: nowrap;
+  padding: 10px 14px;
+  vertical-align: middle;
+  text-align: left;
 }
 
-.employee-register-table th:nth-child(2) {
-  width: 160px;
-}
-
-.employee-register-table th:nth-child(3) {
-  width: 190px;
-}
-
-.employee-register-table th:nth-child(4) {
-  width: 105px;
-}
-
-.employee-register-table th:nth-child(5) {
-  width: 90px;
-}
-
-.employee-register-table th:nth-child(6) {
-  width: 112px;
-}
-
-.employee-register-table th:nth-child(7) {
-  width: 125px;
-}
-
-.employee-register-table th:nth-child(8) {
-  width: 220px;
-}
-
-.employee-register-table th:nth-child(9) {
-  width: 150px;
+.employee-register-table th {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: #fffdf9;
 }
 
 .employee-register-table td {
@@ -3596,6 +3607,9 @@ body.confirm-modal-open {
 }
 
 .employee-register-table td:last-child .table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: nowrap;
 }
 
@@ -5465,3 +5479,190 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
     min-height: 96px;
   }
 }
+
+/* ==========================================================================
+   Payment Voucher Module
+   ========================================================================== */
+
+.voucher-stats {
+  margin-bottom: 20px;
+}
+
+.voucher-items-section {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 6px;
+}
+
+.voucher-items-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.voucher-items-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(213, 184, 150, 0.45);
+  background: #fff;
+}
+
+.voucher-items-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.voucher-items-table th {
+  padding: 10px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: #faf6f0;
+  border-bottom: 1px solid var(--line);
+}
+
+.voucher-items-table td {
+  padding: 8px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid #f2e9de;
+}
+
+.voucher-items-table td input,
+.voucher-items-table td select {
+  height: 38px;
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.voucher-item-remove-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #eecbc6;
+  background: #fff3f1;
+  color: #c9362b;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.voucher-item-remove-btn:hover {
+  background: #c9362b;
+  color: #fff;
+  border-color: #c9362b;
+  transform: scale(1.08);
+}
+
+.voucher-summary-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fffaf4, #fbf2e7);
+  border: 1px solid #dfc6b0;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.voucher-summary-left {
+  flex: 1 1 300px;
+}
+
+.voucher-summary-left span {
+  display: block;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.voucher-words {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #173a5e;
+  font-style: italic;
+}
+
+.voucher-summary-right {
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+.voucher-summary-right span {
+  display: block;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.voucher-total {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: #c56b2d;
+  font-variant-numeric: tabular-nums;
+}
+
+.voucher-register-head {
+  display: block !important;
+  margin-bottom: 16px;
+}
+
+.voucher-register-head h3 {
+  margin: 0 0 12px;
+}
+
+.voucher-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.voucher-summary-download {
+  height: 38px;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.payment-voucher-table {
+  width: 100%;
+  min-width: 1750px;
+  table-layout: auto;
+  border-collapse: collapse;
+}
+
+.payment-voucher-table th,
+.payment-voucher-table td {
+  white-space: nowrap;
+  padding: 10px 14px;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.payment-voucher-table td:last-child .table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+

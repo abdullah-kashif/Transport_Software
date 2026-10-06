@@ -6,7 +6,7 @@
   <title>GTLS Transport - Employees</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261002-2" />
+  <link rel="stylesheet" href="styles.css?v=20261007-3" />
 </head>
 <body data-page="employee">
   <div class="app">
@@ -33,6 +33,7 @@
         <a href="employees.html" data-page="employee">Employees</a>
         <a href="khata.html" data-page="khata">Accounts Receivable</a>
         <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="payment-voucher.html" data-page="payment-voucher">Payment Voucher</a>
         <a href="admin.html" data-page="admin">Admin</a>
       </nav>
       <div class="tip"></div>
@@ -80,11 +81,16 @@
         <form data-employee-form class="form-grid">
           <div class="field"><label>Employee Name</label><input name="name" placeholder="Full Name" required /></div>
           <div class="field"><label>Designation</label><input name="designation" placeholder="Designation / Role" required /></div>
-          <div class="field"><label>Department</label><select name="department"><option>Operations</option><option>Finance</option><option>Admin</option><option>Fleet</option><option>HR</option></select></div>
+          <div class="field"><label>Department</label><select name="department"><option>Operations</option><option>Finance</option><option>Admin</option><option>Fleet</option><option>Fleet Driver</option><option>HR</option></select></div>
+          <div class="field"><label>Registration / License No</label><input name="registrationNo" placeholder="e.g. License / Reg No" /></div>
+          <div class="field"><label>CNIC</label><input name="cnic" placeholder="42101-1234567-1" /></div>
+          <div class="field"><label>Date of Birth</label><input name="dob" type="date" /></div>
           <div class="field"><label>Salary</label><input name="salary" type="number" placeholder="0" required /></div>
           <div class="field"><label>Joining Date</label><input name="joiningDate" type="date" required /></div>
+          <div class="field"><label>Resignation Date</label><input name="resignationDate" type="date" /></div>
           <div class="field"><label>Status</label><select name="status"><option>Active</option><option>Inactive</option></select></div>
           <div class="field"><label>Phone</label><input name="phone" placeholder="0300-1234567" /></div>
+          <div class="field"><label>Reference Details</label><input name="referenceDetails" placeholder="Name, Contact, Relation" /></div>
           <div class="field full"><label>Employee Image</label><div class="maintenance-image-field"><input name="employeeImageFile" type="file" accept="image/*" data-employee-image-input /><button class="maintenance-image-remove" type="button" data-remove-employee-image hidden aria-label="Remove selected image" title="Remove image">&times;</button></div><div class="maintenance-image-preview" data-employee-image-preview hidden></div></div>
           <div class="field full actions">
             <button class="btn primary" type="submit" data-submit-label>Save Employee</button>
@@ -99,6 +105,12 @@
           <div>
             <h3>Employee Register</h3>
           </div>
+          <div class="ledger-filter">
+            <div class="ledger-filter-control">
+              <input type="search" placeholder="Search employees..." data-employee-search />
+            </div>
+            <button class="btn primary" type="button" data-download-employee-summary>Download Summary</button>
+          </div>
         </div>
         <div class="table-wrap employee-register-table-wrap">
         <table class="employee-register-table">
@@ -108,12 +120,17 @@
               <th>Name</th>
               <th>Designation</th>
               <th>Department</th>
+              <th>Reg / License No</th>
+              <th>CNIC</th>
+              <th>Date of Birth</th>
               <th>Salary</th>
               <th>Joining Date</th>
+              <th>Resignation Date</th>
               <th>Phone</th>
+              <th>Reference Details</th>
               <th>Status</th>
               <th>Image</th>
-              <th></th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody data-employee-rows></tbody>
@@ -132,7 +149,7 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261002-5"></script>
+<script src="app.js?v=20261007-3"></script>
 </body>
 </html>
 
