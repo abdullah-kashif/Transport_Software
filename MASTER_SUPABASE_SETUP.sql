@@ -38,12 +38,31 @@ alter table public.bookings add column if not exists broker_entries jsonb defaul
 alter table public.two_pay_records add column if not exists customer_name text;
 alter table public.two_pay_records add column if not exists customer_address text;
 
+create table if not exists public.builty_records (
+  id text primary key,
+  builty_no text not null,
+  bilty_date date,
+  consignor text,
+  consignee text,
+  truck_no text,
+  driver_name text,
+  route text,
+  goods_description text,
+  quantity text,
+  weight text,
+  received_by text,
+  remarks text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- Allow authenticated and anon users to persist and
 -- reload Booking, Container, Broker, Equipment & Handling Fleet, and Fleet Maintenance records.
 grant usage on schema public to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.equipment_fleet to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.maintenance_jobs to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.two_pay_records to authenticated, anon, service_role;
+grant select, insert, update, delete on table public.builty_records to authenticated, service_role;
 grant select, insert, update, delete on table public.bookings to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.booking_containers to authenticated, anon, service_role;
 grant select, insert, update, delete on table public.booking_brokers to authenticated, anon, service_role;
@@ -97,6 +116,13 @@ create policy "payment_vouchers_module_access" on public.payment_vouchers
 for all to authenticated
 using (public.is_active_user() and public.has_module_access('payment-voucher'))
 with check (public.is_active_user() and public.has_module_access('payment-voucher'));
+
+alter table public.builty_records enable row level security;
+drop policy if exists "builty_records_module_access" on public.builty_records;
+create policy "builty_records_module_access" on public.builty_records
+for all to authenticated
+using (public.is_active_user() and public.has_module_access('builty'))
+with check (public.is_active_user() and public.has_module_access('builty'));
 
 -- Keep new generated IDs readable: Job-1, Job-2 and MNT-1, MNT-2.
 alter table public.bookings

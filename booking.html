@@ -7,7 +7,7 @@
   <title>GTLS Transport - Booking Form</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261007-3" />
+  <link rel="stylesheet" href="styles.css?v=20261007-27" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -205,7 +205,6 @@
                 <span>Payment/Cheque/IBFT</span>
                 <span>Payment Date</span>
                 <span>Payment Status</span>
-                <span>P&amp;L</span>
                 <span>Action</span>
               </div>
               <div data-broker-rows class="broker-rows"></div>
@@ -259,8 +258,8 @@
             <div class="ledger-filter-control">
               <label for="booking-date-sort">Date Order</label>
               <select id="booking-date-sort" data-booking-date-sort>
-                <option value="asc" selected>Ascend</option>
-                <option value="desc">Descend</option>
+                <option value="asc" selected>Sort A to Z</option>
+                <option value="desc">Sort Z to A</option>
               </select>
             </div>
           </div>
@@ -323,7 +322,6 @@
                 <th>Payment/Cheque/IBFT</th>
                 <th>Broker Payment Date</th>
                 <th>Broker Payment Status</th>
-                <th>P&amp;L</th>
                 <th>Net P&amp;L</th>
                 <th>Remarks</th>
                 <th>Actions</th>
@@ -342,7 +340,7 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="app.js?v=20261007-3"></script>
+  <script src="app.js?v=20261007-27"></script>
 </body>
 
 </html>

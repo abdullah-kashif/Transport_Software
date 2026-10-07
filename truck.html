@@ -6,7 +6,7 @@
   <title>GTLS Transport - Truck Details</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261007-3" />
+  <link rel="stylesheet" href="styles.css?v=20261007-27" />
 </head>
 <body data-page="truck">
   <div class="app">
@@ -121,7 +121,7 @@
             <div class="ledger-filter-control"><label for="truck-ledger-start">Start Date</label><input id="truck-ledger-start" type="date" data-truck-ledger-start /></div>
             <div class="ledger-filter-control"><label for="truck-ledger-end">End Date</label><input id="truck-ledger-end" type="date" data-truck-ledger-end /></div>
             <div class="ledger-filter-control"><label for="truck-expense-status">Expense Status</label><select id="truck-expense-status" data-truck-expense-status><option value="all">All Expenses</option><option value="missing">Missing</option><option value="entered">Entered</option></select></div>
-            <div class="ledger-filter-control ledger-filter-control-job-order"><label for="truck-job-sort">Job Order</label><select id="truck-job-sort" data-truck-job-sort><option value="desc">Descending (Highest First)</option><option value="asc">Ascending (Lowest First)</option></select></div>
+            <div class="ledger-filter-control ledger-filter-control-job-order"><label for="truck-job-sort">Job Order</label><select id="truck-job-sort" data-truck-job-sort><option value="desc">Sort Z to A</option><option value="asc">Sort A to Z</option></select></div>
             <span class="ledger-count" data-truck-trip-count>0 record(s)</span>
             <button class="btn primary truck-ledger-download" type="button" data-download-truck-ledger>Download Summary</button>
           </div>
@@ -140,6 +140,6 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261007-3"></script>
+<script src="app.js?v=20261007-27"></script>
 </body>
 </html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTLS Transport - Bilty</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="alternate icon" href="favicon.ico" />
+  <link rel="stylesheet" href="styles.css?v=20261007-27" />
+</head>
+<body data-page="builty">
+  <div class="app">
+    <div class="mobile-topbar">
+      <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation">&#9776;</button>
+      <strong>GTLS Transport</strong>
+    </div>
+    <div class="nav-overlay" data-nav-overlay></div>
+
+    <aside class="sidebar">
+      <div class="sidebar-mobile-head">
+        <strong>Menu</strong>
+        <button class="nav-close" type="button" data-nav-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="brand"><h1>GTLS Transport</h1></div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="booking.html" data-page="booking">Booking Form</a>
+        <a href="builty.html" data-page="builty">Bilty</a>
+        <a href="ledger.html" data-page="ledger">Booking Summary</a>
+        <a href="broker-summary.html" data-page="broker-summary">Trucker/Broker Summary</a>
+        <a href="truck.html" data-page="truck">Truck Details</a>
+        <a href="truck-summary.html" data-page="truck-summary">Pending Truck Summary</a>
+        <a href="completed-truck-summary.html" data-page="completed-truck-summary">Completed Truck Summary</a>
+        <a href="two-pay-records.html" data-page="two-pay-records">Two Pay Records</a>
+        <a href="equipment.html" data-page="equipment">Equipment &amp; Handling Fleet</a>
+        <a href="maintenance.html" data-page="maintenance">Fleet Maintenance</a>
+        <a href="employees.html" data-page="employee">Employees</a>
+        <a href="khata.html" data-page="khata">Accounts Receivable</a>
+        <a href="accounts-payable.html" data-page="accounts-payable">Accounts Payable</a>
+        <a href="payment-voucher.html" data-page="payment-voucher">Payment Voucher</a>
+        <a href="admin.html" data-page="admin">Admin</a>
+        <a href="activity-logs.html" data-page="activity-logs">Activity Logs</a>
+      </nav>
+      <div class="tip"></div>
+    </aside>
+
+    <main class="main">
+      <section class="hero dashboard-hero">
+        <h2>Bilty</h2>
+        <div class="notification-center" data-payment-notifications>
+          <button class="notification-trigger" type="button" data-notification-trigger aria-label="Open payment notifications" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+              <path d="M10 21h4"></path>
+            </svg>
+            <span class="notification-badge" data-notification-count hidden>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel hidden>
+            <div class="notification-panel-head">
+              <div><strong>Payment Alerts</strong><span data-notification-summary>No expired payments</span></div>
+              <button class="notification-close" type="button" data-notification-close aria-label="Close notifications">&times;</button>
+            </div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head"><div><h3>Create / Update Bilty</h3></div></div>
+        <form class="form-grid" data-builty-form autocomplete="off">
+          <input type="hidden" name="id" />
+          <div class="field quarter"><label>Bilty No</label><input name="builtyNo" placeholder="BILTY-1" /></div>
+          <div class="field quarter"><label>Date</label><input type="date" name="date" /></div>
+          <div class="field quarter"><label>Consignor</label><input name="consignor" /></div>
+          <div class="field quarter"><label>Consignee</label><input name="consignee" /></div>
+          <div class="field quarter"><label>Truck No</label><input name="truckNo" /></div>
+          <div class="field quarter"><label>Driver Name</label><input name="driverName" /></div>
+          <div class="field quarter"><label>Route</label><input name="route" /></div>
+          <div class="field quarter"><label>Goods Description</label><input name="goodsDescription" /></div>
+          <div class="field quarter"><label>Quantity</label><input name="quantity" /></div>
+          <div class="field quarter"><label>Weight</label><input name="weight" /></div>
+          <div class="field quarter"><label>Received By</label><input name="receivedBy" /></div>
+          <div class="field quarter"><label>Remarks</label><input name="remarks" /></div>
+          <div class="builty-form-actions"><button class="btn primary" type="submit">Save Bilty</button><button class="btn" type="reset">Clear Form</button></div>
+        </form>
+      </section>
+
+      <section class="screen">
+        <div class="screen-head">
+          <div><h3>Bilty Register</h3></div>
+          <div class="toolbar builty-register-toolbar">
+            <input data-builty-search placeholder="Search Bilty" aria-label="Search Bilty" />
+            <span class="ledger-count" data-builty-count>0 record(s)</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Bilty No</th><th>Date</th><th>Consignor</th><th>Consignee</th><th>Truck No</th><th>Driver Name</th><th>Route</th><th>Goods Description</th><th>Quantity</th><th>Weight</th><th>Action</th></tr></thead>
+            <tbody data-builty-rows></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js?v=20261007-27"></script>
+</body>
+</html>

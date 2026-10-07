@@ -36,6 +36,16 @@ body {
   transition: opacity 0.2s ease-in-out;
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+  font-weight: 800;
+}
+
 body.page-loaded {
   opacity: 1;
 }
@@ -503,7 +513,8 @@ body.sidebar-collapsed .main {
   font-size: 24px;
   line-height: 1.1;
   max-width: 840px;
-  color: #a85524;
+  color: #18304d;
+  font-weight: 800;
 }
 
 .hero p {
@@ -859,7 +870,8 @@ body.sidebar-collapsed .main {
 .screen h3 {
   margin: 0 0 4px;
   font-size: 24px;
-  color: #1d4069;
+  color: #18304d;
+  font-weight: 800;
 }
 
 .screen p,
@@ -911,6 +923,59 @@ body[data-page="ledger"] .hero .kicker {
 .btn.small {
   padding: 8px 12px;
   font-size: 13px;
+}
+
+.builty-form-actions,
+.builty-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.builty-form-actions {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+.builty-row-actions .btn {
+  min-height: 36px;
+}
+
+.builty-row-actions {
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+body[data-page="builty"] .table-wrap td:last-child {
+  min-width: 190px;
+  white-space: nowrap;
+}
+
+.builty-register-toolbar {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.builty-register-toolbar input {
+  width: min(305px, 42vw);
+}
+
+.builty-register-toolbar .ledger-count {
+  margin: 0;
+}
+
+@media (max-width: 680px) {
+  .builty-register-toolbar {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .builty-register-toolbar input {
+    width: 100%;
+    flex: 1 1 100%;
+  }
 }
 
 .grid {
@@ -1172,9 +1237,9 @@ a.dashboard-kpi-card:focus-visible {
 
 .dashboard-kpi-card h5 {
   margin: 0;
-  color: #4a6076;
+  color: #18304d;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.35;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -2418,7 +2483,7 @@ th {
 .broker-table-head,
 .broker-row {
   display: grid;
-  grid-template-columns: minmax(125px, 1.25fr) minmax(105px, 0.95fr) minmax(95px, 0.85fr) minmax(85px, 0.8fr) minmax(80px, 0.75fr) minmax(120px, 1.05fr) minmax(110px, 0.95fr) minmax(92px, 0.85fr) minmax(80px, 0.75fr) minmax(68px, auto);
+  grid-template-columns: minmax(125px, 1.25fr) minmax(105px, 0.95fr) minmax(95px, 0.85fr) minmax(85px, 0.8fr) minmax(80px, 0.75fr) minmax(120px, 1.05fr) minmax(110px, 0.95fr) minmax(92px, 0.85fr) minmax(68px, auto);
   gap: 8px;
   align-items: end;
 }
@@ -2605,7 +2670,7 @@ th {
 }
 
 .truck-summary-stats .ledger-total span {
-  color: var(--muted);
+  color: #18304d;
   font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
@@ -2705,7 +2770,7 @@ th {
 }
 
 .ledger-total span {
-  color: var(--muted);
+  color: #18304d;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -2717,6 +2782,203 @@ th {
   line-height: 1.25;
   white-space: nowrap;
   margin: 2px 0 0;
+}
+
+/* Shared KPI card treatment: soft tinted surface, accent rail, and subtle corner glow. */
+.dashboard-kpi-card,
+.ledger-total {
+  position: relative;
+  overflow: hidden;
+  border-left: 5px solid #18304d;
+  background: linear-gradient(135deg, #ffffff 0%, #eef4fb 100%);
+  box-shadow: 0 4px 14px rgba(24, 48, 77, 0.08);
+}
+
+.dashboard-kpi-card::after,
+.ledger-total::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  bottom: -42px;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: rgba(24, 48, 77, 0.08);
+  pointer-events: none;
+}
+
+.dashboard-kpi-card:nth-child(4n + 2),
+.ledger-total:nth-child(4n + 2) {
+  border-left-color: #0d7a6e;
+  background: linear-gradient(135deg, #ffffff 0%, #edf9f7 100%);
+}
+
+.dashboard-kpi-card:nth-child(4n + 2)::after,
+.ledger-total:nth-child(4n + 2)::after {
+  background: rgba(13, 122, 110, 0.08);
+}
+
+.dashboard-kpi-card:nth-child(4n + 3),
+.ledger-total:nth-child(4n + 3) {
+  border-left-color: #c85a17;
+  background: linear-gradient(135deg, #ffffff 0%, #fff6e8 100%);
+}
+
+.dashboard-kpi-card:nth-child(4n + 3)::after,
+.ledger-total:nth-child(4n + 3)::after {
+  background: rgba(200, 90, 23, 0.08);
+}
+
+.dashboard-kpi-card:nth-child(4n),
+.ledger-total:nth-child(4n) {
+  border-left-color: #ba3a2f;
+  background: linear-gradient(135deg, #ffffff 0%, #fdf0ee 100%);
+}
+
+.dashboard-kpi-card:nth-child(4n)::after,
+.ledger-total:nth-child(4n)::after {
+  background: rgba(186, 58, 47, 0.08);
+}
+
+.dashboard-kpi-card > *,
+.ledger-total > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Summary cards used by Equipment, Maintenance, and Employees. */
+.grid > .card {
+  border-left: 5px solid #18304d;
+  background: linear-gradient(135deg, #ffffff 0%, #eef4fb 100%);
+  box-shadow: 0 4px 14px rgba(24, 48, 77, 0.08);
+}
+
+.grid > .card::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  bottom: -42px;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: rgba(24, 48, 77, 0.08);
+  pointer-events: none;
+}
+
+.grid > .card:nth-child(4n + 2) {
+  border-left-color: #0d7a6e;
+  background: linear-gradient(135deg, #ffffff 0%, #edf9f7 100%);
+}
+
+.grid > .card:nth-child(4n + 2)::after {
+  background: rgba(13, 122, 110, 0.08);
+}
+
+.grid > .card:nth-child(4n + 3) {
+  border-left-color: #c85a17;
+  background: linear-gradient(135deg, #ffffff 0%, #fff6e8 100%);
+}
+
+.grid > .card:nth-child(4n + 3)::after {
+  background: rgba(200, 90, 23, 0.08);
+}
+
+.grid > .card:nth-child(4n) {
+  border-left-color: #ba3a2f;
+  background: linear-gradient(135deg, #ffffff 0%, #fdf0ee 100%);
+}
+
+.grid > .card:nth-child(4n)::after {
+  background: rgba(186, 58, 47, 0.08);
+}
+
+.grid > .card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Preserve the dashboard's expiry and outstanding alert semantics over shared card colors. */
+.dashboard-kpi-card.expiry-due {
+  border-left-color: #cf8d27;
+  background: #fff3dc;
+}
+
+.dashboard-kpi-card.expiry-expired {
+  border-left-color: #ca5048;
+  background: #fde9e7;
+}
+
+.dashboard-kpi-card.financial-outstanding {
+  border-left-color: #cf8d27;
+  background: #fff3dc;
+}
+
+/* Shared card badges use the same high-contrast treatment as Two Pay Records. */
+.grid > .card > .badge {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  min-height: 0;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.grid > .card:nth-child(4n + 1) > .badge { background: #18304d; }
+.grid > .card:nth-child(4n + 2) > .badge { background: #0d7a6e; }
+.grid > .card:nth-child(4n + 3) > .badge { background: #c85a17; }
+.grid > .card:nth-child(4n) > .badge { background: #ba3a2f; }
+
+.dashboard-kpi-card h5 {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  min-height: 0;
+  padding: 5px 9px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.dashboard-kpi-card:nth-child(4n + 1) h5 { background: #18304d; }
+.dashboard-kpi-card:nth-child(4n + 2) h5 { background: #0d7a6e; }
+.dashboard-kpi-card:nth-child(4n + 3) h5 { background: #c85a17; }
+.dashboard-kpi-card:nth-child(4n) h5 { background: #ba3a2f; }
+.dashboard-kpi-card.expiry-due h5,
+.dashboard-kpi-card.financial-outstanding h5 { background: #c98b20; color: #fff; }
+.dashboard-kpi-card.expiry-expired h5 { background: #ba3a2f; color: #fff; }
+
+/* Apply the same Two Pay Records typography and spacing to every summary card. */
+.card,
+.ledger-total,
+.dashboard-kpi-card,
+.two-pay-stat-card {
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+.card > strong,
+.ledger-total strong,
+.dashboard-kpi-card strong,
+.two-pay-stat-card strong {
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.card > .badge,
+.ledger-total .badge,
+.dashboard-kpi-card h5,
+.two-pay-stat-card .badge {
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-weight: 700;
+  letter-spacing: .03em;
 }
 
 .ledger-count {
@@ -2951,10 +3213,30 @@ body.confirm-modal-open {
 }
 
 .table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 72vh;
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: #fffdf9;
+}
+
+.table-wrap > table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.table-wrap > table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.table-wrap thead th {
+  background-color: #fffdf9;
 }
 
 .equipment-toolbar {
@@ -3553,26 +3835,6 @@ body.confirm-modal-open {
   height: 38px;
 }
 
-.employee-status-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-width: max-content;
-}
-
-.employee-status-actions .badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 76px;
-}
-
-.employee-status-actions .btn {
-  justify-self: start;
-  min-width: 118px;
-  white-space: nowrap;
-}
-
 .employee-register-table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -3607,10 +3869,15 @@ body.confirm-modal-open {
 }
 
 .employee-register-table td:last-child .table-actions {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  flex-wrap: nowrap;
+}
+
+.employee-register-table td:last-child .table-actions .btn {
+  min-width: 122px;
+  justify-content: center;
 }
 
 .maintenance-image-modal .bilty-modal-dialog {
@@ -3759,9 +4026,16 @@ body[data-page="truck-summary"] .truck-summary-table {
 
 body[data-page="truck-summary"] .truck-summary-table th {
   white-space: nowrap;
-  background: #f2e2d1;
-  color: #3f3025;
-  border-color: #a88469;
+  background: #b8dce7;
+  color: #0b1f33;
+  border-color: #18304d;
+}
+
+body[data-page="completed-truck-summary"] .truck-summary-table th {
+  white-space: nowrap;
+  background: #b8dce7;
+  color: #0b1f33;
+  border-color: #18304d;
 }
 
 body[data-page="truck-summary"] .truck-summary-table th,
@@ -3810,35 +4084,38 @@ body[data-page="truck-summary"] .truck-summary-table td {
   gap: 28px;
   min-height: 62px;
   padding: 11px 16px;
-  border-bottom: 2px solid #a98468;
-  background: #f7eadc;
+  border-bottom: 2px solid #18304d;
+  background: #dceef3;
 }
 
-.truck-job-identity,
-.truck-job-customer {
+.truck-job-meta {
   display: grid;
-  gap: 3px;
-}
-
-.truck-job-customer {
+  gap: 5px;
   flex: 1;
   min-width: 0;
 }
 
-.truck-job-customer strong {
+.truck-job-meta-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: #102a44;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.truck-job-broker {
+  min-width: 0;
+}
+
+.truck-job-broker span {
   overflow-wrap: anywhere;
 }
 
-.truck-job-header span {
-  color: #7b604c;
-  font-size: 11px;
+.truck-job-meta-item strong {
+  color: #102a44;
+  font-size: inherit;
   font-weight: 700;
-  text-transform: uppercase;
-}
-
-.truck-job-header strong {
-  color: #5c402d;
-  font-size: 15px;
 }
 
 .truck-job-count {
@@ -3847,6 +4124,10 @@ body[data-page="truck-summary"] .truck-summary-table td {
   border: 1px solid #ceb49d;
   border-radius: 999px;
   background: rgba(255, 250, 244, 0.92);
+  color: #7b604c;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -4099,13 +4380,13 @@ body[data-page="booking"] .ledger-table thead th {
 body[data-page="booking"] .ledger-table td {
   padding: 10px;
   vertical-align: top;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 body[data-page="booking"] .ledger-table th,
 body[data-page="booking"] .ledger-table td {
   word-break: normal;
-  overflow-wrap: break-word;
+  overflow-wrap: normal;
 }
 
 body[data-page="booking"] .ledger-table .table-actions {
@@ -4644,8 +4925,7 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
     justify-content: flex-end;
   }
 
-  .statement-table,
-  table {
+  .statement-table {
     display: block;
     overflow-x: auto;
     white-space: nowrap;

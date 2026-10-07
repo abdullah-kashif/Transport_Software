@@ -7,6 +7,23 @@
 
 ---
 
+- **2026-10-07 (Update 12)**: Shared summary cards now use Two Pay Records-style colored title badges for clear screen and print visibility. Added the English Builty module (`builty.html`) with searchable local register and excluded driver signature, charges, total rent, and remaining rent fields. Styles cache is `20261007-12`.
+- **2026-10-07 (Update 13)**: Applied Two Pay Records typography and badge styling to all summary cards, renamed the visible module label to Bilty, and fixed Bilty navigation initialization before PJAX listeners. Styles cache is `20261007-13`.
+- **2026-10-07 (Update 14)**: Rebuilt the Bilty page on the standard GTLS application shell and module layout so its hero, notification area, form, toolbar, and register match the other modules.
+- **2026-10-07 (Update 15)**: Added backward-compatible Bilty access normalization so existing admin sessions can open the Bilty module instead of being redirected to Dashboard.
+- **2026-10-07 (Update 16)**: Added a direct Bilty route safeguard and excluded Bilty from the legacy access fallback so clicking Bilty cannot redirect to Dashboard.
+- **2026-10-07 (Update 17)**: Bumped `app.js` to `20261007-17` across all HTML pages to clear stale cached routing code and load the Bilty fix.
+- **2026-10-07 (Update 18)**: Bilty navigation now uses the existing local admin session when Supabase session hydration is temporarily unavailable, preventing the Sign In/Dashboard redirect loop.
+- **2026-10-07 (Update 19)**: Preserved the local session before Supabase access validation and bumped `app.js` to `20261007-19` so Bilty navigation can complete during temporary remote-session misses.
+- **2026-10-07 (Update 20)**: Rebuilt Bilty with valid nested markup and the standard module shell, including responsive sidebar, hero/notifications, section headers, form grid, and register toolbar. Updated its assets to `20261007-20`.
+- **2026-10-07 (Update 21)**: Aligned Bilty form actions with side-by-side Save and Clear Form buttons, added per-record letterhead PDF downloads, and connected Bilty records to Supabase hydration/upsert. Added `supabase-bilty.sql` with the `builty_records` table and module-scoped RLS; bumped application and stylesheet caches across HTML pages.
+- **2026-10-07 (Update 22)**: Aligned the Bilty record count with the search field. Repaired missing/duplicate internal record IDs from earlier Bilty saves so editing and saving updates the selected record instead of creating a new one. Bumped app and stylesheet cache keys to `20261007-22`.
+- **2026-10-07 (Update 23)**: Bilty Download PDF now uses `assets/Builty.pdf` as the full page background and fills saved record values into its header lines, goods row, and details area. Kept Edit and Download PDF side by side with a wider Action cell. Added pdf-lib and bumped cache keys to `20261007-23`.
+- **2026-10-07 (Update 24)**: Standardized ledger table behavior across modules: wrapped tables now scroll horizontally and vertically with sticky, non-wrapping headers. Repositioned Bilty PDF values to their matching header blanks and aligned font baseline sizing to the template. Bumped app and stylesheet cache keys to `20261007-24`.
+- **2026-10-07 (Update 26)**: Increased Bilty PDF field text size for clearer print output while retaining field-width fitting; quantity, weight, and remarks also use improved readable sizing. Bumped app cache keys to `20261007-26`.
+- **2026-10-07 (Update 27)**: Moved Employee Register's Download PDF button into the Action column beneath Edit. Kept the Status and Image columns dedicated to their respective values and stacked the two actions with matching button widths. Bumped app/style caches to `20261007-27`.
+- **2026-10-07 (Update 25)**: Corrected Bilty PDF field alignment by right-aligning header values within their blank lines, fitting long values to each field, and centering quantity/weight in their boxes. Updated app cache keys to `20261007-25`.
+
 ## 1. Quick Technical Summary
 
 - **Type**: Enterprise Transport & Logistics Management Application.
@@ -25,9 +42,9 @@
 | **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 4019) |
 | **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5364) |
 | **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5919) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6418) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6418) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6718) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6535) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6535) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6877) |
 | **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7104) |
 | **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7449) |
 | **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7834) |
@@ -60,6 +77,22 @@
 3. **No Build Step Required**: Never install bundlers (webpack, vite, rollup) unless explicitly asked. The app runs directly by opening any `.html` file or via a static web server.
 4. **Refer to Documentation**: For comprehensive data structures and database schema, read [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md).
 5. **Always Update Documentation on Code Changes**: Whenever you make any modifications (add a field, change calculation math, alter Supabase schema or RLS, add new pages, or update styles), you **MUST update [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md)** (and this file's line index if shifted) and log the change in the **Changelog** section.
+
+- **2026-10-07 (Update 6)**: Pending and Completed Truck Summary job cards now show Job No on the first line and Broker on the second line. Standardized all downloadable summary/register table headers with the shared theme navy `#18304D` background and white bold text for consistent, print-clear output across Booking, Customer, Broker, Truck, Two Pay, Equipment, Maintenance, Employee, and Payment Voucher summaries. Bumped the two truck summary pages to `app.js` and `styles.css` version `20261007-6`.
+
+- **2026-10-07 (Update 7)**: Removed the individual P&L field from each Trucker/Broker row in the Booking Form and removed the per-broker P&L column from the Booking Ledger. Booking-level Net P&L and container-level P&L remain available; legacy broker P&L data stays internal for compatibility. Bumped `booking.html` and `ledger.html` assets to `v=20261007-7`.
+
+- **2026-10-07 (Update 8)**: Standardized downloadable summary/register table headers to the supplied light blue `#B8DCE7` background with bold black text and print-safe dark borders. Changed Job Order labels to `A-Z` / `Z-A` and Date Order labels to `Oldest First` / `Newest First`, preserving the existing sort behavior. Bumped affected pages to `app.js?v=20261007-8`.
+
+- **2026-10-07 (Update 9)**: Applied the Two Pay Records colored KPI card treatment across dashboard and ledger summary cards. Standardized all visible sort controls to `Sort A to Z` / `Sort Z to A` with consistent `asc` / `desc` values, including date and job controls. Bumped affected pages to `app.js` and `styles.css` version `20261007-9`.
+
+- **2026-10-07 (Update 10)**: Improved print and screenshot readability across the software with dark navy page titles, navy KPI labels, pale blue truck job headers, and light blue high-contrast summary table headers. Bumped `styles.css` to `v=20261007-10` across all HTML pages.
+
+- **2026-10-07 (Update 11)**: Extended colored KPI cards to Equipment, Fleet Maintenance, and Employees; preserved Dashboard expiry and outstanding alert colors; and applied a consistent Trebuchet MS / Segoe UI font stack to all headings. Bumped `styles.css` to `v=20261007-11` across all HTML pages.
+
+- **2026-10-07 (Update 5)**: Pending and Completed Truck Summary job headers now display inline as `Job No: [value], Broker: [value]`. Long broker names wrap responsively while the movement count remains aligned on the right. Bumped `app.js` and `styles.css` to `v=20261007-5` on both summary pages.
+
+- **2026-10-07 (Update 4)**: Completed Truck Summary now has a Download Summary button immediately before Clear Filters. The A3 landscape PDF uses the official letterhead and exports only the completed trips matching General Filter, Truck No, completion date range, and Job Order; its amounts are labeled Received Amount. Updated the completed page's `app.js` cache version to `20261007-4` and documented the change in `PROJECT_ARCHITECTURE.md`.
 
 - **2026-10-07 (Update 3)**: New Payment Voucher Module with Dynamic Multi-Row Line Items, Auto Words Conversion, 1-to-1 PDF & Remote Supabase Persistence:
   1. **New Module (`payment-voucher.html`)**: Added dedicated Payment Voucher module with header metadata (`PV No.`, `Date`, `Pay To`, `Pay By`, `A/C No.`, `Prepared By`, `Received By`), dynamic multi-item line matrix (`Serial No.`, `Payment Method`, `Description`, `Unit Price`, `Amount`), real-time Total Amount & Words conversion (`The Sum of: Rupees ... Only`), top KPI summary counters, and full Voucher Register with search, payee filter, date range, date order, and edit/delete actions.

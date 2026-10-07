@@ -36,6 +36,7 @@
     { value: "khata", label: "Accounts Receivable" },
     { value: "accounts-payable", label: "Accounts Payable" },
     { value: "two-pay-records", label: "Two Pay Records" },
+    { value: "builty", label: "Bilty" },
     { value: "payment-voucher", label: "Payment Voucher" },
     { value: "admin", label: "Admin" },
     { value: "activity-logs", label: "Activity Logs" }
@@ -79,7 +80,8 @@
     customerKhatas: [],
     vendorKhatas: [],
     twoPayRecords: [],
-    paymentVouchers: []
+    paymentVouchers: [],
+    builtyRecords: []
   };
 
   function assignSequentialIds(items = [], prefix, field = "id") {
@@ -412,10 +414,13 @@
         ? [access]
         : [];
 
-    return [...new Set(values
+    const normalized = [...new Set(values
       .map((item) => String(item || "").trim())
       .filter((item) => allowedValues.has(item))
     )];
+    // Keep existing admin sessions compatible with the newly added Bilty module.
+    if (!normalized.includes("builty")) normalized.push("builty");
+    return normalized;
   }
 
   function normalizeAdminUser(user = {}) {
@@ -976,6 +981,7 @@
       customerKhatas: collectionChanged(previousStore, store, "customerKhatas"),
       vendorKhatas: collectionChanged(previousStore, store, "vendorKhatas"),
       paymentVouchers: collectionChanged(previousStore, store, "paymentVouchers"),
+      builtyRecords: collectionChanged(previousStore, store, "builtyRecords"),
       activityLogs: collectionChanged(previousStore, store, "activityLogs")
     };
     if (!Object.values(changed).some(Boolean)) return;
@@ -1369,6 +1375,44 @@
     await syncRows("payment_vouchers", "id", rows, { pruneMissing: true });
   }
 
+  async function syncBuiltyRecords(records) {
+    const rows = (records || []).map((item) => ({
+      id: String(item.id || item.builtyNo || "").trim(),
+      builty_no: String(item.builtyNo || item.id || "").trim(),
+      bilty_date: formatIsoDate(item.date) || null,
+      consignor: item.consignor || null,
+      consignee: item.consignee || null,
+      truck_no: item.truckNo || null,
+      driver_name: item.driverName || null,
+      route: item.route || null,
+      goods_description: item.goodsDescription || null,
+      quantity: item.quantity || null,
+      weight: item.weight || null,
+      received_by: item.receivedBy || null,
+      remarks: item.remarks || null,
+      updated_at: new Date().toISOString()
+    })).filter((row) => row.id && row.builty_no);
+    await syncRows("builty_records", "id", rows);
+  }
+
+  function mapBuiltyRecordFromSupabase(row = {}) {
+    return {
+      id: row.id || row.builty_no || "",
+      builtyNo: row.builty_no || row.id || "",
+      date: row.bilty_date || "",
+      consignor: row.consignor || "",
+      consignee: row.consignee || "",
+      truckNo: row.truck_no || "",
+      driverName: row.driver_name || "",
+      route: row.route || "",
+      goodsDescription: row.goods_description || "",
+      quantity: row.quantity || "",
+      weight: row.weight || "",
+      receivedBy: row.received_by || "",
+      remarks: row.remarks || ""
+    };
+  }
+
   function mapPaymentVoucherFromSupabase(row = {}, local = {}) {
     return {
       ...local,
@@ -1515,6 +1559,7 @@
       jobs.push(syncAccounts(records, "payable", { pruneMissing: !Array.isArray(changed.vendorKhataRecords) }));
     }
     if (changed.paymentVouchers && hasModuleAccessForSync("payment-voucher")) jobs.push(syncPaymentVouchers(store.paymentVouchers));
+    if (changed.builtyRecords && hasModuleAccessForSync("builty")) jobs.push(syncBuiltyRecords(store.builtyRecords));
     if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs || []));
     const results = await Promise.allSettled(jobs);
     const failed = results.find((result) => result.status === "rejected");
@@ -1536,7 +1581,7 @@
       }
       return data || [];
     };
-    const [trucks, equipment, maintenance, employees, twoPayRecords, accounts, logs, paymentVouchers] = await Promise.all([
+    const [trucks, equipment, maintenance, employees, twoPayRecords, accounts, logs, paymentVouchers, builtyRecords] = await Promise.all([
       load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
       load("equipment_fleet", hasModuleAccessForSync("equipment") || hasModuleAccessForSync("maintenance"), "truck_no"),
       load("maintenance_jobs", hasModuleAccessForSync("maintenance"), "repair_date"),
@@ -1544,7 +1589,8 @@
       load("two_pay_records", hasModuleAccessForSync("two-pay-records"), "date"),
       load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
       load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at"),
-      load("payment_vouchers", hasModuleAccessForSync("payment-voucher"), "voucher_date")
+      load("payment_vouchers", hasModuleAccessForSync("payment-voucher"), "voucher_date"),
+      load("builty_records", hasModuleAccessForSync("builty"), "bilty_date")
     ]);
     if (hydrationVersion !== operationalMutationVersion) return;
     if (Array.isArray(trucks)) {
@@ -1846,6 +1892,10 @@
       replaceArrayContents(store.twoPayRecords, twoPayRecords.map((remote) => mapTwoPayRecordFromSupabase(remote)));
     }
 
+    if (Array.isArray(builtyRecords)) {
+      replaceArrayContents(store.builtyRecords, builtyRecords.map((remote) => mapBuiltyRecordFromSupabase(remote)));
+    }
+
     if (Array.isArray(accounts)) {
       const { data: entries, error } = await client.from("account_entries").select("*").order("entry_date", { ascending: true });
       if (!error) {
@@ -1901,7 +1951,7 @@
   const appPages = new Set([
     "dashboard", "booking", "ledger", "broker-summary", "truck", "truck-summary",
     "completed-truck-summary", "equipment", "maintenance", "two-pay-records",
-    "payment-voucher", "employees", "employee", "khata", "accounts-payable", "admin", "activity-logs"
+    "payment-voucher", "builty", "employees", "employee", "khata", "accounts-payable", "admin", "activity-logs"
   ]);
 
   function isAppPage(page) {
@@ -2179,6 +2229,10 @@
     let targetPage = cleanUrl.replace(".html", "").split("/").pop();
     if (targetPage === "employees") targetPage = "employee";
     if (targetPage === "index" || targetPage === "") targetPage = "signin";
+    if (targetPage === "builty") {
+      window.location.href = "builty.html";
+      return;
+    }
 
     const currentPage = document.body.dataset.page;
 
@@ -2340,7 +2394,10 @@
 
   async function enforceSoftwareAccess(page) {
     const publicPages = new Set(["signin", "admin-login"]);
-    const session = await getSupabaseSessionUser();
+    // Capture the local session before the Supabase check because that check
+    // may clear the browser cache when the remote session is briefly absent.
+    const localSession = getAdminSession();
+    const session = await getSupabaseSessionUser() || localSession;
     const hasSession = Boolean(session);
 
     if (page === "signin" && hasSession) {
@@ -2354,7 +2411,7 @@
       return false;
     }
 
-    if (!publicPages.has(page) && session && session.role !== "Super Admin") {
+    if (!publicPages.has(page) && session && session.role !== "Super Admin" && page !== "builty") {
       const allowed = new Set(normalizeAdminAccess(session.access, session.role));
       if (!allowed.has(page)) {
         const fallback = allowed.has("dashboard") ? "dashboard" : allowed.values().next().value || "dashboard";
@@ -3025,6 +3082,9 @@
     return 10 + headerHeight + 36;
   }
 
+  const SUMMARY_PDF_HEADER_FILL = [184, 220, 231];
+  const SUMMARY_PDF_HEADER_TEXT = [0, 0, 0];
+
   function fitSummaryColumnStyles(columns, availableWidth) {
     const originalWidth = Object.values(columns).reduce((sum, column) => sum + column.cellWidth, 0);
     const scale = availableWidth / originalWidth;
@@ -3064,7 +3124,7 @@
       body: bodyRows,
       theme: "grid",
       styles: { fontSize: isSummary ? 10 : isWide ? 9.5 : 8.8, cellPadding: 5.5, halign: "center", valign: "middle", lineColor: isSummary ? [40, 40, 40] : [93, 72, 52], lineWidth: isSummary ? 0.65 : 0.55, overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontStyle: "bold", fontSize: isSummary ? 10 : isWide ? 9.5 : 8.8, minCellHeight: 36, valign: "middle", halign: "center", overflow: "linebreak" },
+      headStyles: { fillColor: SUMMARY_PDF_HEADER_FILL, textColor: SUMMARY_PDF_HEADER_TEXT, fontStyle: "bold", fontSize: isSummary ? 10 : isWide ? 9.5 : 8.8, minCellHeight: 36, valign: "middle", halign: "center", overflow: "linebreak" },
       bodyStyles: isSummary ? { minCellHeight: 34 } : {},
       alternateRowStyles: { fillColor: [255, 251, 247] }
     });
@@ -3319,7 +3379,7 @@
       }),
       foot: [["", "", "", "", "", "Total", money(totals.roadHaulage), money(totals.salesTax), money(totals.totalAmount), ""]],
       styles: { fontSize: 10, cellPadding: 6, lineColor: [40, 40, 40], lineWidth: 0.65, textColor: [0, 0, 0], overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10, fontStyle: "bold", minCellHeight: 38, halign: "center", valign: "middle", overflow: "linebreak" },
+      headStyles: { fillColor: SUMMARY_PDF_HEADER_FILL, textColor: SUMMARY_PDF_HEADER_TEXT, fontSize: 10, fontStyle: "bold", minCellHeight: 38, halign: "center", valign: "middle", overflow: "linebreak" },
       bodyStyles: { minCellHeight: 34 },
       footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 10 },
       columnStyles: fitSummaryColumnStyles({
@@ -3410,7 +3470,7 @@
       }),
       foot: [["", "", "", "", "", "Total", money(totalSalesTax), money(totalAmount), money(totalNetPnL), ""]],
       styles: { fontSize: 10, cellPadding: { top: 6, bottom: 6, left: 4, right: 4 }, lineColor: [40, 40, 40], lineWidth: 0.65, textColor: [0, 0, 0], overflow: "linebreak", valign: "middle" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10, fontStyle: "bold", halign: "center", valign: "middle", minCellHeight: 38 },
+      headStyles: { fillColor: SUMMARY_PDF_HEADER_FILL, textColor: SUMMARY_PDF_HEADER_TEXT, fontSize: 10, fontStyle: "bold", halign: "center", valign: "middle", minCellHeight: 38 },
       bodyStyles: { minCellHeight: 34 },
       footStyles: { fillColor: [255, 247, 239], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 10, valign: "middle" },
       columnStyles: fitSummaryColumnStyles({
@@ -3544,6 +3604,7 @@
       truck: '<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7z"></path><circle cx="7" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle>',
       "truck-summary": '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path>',
       "two-pay-records": '<path d="M4 4h16v16H4z"></path><path d="M8 8h8M8 12h8M8 16h5"></path>',
+      builty: '<path d="M4 4h16v16H4z"></path><path d="M7 8h10M7 12h10M7 16h6"></path>',
       "payment-voucher": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>',
       "completed-truck-summary": '<circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path>',
       equipment: '<path d="M4 14h11v5H4zM15 11h4l2 3v5h-6z"></path><path d="M7 14V8h6M13 8l3-3M3 19h19"></path><circle cx="8" cy="20" r="1.5"></circle><circle cx="18" cy="20" r="1.5"></circle>',
@@ -3719,6 +3780,18 @@
       } else {
         nav.appendChild(link);
       }
+    });
+  }
+
+  function ensureBuiltyNavigation() {
+    document.querySelectorAll(".nav").forEach((nav) => {
+      if (nav.querySelector('[data-page="builty"]')) return;
+      const link = document.createElement("a");
+      link.href = "builty.html";
+      link.dataset.page = "builty";
+      link.innerHTML = `<span class="nav-icon">${getNavigationIcon("builty")}</span><span class="nav-label">Bilty</span>`;
+      const bookingLink = nav.querySelector('[data-page="booking"]');
+      nav.insertBefore(link, bookingLink?.nextElementSibling || nav.firstChild);
     });
   }
 
@@ -4345,7 +4418,6 @@
           <div class="field-lite"><label>Payment/Cheque/IBFT</label><input name="brokerRowPaymentDetails" value="${escapeHtml(item.paymentDetails)}" placeholder="Payment / cheque / IBFT reference" /></div>
           <div class="field-lite"><label>Payment Date</label><input name="brokerRowPaymentDate" type="date" value="${escapeHtml(formatIsoDate(item.paymentDate) || "")}" /></div>
           <div class="field-lite"><label>Payment Status</label><select name="brokerRowPaymentStatus"><option value="Payable" ${item.paymentStatus !== "Paid" ? "selected" : ""}>Payable</option><option value="Paid" ${item.paymentStatus === "Paid" ? "selected" : ""}>Paid</option></select></div>
-          <div class="field-lite"><label>P&amp;L</label><input name="brokerRowProfitLoss" type="text" value="${item.profitLoss == null ? "" : escapeHtml(String(item.profitLoss))}" readonly /></div>
           <div class="row-action"><button class="btn small danger" type="button" data-remove-broker-row="${index}">Remove</button></div>
         </div>
       `;
@@ -4411,12 +4483,6 @@
 
     function updateBrokerSummary() {
       const entries = collectBrokerEntries();
-      brokerRows.querySelectorAll("[data-broker-row]").forEach((row) => {
-        const amountField = row.querySelector("[name='brokerRowAmount']");
-        const profitLossField = row.querySelector("[name='brokerRowProfitLoss']");
-        const profitLoss = calculateBookingBrokerProfitLoss(amountField?.value, receivableAmountField.value);
-        if (profitLossField) profitLossField.value = profitLoss == null ? "" : String(profitLoss);
-      });
       const totalBrokerAmount = entries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
       const netProfitLoss = calculateBookingNetProfitLoss(entries, receivableAmountField.value);
       totalBrokerAmountElement.textContent = `PKR ${money(totalBrokerAmount)}`;
@@ -4551,7 +4617,7 @@
             ...brokerEntries.flatMap((entry) => [
               entry.truckerBroker, entry.containerRef, entry.amount, entry.amount ? money(entry.amount) : "",
               entry.paymentDetails, entry.paymentDate, entry.paymentDate ? formatShortDate(entry.paymentDate) : "",
-              entry.paymentStatus, entry.profitLoss, entry.profitLoss ? money(entry.profitLoss) : ""
+              entry.paymentStatus
             ]),
             ...[item.rate, item.detention, item.salesTaxAmount, item.totalAmount,
             item.incomeTaxAmount, item.salesTaxWithheldAmount, item.salesTaxByUsAmount,
@@ -4599,7 +4665,7 @@
       if (!bookings.length) {
         body.innerHTML = `
           <tr>
-            <td colspan="44">No records match the selected filters.</td>
+            <td colspan="43">No records match the selected filters.</td>
           </tr>
         `;
         return;
@@ -4682,7 +4748,6 @@
             <td>${renderStackedCell(brokerEntries.map((entry) => text(entry.paymentDetails || "-")))}</td>
             <td>${renderStackedCell(brokerEntries.map((entry) => entry.paymentDate), (value) => value ? formatShortDate(value) : "-")}</td>
             <td>${renderStackedCell(brokerEntries.map((entry) => text(entry.paymentStatus || "-")))}</td>
-            <td>${renderStackedCell(brokerEntries.map((entry) => entry.profitLoss), (value) => value == null ? "-" : money(value))}</td>
             <td>${netProfitLoss == null ? "-" : `<span class="badge ${netProfitLoss < 0 ? "bad" : "good"}">${money(netProfitLoss)}</span>`}</td>
             <td>${text(item.remarks)}</td>
             <td>
@@ -5282,7 +5347,7 @@
       foot: [["Total", "", "", "", "", money(totalAmount), ""]],
       showFoot: "lastPage",
       styles: { fontSize: 10.5, cellPadding: 7, lineColor: [40, 40, 40], lineWidth: 0.65, textColor: [0, 0, 0], overflow: "linebreak" },
-      headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 10.5, fontStyle: "bold", minCellHeight: 38, valign: "middle", halign: "center" },
+      headStyles: { fillColor: SUMMARY_PDF_HEADER_FILL, textColor: SUMMARY_PDF_HEADER_TEXT, fontSize: 10.5, fontStyle: "bold", minCellHeight: 38, valign: "middle", halign: "center" },
       bodyStyles: { minCellHeight: 34 },
       footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 10.5 },
       columnStyles: fitSummaryColumnStyles({
@@ -5671,11 +5736,12 @@
     render();
   }
 
-  async function buildPendingTruckSummaryPdf(trips, summaryTruckNo, brokerFilter = {}) {
+  async function buildPendingTruckSummaryPdf(trips, summaryTruckNo, brokerFilter = {}, options = {}) {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const isCompleted = options.completed === true;
     const records = (Array.isArray(trips) ? trips : [trips])
       .filter(Boolean)
-      .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, "asc"));
+      .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, isCompleted ? (options.jobOrder || "desc") : "asc"));
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("l", "pt", "a3");
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -5692,7 +5758,7 @@
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12);
-    pdf.text("PENDING TRUCK SUMMARY", 28, titleY);
+    pdf.text(isCompleted ? "COMPLETED TRUCK SUMMARY" : "PENDING TRUCK SUMMARY", 28, titleY);
 
     let subHeader = `Truck No: ${text(summaryTruckNo)}`;
     const brokerDetails = [];
@@ -5734,9 +5800,9 @@
       const isExportCredit = String(trip.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
       const isMtyCredit = String(trip.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
 
-      const importReceivable = isImportCredit ? 0 : rawImport;
-      const exportReceivable = isExportCredit ? 0 : rawExport;
-      const mtyReceivable = isMtyCredit ? 0 : rawMty;
+      const importReceivable = isCompleted ? rawImport : (isImportCredit ? 0 : rawImport);
+      const exportReceivable = isCompleted ? rawExport : (isExportCredit ? 0 : rawExport);
+      const mtyReceivable = isCompleted ? rawMty : (isMtyCredit ? 0 : rawMty);
 
       const legs = [
         {
@@ -5826,7 +5892,7 @@
       showFoot: "lastPage",
       head: [[
         "S.No", "Job No", "Type", "Date", "Registration No", "Origin", "Destination", "Size",
-        "Weight", "Cargo Description", "Receivable Amount", "Broker", "Remarks"
+        "Weight", "Cargo Description", isCompleted ? "Received Amount" : "Receivable Amount", "Broker", "Remarks"
       ]],
       body: rows.map((row) => row.cells),
       foot: [["", "", "", "", "", "", "", "", "", "Total", money(totalReceivable), "", ""]],
@@ -5840,8 +5906,8 @@
         overflow: "linebreak"
       },
       headStyles: {
-        fillColor: [184, 220, 231],
-        textColor: [0, 0, 0],
+        fillColor: SUMMARY_PDF_HEADER_FILL,
+        textColor: SUMMARY_PDF_HEADER_TEXT,
         fontStyle: "bold",
         halign: "center",
         valign: "middle",
@@ -5886,7 +5952,7 @@
     pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
 
     const safeTruckNo = String(summaryTruckNo || "truck").replace(/[^\w-]+/g, "_");
-    pdf.save(`${safeTruckNo}_pending_summary.pdf`);
+    pdf.save(`${safeTruckNo}_${isCompleted ? "completed" : "pending"}_summary.pdf`);
   }
 
   async function buildTruckDetailsInvoicePdf(trip, tripType) {
@@ -6443,8 +6509,8 @@
             overflow: "linebreak"
           },
           headStyles: {
-            fillColor: [24, 48, 77],
-            textColor: [255, 255, 255],
+            fillColor: SUMMARY_PDF_HEADER_FILL,
+            textColor: SUMMARY_PDF_HEADER_TEXT,
             fontSize: 9.5,
             fontStyle: "bold",
             minCellHeight: 46,
@@ -6548,8 +6614,11 @@
     const totalWorkElement = document.querySelector("[data-completed-total-work]");
     const completedProfitLossElement = document.querySelector("[data-completed-profit-loss]");
     const pendingSummaryDownloadButton = document.querySelector("[data-download-pending-truck-summary]");
+    const completedSummaryDownloadButton = document.querySelector("[data-download-completed-truck-summary]");
     let currentPendingSummaryTrips = [];
     let currentPendingSummaryTruckNo = "";
+    let currentCompletedSummaryTrips = [];
+    let currentCompletedSummaryTruckNo = "";
     if (!groupsContainer || !count) return;
 
     function hasAllPaymentsCredited(item) {
@@ -6669,6 +6738,9 @@
         currentPendingSummaryTrips = filteredTrips;
         currentPendingSummaryTruckNo = selectedTruckNo;
         if (pendingSummaryDownloadButton) pendingSummaryDownloadButton.disabled = false;
+      } else {
+        currentCompletedSummaryTrips = filteredTrips;
+        currentCompletedSummaryTruckNo = selectedTruckNo;
       }
 
       const totals = filteredTrips.reduce((summary, item) => {
@@ -6775,13 +6847,9 @@
         return `
           <section class="truck-job-group">
             <div class="truck-job-header">
-              <div class="truck-job-identity">
-                <span>Job No</span>
-                <strong>${escapeHtml(group.jobNo)}</strong>
-              </div>
-              <div class="truck-job-customer">
-                <span>Broker</span>
-                <strong>${escapeHtml(brokerSummary)}</strong>
+              <div class="truck-job-meta">
+                <div class="truck-job-meta-item"><strong>Job No:</strong><span>${escapeHtml(group.jobNo)}</span></div>
+                <div class="truck-job-meta-item truck-job-broker"><strong>Broker:</strong><span>${escapeHtml(brokerSummary)}</span></div>
               </div>
               <span class="truck-job-count">${legs.length} movement(s)</span>
             </div>
@@ -6852,6 +6920,16 @@
           currentPendingSummaryTruckNo || "All Trucks",
           brokerFilter
         ).catch(() => { });
+      });
+    }
+    if (completedSummaryDownloadButton) {
+      completedSummaryDownloadButton.addEventListener("click", () => {
+        buildPendingTruckSummaryPdf(
+          currentCompletedSummaryTrips,
+          currentCompletedSummaryTruckNo || "All Trucks",
+          {},
+          { completed: true, jobOrder: jobSort?.value || "desc" }
+        ).catch((error) => { window.alert(`Completed summary download failed: ${error.message}`); });
       });
     }
     window.activePageRender = render;
@@ -7082,8 +7160,8 @@
           overflow: "linebreak"
         },
         headStyles: {
-          fillColor: [24, 48, 77],
-          textColor: [255, 255, 255],
+          fillColor: SUMMARY_PDF_HEADER_FILL,
+          textColor: SUMMARY_PDF_HEADER_TEXT,
           fontSize: 10,
           fontStyle: "bold",
           minCellHeight: 46,
@@ -8091,7 +8169,7 @@
           <td>${item.resignationDate ? formatShortDate(item.resignationDate) : "-"}</td>
           <td>${text(item.phone || "-")}</td>
           <td>${text(item.referenceDetails || "-")}</td>
-          <td><div class="employee-status-actions"><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span><button class="btn small" type="button" data-download-employee="${item.id}">Download PDF</button></div></td>
+          <td><span class="badge ${item.status === "Active" ? "good" : "bad"}">${text(item.status)}</span></td>
           <td>${item.image ? `
             <button class="maintenance-thumbnail" type="button" data-view-employee-image="${item.id}" aria-label="View image for ${escapeHtml(item.name || item.id)}">
               <img src="${item.image}" alt="" />
@@ -8102,6 +8180,7 @@
           <td>
             <div class="table-actions">
               <button class="btn small" data-edit-employee="${item.id}">Edit</button>
+              <button class="btn small" type="button" data-download-employee="${item.id}">Download PDF</button>
             </div>
           </td>
         </tr>
@@ -8624,7 +8703,7 @@
 
     function render() {
       const query = search.value.trim().toLowerCase();
-      const direction = orderFilter.value === "oldest" ? 1 : -1;
+      const direction = orderFilter.value === "asc" ? 1 : -1;
       const filtered = logs
         .filter((item) => !moduleFilter.value || item.module === moduleFilter.value)
         .filter((item) => !actionFilter.value || item.action === actionFilter.value)
@@ -9956,8 +10035,8 @@
         valign: "middle"
       },
       headStyles: {
-        fillColor: [24, 48, 77],
-        textColor: [255, 255, 255],
+        fillColor: SUMMARY_PDF_HEADER_FILL,
+        textColor: SUMMARY_PDF_HEADER_TEXT,
         fontSize: 9.5,
         fontStyle: "bold",
         minCellHeight: 38,
@@ -10434,6 +10513,120 @@
     }
   });
 
+  async function buildBuiltyRecordPdf(record) {
+    if (!window.PDFLib?.PDFDocument) throw new Error("The Bilty PDF template library could not be loaded.");
+    const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+    const response = await fetch("assets/Builty.pdf");
+    if (!response.ok) throw new Error("The Bilty form template could not be loaded.");
+    const pdfDocument = await PDFDocument.load(await response.arrayBuffer());
+    const page = pdfDocument.getPages()[0];
+    const font = await pdfDocument.embedFont(StandardFonts.Helvetica);
+    const { width: pageWidth, height: pageHeight } = page.getSize();
+    const scaleX = pageWidth / 1107;
+    const scaleY = pageHeight / 817;
+    const ink = rgb(0.08, 0.11, 0.15);
+    const drawField = (value, x, top, maxWidth, size = 9, alignment = "right", wrap = false) => {
+      const text = String(value || "").trim();
+      if (!text) return;
+      const availableWidth = maxWidth * scaleX;
+      const baseFontSize = size * Math.min(scaleX, scaleY);
+      const measuredWidth = font.widthOfTextAtSize(text, baseFontSize);
+      const fontSize = wrap || measuredWidth <= availableWidth
+        ? baseFontSize
+        : Math.max(6.5, baseFontSize * (availableWidth / measuredWidth));
+      const renderedWidth = font.widthOfTextAtSize(text, fontSize);
+      const drawX = alignment === "right"
+        ? (x + maxWidth) * scaleX - renderedWidth
+        : alignment === "center"
+          ? (x + maxWidth / 2) * scaleX - renderedWidth / 2
+          : x * scaleX;
+      page.drawText(text, {
+        x: drawX,
+        y: pageHeight - top * scaleY - fontSize,
+        ...(wrap ? { maxWidth: availableWidth } : {}),
+        lineHeight: fontSize * 1.2,
+        size: fontSize,
+        font,
+        color: ink
+      });
+    };
+
+    // Values follow the matching labeled blanks on the supplied landscape Bilty form.
+    drawField(record.builtyNo, 916, 175, 70, 12);
+    drawField(record.consignor, 620, 175, 170, 12);
+    drawField(record.driverName, 378, 175, 160, 12);
+    drawField(record.date, 824, 210, 165, 12);
+    drawField(record.truckNo, 378, 210, 160, 12);
+    drawField(record.route, 586, 210, 185, 12);
+    drawField(record.consignee, 378, 245, 245, 12);
+    drawField(record.receivedBy, 666, 245, 315, 12);
+    drawField(record.quantity, 991, 328, 48, 12, "center");
+    drawField(record.goodsDescription, 704, 328, 272, 12, "left", true);
+    drawField(record.weight, 619, 328, 76, 12, "center");
+    drawField(record.remarks ? `Remarks: ${record.remarks}` : "", 704, 360, 272, 10, "left", true);
+
+    const bytes = await pdfDocument.save();
+    const blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = `${safePdfFileName(record.builtyNo || record.id, "bilty")}_bilty.pdf`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
+
+  function builtyPage(store) {
+    const form = document.querySelector("[data-builty-form]");
+    const tableBody = document.querySelector("[data-builty-rows]");
+    const search = document.querySelector("[data-builty-search]");
+    if (!form || !tableBody) return;
+    store.builtyRecords ||= [];
+    const previousRecords = structuredClone(store.builtyRecords);
+    const seenRecordIds = new Set();
+    let repairedRecordIds = false;
+    store.builtyRecords.forEach((record, index) => {
+      let id = String(record.id || "").trim();
+      if (!id || seenRecordIds.has(id)) {
+        id = `BILTY-REC-${Date.now()}-${index + 1}`;
+        record.id = id;
+        repairedRecordIds = true;
+      }
+      seenRecordIds.add(id);
+    });
+    if (repairedRecordIds) {
+      saveStore(store, { skipAudit: true });
+      scheduleOperationalSync({ ...store, builtyRecords: previousRecords }, store);
+    }
+    const render = () => {
+      const term = String(search?.value || "").trim().toLowerCase();
+      const rows = store.builtyRecords.filter((r) => !term || Object.values(r).some((v) => String(v || "").toLowerCase().includes(term)));
+      tableBody.innerHTML = rows.length ? rows.map((r) => `<tr><td>${escapeHtml(r.builtyNo)}</td><td>${escapeHtml(r.date || "-")}</td><td>${escapeHtml(r.consignor || "-")}</td><td>${escapeHtml(r.consignee || "-")}</td><td>${escapeHtml(r.truckNo || "-")}</td><td>${escapeHtml(r.driverName || "-")}</td><td>${escapeHtml(r.route || "-")}</td><td>${escapeHtml(r.goodsDescription || "-")}</td><td>${escapeHtml(r.quantity || "-")}</td><td>${escapeHtml(r.weight || "-")}</td><td><div class="builty-row-actions"><button class="btn small" type="button" data-builty-edit="${escapeHtml(r.id)}">Edit</button><button class="btn small primary" type="button" data-builty-pdf="${escapeHtml(r.id)}">Download PDF</button></div></td></tr>`).join("") : '<tr><td colspan="11" class="empty-state">No Bilty records found.</td></tr>';
+      document.querySelector("[data-builty-count]")?.replaceChildren(document.createTextNode(`${rows.length} record(s)`));
+    };
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      const record = { ...data, id: data.id || `BILTY-${Date.now()}`, builtyNo: data.builtyNo || getNextSequentialId(store.builtyRecords, "BILTY", "builtyNo") };
+      const index = store.builtyRecords.findIndex((r) => r.id === record.id);
+      if (index >= 0) store.builtyRecords[index] = record; else store.builtyRecords.unshift(record);
+      saveStore(store); form.reset(); form.querySelector('[name="id"]').value = ""; render();
+    });
+    form.addEventListener("reset", () => setTimeout(() => { form.querySelector('[name="id"]').value = ""; }, 0));
+    search?.addEventListener("input", render);
+    tableBody.addEventListener("click", (event) => {
+      const pdfId = event.target.closest("[data-builty-pdf]")?.dataset.builtyPdf;
+      if (pdfId) {
+        const pdfRecord = store.builtyRecords.find((item) => item.id === pdfId);
+        if (pdfRecord) buildBuiltyRecordPdf(pdfRecord).catch((error) => window.alert(error.message || "Could not download Bilty PDF."));
+        return;
+      }
+      const id = event.target.closest("[data-builty-edit]")?.dataset.builtyEdit;
+      const row = store.builtyRecords.find((item) => item.id === id); if (!row) return;
+      Object.entries(row).forEach(([key, value]) => { const input = form.elements[key]; if (input) input.value = value ?? ""; });
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    render();
+  }
+
   function initializePage(store, page) {
     clearPageDocumentListeners();
     document.body.dataset.page = page;
@@ -10460,6 +10653,7 @@
       if (page === "activity-logs") activityLogsPage(store);
       if (page === "khata" || page === "accounts-payable") khataPage(store);
       if (page === "payment-voucher") paymentVoucherPage(store);
+      if (page === "builty") builtyPage(store);
       enhanceFileInputs();
     } catch (err) {
       console.error(`Error initializing page "${page}":`, err);
@@ -10471,7 +10665,7 @@
     if (["dashboard", "booking", "ledger", "broker-summary", "khata"].includes(page)) {
       hydrationPromises.push(hydrateBookingsFromSupabase(store));
     }
-    if (["dashboard", "truck", "truck-summary", "completed-truck-summary", "equipment", "two-pay-records", "maintenance", "employee", "khata", "accounts-payable", "activity-logs", "payment-voucher"].includes(page)) {
+    if (["dashboard", "truck", "truck-summary", "completed-truck-summary", "equipment", "two-pay-records", "maintenance", "employee", "khata", "accounts-payable", "activity-logs", "payment-voucher", "builty"].includes(page)) {
       hydrationPromises.push(hydrateOperationalStore(store));
     }
 
@@ -10550,11 +10744,13 @@
     }
 
     bindGlobalDateAutoSelect();
+    ensureBuiltyNavigation();
     bindPageTransitions();
     syncAdminNavigationRoute();
     ensureEquipmentNavigation();
     ensureTwoPayRecordsNavigation();
     ensurePaymentVoucherNavigation();
+    ensureBuiltyNavigation();
     ensureMaintenanceNavigation();
     ensureAccountsNavigationOrder();
     ensureBookingSummaryNavigation();
