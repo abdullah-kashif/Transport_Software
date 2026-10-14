@@ -122,9 +122,9 @@
     let truckJobNumber = 1;
     store.truckExpenses = (store.truckExpenses || []).map((item, index) => {
       const currentJobNo = String(item.jobNo || "").trim();
-      if (!currentJobNo) return { ...item, id: `TRIP-${index + 1}` };
+      if (!currentJobNo) return { ...item, id: `TRIP-${index + 1}`, additionalImportDetails: Array.isArray(item.additionalImportDetails) ? item.additionalImportDetails : [], additionalExportDetails: Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : [] };
       if (!truckJobIds.has(currentJobNo)) truckJobIds.set(currentJobNo, `Job-${truckJobNumber++}`);
-      return { ...item, id: `TRIP-${index + 1}`, jobNo: truckJobIds.get(currentJobNo) };
+      return { ...item, id: `TRIP-${index + 1}`, jobNo: truckJobIds.get(currentJobNo), additionalImportDetails: Array.isArray(item.additionalImportDetails) ? item.additionalImportDetails : [], additionalExportDetails: Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : [] };
     });
 
     store.readableIdVersion = 2;
@@ -1140,8 +1140,65 @@
     }
   }
 
+  const TRUCK_DETAIL_DATABASE_FIELDS = {
+    import: {
+      truckNo: "import_truck_no", date: "import_date", customer: "import_customer", origin: "import_origin",
+      destination: "import_destination", size: "import_size", weight: "import_weight", cargoDescription: "import_cargo_description",
+      mtyBoxFreight: "mty_box_freight", mtyBroker: "mty_broker", importFreight: "import_freight",
+      importDetention: "import_detention", importBrokerCommission: "import_broker_commission", importBroker: "import_broker",
+      importReceivedAmount: "import_receivable_amount", importPaymentTerm: "import_payment_term", importChequeDetails: "import_cheque_details",
+      importPaymentReceivedDate: "import_payment_received_date", importPaymentStatus: "import_payment_status",
+      mtyPaymentDate: "mty_payment_date", mtyPaymentStatus: "mty_payment_status", importCustomerCollection: "import_customer_collection",
+      importPaymentDate: "import_payment_date", importChequeDetails2: "import_cheque_details2", importRemarks: "import_remarks"
+    },
+    export: {
+      exportTruckNo: "export_truck_no", exportLoadDate: "export_load_date", exportCustomer: "export_customer",
+      exportOrigin: "export_origin", exportDestination: "export_destination", exportSize: "export_size",
+      exportWeight: "export_weight", exportCargoDescription: "export_cargo_description", exportMtyBoxFreight: "export_mty_box_freight",
+      exportMtyBroker: "export_mty_broker", exportFreight: "export_freight", exportDetention: "export_detention",
+      exportBrokerCommission: "export_broker_commission", exportBroker: "export_broker", exportReceivedAmount: "export_receivable_amount",
+      exportPaymentTerm: "export_payment_term", exportChequeDetails: "export_cheque_details",
+      exportPaymentReceivedDate: "export_payment_received_date", exportPaymentStatus: "export_payment_status",
+      exportMtyPaymentDate: "export_mty_payment_date", exportMtyPaymentStatus: "export_mty_payment_status",
+      exportCustomerCollection: "export_customer_collection", exportPaymentDate: "export_payment_date",
+      exportChequeDetails2: "export_cheque_details2", exportRemarks: "export_remarks"
+    }
+  };
+
+  function mapTruckDetailToDatabase(detail = {}, type) {
+    const fields = TRUCK_DETAIL_DATABASE_FIELDS[type] || {};
+    const dateFields = new Set(["date", "exportLoadDate", "importPaymentReceivedDate", "mtyPaymentDate", "exportPaymentReceivedDate", "exportMtyPaymentDate", "importPaymentDate", "exportPaymentDate"]);
+    const statusFields = new Set(["importPaymentStatus", "mtyPaymentStatus", "exportPaymentStatus", "exportMtyPaymentStatus"]);
+    const numericFields = new Set(["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportMtyBoxFreight", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection"]);
+    return Object.fromEntries(Object.entries(fields).map(([key, column]) => {
+      let value = detail[key];
+      if (dateFields.has(key)) value = formatIsoDate(value) || null;
+      else if (statusFields.has(key)) value = value === "Credit" ? "Credit" : "Awaited";
+      else if (numericFields.has(key)) value = Number(value || 0);
+      else {
+        const textValue = String(value ?? "");
+        value = textValue.trim() ? textValue : null;
+      }
+      return [column, value];
+    }));
+  }
+
+  function mapTruckDetailFromDatabase(row = {}, type) {
+    const fields = TRUCK_DETAIL_DATABASE_FIELDS[type] || {};
+    const numericFields = new Set(["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportMtyBoxFreight", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection"]);
+    const statusFields = new Set(["importPaymentStatus", "mtyPaymentStatus", "exportPaymentStatus", "exportMtyPaymentStatus"]);
+    return Object.fromEntries(Object.entries(fields).map(([key, column]) => {
+      const value = row[column];
+      if (numericFields.has(key)) return [key, Number(value || 0)];
+      if (statusFields.has(key)) return [key, value === "Credit" ? "Credit" : "Awaited"];
+      return [key, value ?? ""];
+    }));
+  }
+
   async function syncTruckJobs(records) {
     const rows = [];
+    const importDetailRows = [];
+    const exportDetailRows = [];
     for (const item of records || []) {
       const imagePath = await uploadPrivateDataUrl(
         item.image,
@@ -1186,6 +1243,12 @@
         profit_loss: Number(item.profitLoss || 0), image_path: imagePath || null,
         updated_at: new Date().toISOString()
       });
+      (Array.isArray(item.additionalImportDetails) ? item.additionalImportDetails : []).forEach((detail, index) => {
+        importDetailRows.push({ job_no: item.jobNo || item.id, detail_number: index + 2, ...mapTruckDetailToDatabase(detail, "import") });
+      });
+      (Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : []).forEach((detail, index) => {
+        exportDetailRows.push({ job_no: item.jobNo || item.id, detail_number: index + 2, ...mapTruckDetailToDatabase(detail, "export") });
+      });
     }
     try {
       await syncRows("truck_jobs", "job_no", rows);
@@ -1217,6 +1280,16 @@
       } else {
         throw error;
       }
+    }
+    try {
+      if (importDetailRows.length) await syncRows("truck_import_details", "job_no,detail_number", importDetailRows);
+      if (exportDetailRows.length) await syncRows("truck_export_details", "job_no,detail_number", exportDetailRows);
+    } catch (error) {
+      const msg = String(error?.message || error?.details || "");
+      if (msg.includes("truck_import_details") || msg.includes("truck_export_details") || error?.code === "PGRST205") {
+        throw new Error("Run supabase-truck-multiple-details.sql before syncing additional Import / Export forms.");
+      }
+      throw error;
     }
   }
 
@@ -1581,8 +1654,10 @@
       }
       return data || [];
     };
-    const [trucks, equipment, maintenance, employees, twoPayRecords, accounts, logs, paymentVouchers, builtyRecords] = await Promise.all([
+    const [trucks, truckImportDetails, truckExportDetails, equipment, maintenance, employees, twoPayRecords, accounts, logs, paymentVouchers, builtyRecords] = await Promise.all([
       load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
+      load("truck_import_details", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "detail_number"),
+      load("truck_export_details", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "detail_number"),
       load("equipment_fleet", hasModuleAccessForSync("equipment") || hasModuleAccessForSync("maintenance"), "truck_no"),
       load("maintenance_jobs", hasModuleAccessForSync("maintenance"), "repair_date"),
       load("employees", hasModuleAccessForSync("employee"), "joining_date"),
@@ -1593,6 +1668,29 @@
       load("builty_records", hasModuleAccessForSync("builty"), "bilty_date")
     ]);
     if (hydrationVersion !== operationalMutationVersion) return;
+    const importDetailsByJob = new Map();
+    const exportDetailsByJob = new Map();
+    (truckImportDetails || []).forEach((row) => {
+      const key = String(row.job_no || "").trim().toUpperCase();
+      if (!key) return;
+      if (!importDetailsByJob.has(key)) importDetailsByJob.set(key, []);
+      importDetailsByJob.get(key).push({ detailNumber: Number(row.detail_number || 0), detail: mapTruckDetailFromDatabase(row, "import") });
+    });
+    (truckExportDetails || []).forEach((row) => {
+      const key = String(row.job_no || "").trim().toUpperCase();
+      if (!key) return;
+      if (!exportDetailsByJob.has(key)) exportDetailsByJob.set(key, []);
+      exportDetailsByJob.get(key).push({ detailNumber: Number(row.detail_number || 0), detail: mapTruckDetailFromDatabase(row, "export") });
+    });
+    for (const detailMap of [importDetailsByJob, exportDetailsByJob]) {
+      detailMap.forEach((details) => details.sort((left, right) => left.detailNumber - right.detailNumber));
+    }
+    const getAdditionalDetails = (detailMap, key, legacyDetails, localDetails) => {
+      const relational = (detailMap.get(key) || []).map((entry) => entry.detail);
+      if (relational.length) return relational;
+      if (Array.isArray(legacyDetails) && legacyDetails.length) return legacyDetails;
+      return Array.isArray(localDetails) ? localDetails : [];
+    };
     if (Array.isArray(trucks)) {
       const remoteMap = new Map();
       trucks.forEach((r) => {
@@ -1640,6 +1738,8 @@
             exportMtyPaymentStatus: r.export_mty_payment_status || local.exportMtyPaymentStatus || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
             roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense ?? local.dieselExpense ?? 0),
+            additionalImportDetails: getAdditionalDetails(importDetailsByJob, key, r.additional_import_details, local.additionalImportDetails),
+            additionalExportDetails: getAdditionalDetails(exportDetailsByJob, key, r.additional_export_details, local.additionalExportDetails),
             profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || local.imagePath || "",
             image: local.image || getCachedSignedUrl(r.image_path)
           });
@@ -1684,6 +1784,8 @@
             exportMtyPaymentStatus: r.export_mty_payment_status || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
             roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense || 0),
+            additionalImportDetails: getAdditionalDetails(importDetailsByJob, key, r.additional_import_details, []),
+            additionalExportDetails: getAdditionalDetails(exportDetailsByJob, key, r.additional_export_details, []),
             profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
             image: getCachedSignedUrl(r.image_path)
           });
@@ -3868,32 +3970,20 @@
             suffix: "booking"
           })),
         ...truckJobs.flatMap((item) => [
-          {
-            item,
-            moduleLabel: "Import Payment",
-            href: "truck.html",
-            amount: calculateTruckTripFinancials(item).importReceivable,
-            subject: item.truckNo || item.jobNo || item.id || "Truck Job",
-            reference: item.jobNo || item.id || "Payment",
-            dateLabel: "Due date",
-            paymentTerm: item.importPaymentTerm,
-            baseDate: item.date,
-            status: item.importPaymentStatus,
-            suffix: "import"
-          },
-          {
-            item,
-            moduleLabel: "Export Payment",
-            href: "truck.html",
-            amount: calculateTruckTripFinancials(item).exportReceivable,
-            subject: item.exportTruckNo || item.truckNo || item.jobNo || item.id || "Truck Job",
-            reference: item.jobNo || item.id || "Payment",
-            dateLabel: "Due date",
-            paymentTerm: item.exportPaymentTerm,
-            baseDate: item.exportLoadDate,
-            status: item.exportPaymentStatus,
-            suffix: "export"
-          }
+          ...getTruckImportDetails(item).map((detail, index) => ({
+            item, moduleLabel: `Import Payment${index ? ` ${index + 1}` : ""}`, href: "truck.html",
+            amount: Number(detail.importReceivedAmount ?? (Number(detail.importFreight || 0) + Number(detail.importDetention || 0) - Number(detail.importBrokerCommission || 0))),
+            subject: detail.truckNo || item.jobNo || item.id || "Truck Job", reference: `${item.jobNo || item.id || "Payment"}${getTruckImportDetails(item).length > 1 ? ` / Import ${index + 1}` : ""}`,
+            dateLabel: "Due date", paymentTerm: detail.importPaymentTerm, baseDate: detail.date,
+            status: detail.importPaymentStatus, suffix: `import-${index + 1}`
+          })),
+          ...getTruckExportDetails(item).map((detail, index) => ({
+            item, moduleLabel: `Export Payment${index ? ` ${index + 1}` : ""}`, href: "truck.html",
+            amount: Number(detail.exportReceivedAmount ?? (Number(detail.exportFreight || 0) + Number(detail.exportDetention || 0) - Number(detail.exportBrokerCommission || 0))),
+            subject: detail.exportTruckNo || item.truckNo || item.jobNo || item.id || "Truck Job", reference: `${item.jobNo || item.id || "Payment"}${getTruckExportDetails(item).length > 1 ? ` / Export ${index + 1}` : ""}`,
+            dateLabel: "Due date", paymentTerm: detail.exportPaymentTerm, baseDate: detail.exportLoadDate,
+            status: detail.exportPaymentStatus, suffix: `export-${index + 1}`
+          }))
         ].filter((entry) => String(entry.status || "Awaited").trim().toLowerCase() !== "credit"))
       ];
       const paymentAlerts = paymentEntries
@@ -4015,8 +4105,10 @@
 
   function dashboardPage(store) {
     function hasAllTruckPaymentsCredited(item) {
-      return [item.importPaymentStatus, item.exportPaymentStatus, item.mtyPaymentStatus]
-        .every((status) => String(status || "Awaited").trim().toLowerCase() === "credit");
+      const credited = (status) => String(status || "Awaited").trim().toLowerCase() === "credit";
+      return getTruckImportDetails(item).every((detail) => credited(detail.importPaymentStatus) && credited(detail.mtyPaymentStatus))
+        && getTruckExportDetails(item).every((detail) => credited(detail.exportPaymentStatus)
+          && (Number(detail.exportMtyBoxFreight || 0) === 0 || credited(detail.exportMtyPaymentStatus)));
     }
 
     function isTruckPaymentCredited(status) {
@@ -4024,11 +4116,15 @@
     }
 
     function getAwaitedTruckReceivable(item) {
-      const financials = calculateTruckTripFinancials(item);
       let total = 0;
-      if (!isTruckPaymentCredited(item.importPaymentStatus)) total += financials.importReceivable;
-      if (!isTruckPaymentCredited(item.exportPaymentStatus)) total += financials.exportReceivable;
-      if (!isTruckPaymentCredited(item.mtyPaymentStatus)) total += Number(item.mtyBoxFreight || 0);
+      getTruckImportDetails(item).forEach((detail) => {
+        if (!isTruckPaymentCredited(detail.importPaymentStatus)) total += Number(detail.importReceivedAmount ?? (Number(detail.importFreight || 0) + Number(detail.importDetention || 0) - Number(detail.importBrokerCommission || 0)));
+        if (!isTruckPaymentCredited(detail.mtyPaymentStatus)) total += Number(detail.mtyBoxFreight || 0);
+      });
+      getTruckExportDetails(item).forEach((detail) => {
+        if (!isTruckPaymentCredited(detail.exportPaymentStatus)) total += Number(detail.exportReceivedAmount ?? (Number(detail.exportFreight || 0) + Number(detail.exportDetention || 0) - Number(detail.exportBrokerCommission || 0)));
+        if (!isTruckPaymentCredited(detail.exportMtyPaymentStatus)) total += Number(detail.exportMtyBoxFreight || 0);
+      });
       return total;
     }
 
@@ -5786,84 +5882,34 @@
     }
 
     const rows = records.flatMap((trip) => {
-      const storedImport = Number(trip.importReceivedAmount);
-      const rawImport = Number.isFinite(storedImport)
-        ? storedImport
-        : (Number(trip.importFreight || 0) + Number(trip.importDetention || 0)) - Number(trip.importBrokerCommission || 0);
-      const storedExport = Number(trip.exportReceivedAmount);
-      const rawExport = Number.isFinite(storedExport)
-        ? storedExport
-        : (Number(trip.exportFreight || 0) + Number(trip.exportDetention || 0)) - Number(trip.exportBrokerCommission || 0);
-      const rawMty = Number(trip.mtyBoxFreight || 0);
-
-      const isImportCredit = String(trip.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-      const isExportCredit = String(trip.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-      const isMtyCredit = String(trip.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-
-      const importReceivable = isCompleted ? rawImport : (isImportCredit ? 0 : rawImport);
-      const exportReceivable = isCompleted ? rawExport : (isExportCredit ? 0 : rawExport);
-      const mtyReceivable = isCompleted ? rawMty : (isMtyCredit ? 0 : rawMty);
-
+      const imports = getTruckImportDetails(trip);
+      const exports = getTruckExportDetails(trip);
       const legs = [
-        {
-          amount: importReceivable,
-          type: "Import",
-          broker: trip.importBroker,
-          values: {
-            jobNo: trip.jobNo,
-            type: "Import",
-            date: shortPdfDate(trip.date),
-            truckNo: trip.truckNo,
-            origin: trip.origin,
-            destination: trip.destination,
-            size: trip.size,
-            weight: trip.weight,
-            cargo: trip.cargoDescription,
-            receivable: importReceivable,
-            broker: trip.importBroker,
-            remarks: trip.importRemarks || trip.remarks
-          }
-        },
-        {
-          amount: exportReceivable,
-          type: "Export",
-          broker: trip.exportBroker,
-          values: {
-            jobNo: trip.jobNo,
-            type: "Export",
-            date: shortPdfDate(trip.exportLoadDate),
-            truckNo: trip.exportTruckNo || trip.truckNo,
-            origin: trip.exportOrigin,
-            destination: trip.exportDestination,
-            size: trip.exportSize,
-            weight: trip.exportWeight,
-            cargo: trip.cargoDescription,
-            receivable: exportReceivable,
-            broker: trip.exportBroker,
-            remarks: trip.exportRemarks || trip.remarks
-          }
-        },
-        {
-          amount: mtyReceivable,
-          type: "MTY",
-          broker: trip.mtyBroker,
-          values: {
-            jobNo: trip.jobNo,
-            type: "MTY",
-            date: "-",
-            truckNo: "-",
-            origin: "-",
-            destination: "-",
-            size: "-",
-            weight: "-",
-            cargo: "-",
-            receivable: mtyReceivable,
-            broker: trip.mtyBroker,
-            remarks: "-"
-          }
-        }
+        ...imports.flatMap((detail, index) => {
+          const suffix = imports.length > 1 ? ` ${index + 1}` : "";
+          const importAmount = Number(detail.importReceivedAmount ?? (Number(detail.importFreight || 0) + Number(detail.importDetention || 0) - Number(detail.importBrokerCommission || 0)));
+          const importCredit = String(detail.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+          const mtyCredit = String(detail.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+          const importReceivable = isCompleted || !importCredit ? importAmount : 0;
+          const mtyReceivable = isCompleted || !mtyCredit ? Number(detail.mtyBoxFreight || 0) : 0;
+          return [
+            { amount: importReceivable, type: "Import", broker: detail.importBroker, values: { jobNo: trip.jobNo, type: `Import${suffix}`, date: shortPdfDate(detail.date), truckNo: detail.truckNo, origin: detail.origin, destination: detail.destination, size: detail.size, weight: detail.weight, cargo: detail.cargoDescription, receivable: importReceivable, broker: detail.importBroker, remarks: detail.importRemarks } },
+            { amount: mtyReceivable, type: "MTY", broker: detail.mtyBroker, values: { jobNo: trip.jobNo, type: `MTY Import${suffix}`, date: shortPdfDate(detail.date), truckNo: detail.truckNo, origin: "-", destination: "-", size: "-", weight: "-", cargo: "-", receivable: mtyReceivable, broker: detail.mtyBroker, remarks: "-" } }
+          ];
+        }),
+        ...exports.flatMap((detail, index) => {
+          const suffix = exports.length > 1 ? ` ${index + 1}` : "";
+          const exportAmount = Number(detail.exportReceivedAmount ?? (Number(detail.exportFreight || 0) + Number(detail.exportDetention || 0) - Number(detail.exportBrokerCommission || 0)));
+          const exportCredit = String(detail.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+          const mtyCredit = String(detail.exportMtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+          const exportReceivable = isCompleted || !exportCredit ? exportAmount : 0;
+          const mtyReceivable = isCompleted || !mtyCredit ? Number(detail.exportMtyBoxFreight || 0) : 0;
+          return [
+            { amount: exportReceivable, type: "Export", broker: detail.exportBroker, values: { jobNo: trip.jobNo, type: `Export${suffix}`, date: shortPdfDate(detail.exportLoadDate), truckNo: detail.exportTruckNo, origin: detail.exportOrigin, destination: detail.exportDestination, size: detail.exportSize, weight: detail.exportWeight, cargo: detail.exportCargoDescription, receivable: exportReceivable, broker: detail.exportBroker, remarks: detail.exportRemarks } },
+            { amount: mtyReceivable, type: "MTY", broker: detail.exportMtyBroker, values: { jobNo: trip.jobNo, type: `MTY Export${suffix}`, date: shortPdfDate(detail.exportLoadDate), truckNo: detail.exportTruckNo, origin: "-", destination: "-", size: "-", weight: "-", cargo: "-", receivable: mtyReceivable, broker: detail.exportMtyBroker, remarks: "-" } }
+          ];
+        })
       ];
-
       return legs.filter((leg) => shouldIncludeLeg(leg.type, leg.broker));
     }).map((row, index) => ({
       amount: row.amount,
@@ -5955,7 +6001,41 @@
     pdf.save(`${safeTruckNo}_${isCompleted ? "completed" : "pending"}_summary.pdf`);
   }
 
-  async function buildTruckDetailsInvoicePdf(trip, tripType) {
+  function getTruckImportDetails(trip = {}) {
+    const legacy = {
+      truckNo: trip.truckNo, date: trip.date, customer: trip.customer, origin: trip.origin,
+      destination: trip.destination, size: trip.size, weight: trip.weight, cargoDescription: trip.cargoDescription,
+      mtyBoxFreight: trip.mtyBoxFreight, mtyBroker: trip.mtyBroker, importFreight: trip.importFreight,
+      importDetention: trip.importDetention, importBrokerCommission: trip.importBrokerCommission, importBroker: trip.importBroker,
+      importReceivedAmount: trip.importReceivedAmount, importPaymentTerm: trip.importPaymentTerm,
+      importChequeDetails: trip.importChequeDetails, importPaymentReceivedDate: trip.importPaymentReceivedDate,
+      importPaymentStatus: trip.importPaymentStatus, mtyPaymentDate: trip.mtyPaymentDate, mtyPaymentStatus: trip.mtyPaymentStatus,
+      importCustomerCollection: trip.importCustomerCollection, importPaymentDate: trip.importPaymentDate,
+      importChequeDetails2: trip.importChequeDetails2, importRemarks: trip.importRemarks || trip.remarks
+    };
+    return [legacy, ...(Array.isArray(trip.additionalImportDetails) ? trip.additionalImportDetails : [])];
+  }
+
+  function getTruckExportDetails(trip = {}) {
+    const legacy = {
+      exportTruckNo: trip.exportTruckNo || trip.truckNo, exportLoadDate: trip.exportLoadDate,
+      exportCustomer: trip.exportCustomer || trip.customer, exportOrigin: trip.exportOrigin,
+      exportDestination: trip.exportDestination, exportSize: trip.exportSize, exportWeight: trip.exportWeight,
+      exportCargoDescription: trip.exportCargoDescription || trip.cargoDescription,
+      exportMtyBoxFreight: trip.exportMtyBoxFreight, exportMtyBroker: trip.exportMtyBroker,
+      exportFreight: trip.exportFreight, exportDetention: trip.exportDetention,
+      exportBrokerCommission: trip.exportBrokerCommission, exportBroker: trip.exportBroker,
+      exportReceivedAmount: trip.exportReceivedAmount, exportPaymentTerm: trip.exportPaymentTerm,
+      exportChequeDetails: trip.exportChequeDetails, exportPaymentReceivedDate: trip.exportPaymentReceivedDate,
+      exportPaymentStatus: trip.exportPaymentStatus, exportMtyPaymentDate: trip.exportMtyPaymentDate,
+      exportMtyPaymentStatus: trip.exportMtyPaymentStatus, exportCustomerCollection: trip.exportCustomerCollection,
+      exportPaymentDate: trip.exportPaymentDate, exportChequeDetails2: trip.exportChequeDetails2,
+      exportRemarks: trip.exportRemarks || trip.remarks
+    };
+    return [legacy, ...(Array.isArray(trip.additionalExportDetails) ? trip.additionalExportDetails : [])];
+  }
+
+  async function buildTruckDetailsInvoicePdf(trip, tripType, detailIndex = 0) {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
     const isImport = tripType === "import";
     const { jsPDF } = window.jspdf;
@@ -5968,54 +6048,33 @@
     pdf.setFillColor(255, 255, 255);
     pdf.rect(22, 118, pageWidth - 44, pageHeight - 172, "F");
 
+    const selectedDetail = (isImport ? getTruckImportDetails(trip) : getTruckExportDetails(trip))[detailIndex] || {};
     const details = isImport ? {
-      date: trip.date,
-      truckNo: trip.truckNo,
-      customer: trip.customer,
-      origin: trip.origin,
-      destination: trip.destination,
-      size: trip.size,
-      weight: trip.weight,
-      cargoDescription: trip.cargoDescription,
-      mtyBoxFreight: trip.mtyBoxFreight,
-      mtyBroker: trip.mtyBroker,
-      freight: trip.importFreight,
-      detention: trip.importDetention,
-      broker: trip.importBroker,
-      commission: trip.importBrokerCommission,
-      paymentTerm: trip.importPaymentTerm,
-      customerCollection: trip.importCustomerCollection,
-      chequeDetails: trip.importChequeDetails,
-      paidDate: trip.importPaymentDate,
-      paymentStatus: trip.importPaymentStatus,
-      remarks: trip.importRemarks || trip.remarks
+      date: selectedDetail.date, truckNo: selectedDetail.truckNo, customer: selectedDetail.customer,
+      origin: selectedDetail.origin, destination: selectedDetail.destination, size: selectedDetail.size,
+      weight: selectedDetail.weight, cargoDescription: selectedDetail.cargoDescription,
+      mtyBoxFreight: selectedDetail.mtyBoxFreight, mtyBroker: selectedDetail.mtyBroker,
+      freight: selectedDetail.importFreight, detention: selectedDetail.importDetention,
+      broker: selectedDetail.importBroker, commission: selectedDetail.importBrokerCommission,
+      paymentTerm: selectedDetail.importPaymentTerm, customerCollection: selectedDetail.importCustomerCollection,
+      chequeDetails: selectedDetail.importChequeDetails, paidDate: selectedDetail.importPaymentDate,
+      paymentStatus: selectedDetail.importPaymentStatus, remarks: selectedDetail.importRemarks
     } : {
-      date: trip.exportLoadDate,
-      truckNo: trip.exportTruckNo || trip.truckNo,
-      customer: trip.exportCustomer || trip.customer,
-      origin: trip.exportOrigin,
-      destination: trip.exportDestination,
-      size: trip.exportSize,
-      weight: trip.exportWeight,
-      cargoDescription: trip.exportCargoDescription || trip.cargoDescription,
-      mtyBoxFreight: trip.exportMtyBoxFreight,
-      mtyBroker: trip.exportMtyBroker,
-      freight: trip.exportFreight,
-      detention: trip.exportDetention,
-      broker: trip.exportBroker,
-      commission: trip.exportBrokerCommission,
-      paymentTerm: trip.exportPaymentTerm,
-      customerCollection: trip.exportCustomerCollection,
-      chequeDetails: trip.exportChequeDetails,
-      paidDate: trip.exportPaymentDate,
-      paymentStatus: trip.exportPaymentStatus,
-      remarks: trip.exportRemarks || trip.remarks
+      date: selectedDetail.exportLoadDate, truckNo: selectedDetail.exportTruckNo, customer: selectedDetail.exportCustomer,
+      origin: selectedDetail.exportOrigin, destination: selectedDetail.exportDestination, size: selectedDetail.exportSize,
+      weight: selectedDetail.exportWeight, cargoDescription: selectedDetail.exportCargoDescription,
+      mtyBoxFreight: selectedDetail.exportMtyBoxFreight, mtyBroker: selectedDetail.exportMtyBroker,
+      freight: selectedDetail.exportFreight, detention: selectedDetail.exportDetention,
+      broker: selectedDetail.exportBroker, commission: selectedDetail.exportBrokerCommission,
+      paymentTerm: selectedDetail.exportPaymentTerm, customerCollection: selectedDetail.exportCustomerCollection,
+      chequeDetails: selectedDetail.exportChequeDetails, paidDate: selectedDetail.exportPaymentDate,
+      paymentStatus: selectedDetail.exportPaymentStatus, remarks: selectedDetail.exportRemarks
     };
 
     pdf.setTextColor(24, 48, 77);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12);
-    pdf.text(isImport ? "IMPORT INVOICE" : "EXPORT INVOICE", 36, 158);
+    pdf.text(`${isImport ? "IMPORT INVOICE" : "EXPORT INVOICE"}${detailIndex ? ` ${detailIndex + 1}` : ""}`, 36, 158);
     pdf.text(`Job No: ${text(trip.jobNo || "-")}`, 36, 178);
     pdf.text(
       `${isImport ? "Import - Broker" : "Export - Broker"}: ${text(details.broker || "-")}`,
@@ -6080,16 +6139,24 @@
     ).trim();
     const customerName = safePdfFileName(rawCustomer || "customer");
     const safeJobNo = trip.jobNo ? `_${safePdfFileName(trip.jobNo)}` : "";
-    pdf.save(`${customerName}${safeJobNo}_${isImport ? "import" : "export"}_invoice.pdf`);
+    const detailSuffix = detailIndex ? `_${detailIndex + 1}` : "";
+    pdf.save(`${customerName}${safeJobNo}_${isImport ? "import" : "export"}${detailSuffix}_invoice.pdf`);
   }
 
   function calculateTruckTripFinancials(trip = {}) {
-    const importReceivable = (Number(trip.importFreight || 0) + Number(trip.importDetention || 0)) - Number(trip.importBrokerCommission || 0);
-    const exportReceivable = (Number(trip.exportFreight || 0) + Number(trip.exportDetention || 0)) - Number(trip.exportBrokerCommission || 0);
-    const grandTotal = importReceivable + exportReceivable + Number(trip.mtyBoxFreight || 0) + Number(trip.exportMtyBoxFreight || 0);
+    const importDetails = getTruckImportDetails(trip);
+    const exportDetails = getTruckExportDetails(trip);
+    const importReceivable = importDetails.reduce((total, detail) => total + Number(detail.importFreight || 0) + Number(detail.importDetention || 0) - Number(detail.importBrokerCommission || 0), 0);
+    const exportReceivable = exportDetails.reduce((total, detail) => total + Number(detail.exportFreight || 0) + Number(detail.exportDetention || 0) - Number(detail.exportBrokerCommission || 0), 0);
+    const mtyFreight = importDetails.reduce((total, detail) => total + Number(detail.mtyBoxFreight || 0), 0)
+      + exportDetails.reduce((total, detail) => total + Number(detail.exportMtyBoxFreight || 0), 0);
+    const grandTotal = importReceivable + exportReceivable + mtyFreight;
     const roundTripExpense = Number(trip.roundTripExpense || 0);
     return {
       grandTotal,
+      importReceivable,
+      exportReceivable,
+      mtyFreight,
       roundTripExpense,
       profitLoss: grandTotal - roundTripExpense
     };
@@ -6118,25 +6185,121 @@
     let editingId = "";
     let tripImageData = "";
     let tripImagePromise = Promise.resolve("");
+    const detailNumericFields = {
+      import: ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection"],
+      export: ["exportMtyBoxFreight", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection"]
+    };
+    const detailStatusFields = {
+      import: ["importPaymentStatus", "mtyPaymentStatus"],
+      export: ["exportPaymentStatus", "exportMtyPaymentStatus"]
+    };
+    const getDetailManager = (type) => form.querySelector(`[data-truck-details-manager="${type}"]`);
+    const getDetailSections = (type) => [...(getDetailManager(type)?.querySelectorAll("[data-truck-detail-section]") || [])];
+
+    function addDetailSection(type, initialValues = null, allowRemove = true) {
+      const manager = getDetailManager(type);
+      const base = manager?.querySelector('[data-detail-index="0"]');
+      const extraList = manager?.querySelector(`[data-truck-detail-extra-list="${type}"]`);
+      if (!base || !extraList) return null;
+      const detailIndex = getDetailSections(type).length;
+      const section = base.cloneNode(true);
+      section.dataset.detailIndex = String(detailIndex);
+      const title = section.querySelector(".truck-detail-section-head h3");
+      if (title) title.textContent = `${type === "import" ? "Import" : "Export"} Details ${detailIndex + 1}`;
+      const sectionHead = section.querySelector(".truck-detail-section-head");
+      if (sectionHead && allowRemove) {
+        sectionHead.classList.add("has-remove-button");
+        const removeButton = document.createElement("button");
+        removeButton.className = "btn small truck-detail-remove";
+        removeButton.type = "button";
+        removeButton.dataset.removeTruckDetail = "true";
+        removeButton.textContent = "Remove Details";
+        sectionHead.append(removeButton);
+      }
+      section.querySelectorAll("[name]").forEach((control) => {
+        const key = control.name;
+        control.dataset.detailField = key;
+        control.removeAttribute("name");
+        control.removeAttribute("id");
+        control.required = false;
+        if (control instanceof HTMLSelectElement) {
+          control.value = detailStatusFields[type].includes(key) ? "Awaited" : control.options[0]?.value || "";
+        } else {
+          control.value = "";
+        }
+        if (initialValues && Object.prototype.hasOwnProperty.call(initialValues, key)) {
+          control.value = initialValues[key] ?? "";
+        }
+      });
+      extraList.append(section);
+      return section;
+    }
+
+    function clearAdditionalDetailSections() {
+      form.querySelectorAll("[data-truck-detail-extra-list]").forEach((list) => { list.innerHTML = ""; });
+    }
+
+    function readDetailSection(section) {
+      const values = {};
+      section?.querySelectorAll("[name], [data-detail-field]").forEach((control) => {
+        const key = control.dataset.detailField || control.name;
+        if (key) values[key] = control.value;
+      });
+      return values;
+    }
+
+    function normalizeDetailValues(type, values) {
+      const normalized = { ...values };
+      detailNumericFields[type].forEach((key) => { normalized[key] = Number(values[key] || 0); });
+      detailStatusFields[type].forEach((key) => { normalized[key] = values[key] || "Awaited"; });
+      return normalized;
+    }
+
+    function collectAdditionalDetails(type) {
+      const extraList = getDetailManager(type)?.querySelector(`[data-truck-detail-extra-list="${type}"]`);
+      return [...(extraList?.querySelectorAll("[data-truck-detail-section]") || [])]
+        .map((section) => ({ section, detail: normalizeDetailValues(type, readDetailSection(section)) }))
+        .filter(({ section, detail }) => section.dataset.preserveExistingDetail === "true" || Object.entries(detail).some(([key, value]) => {
+          if (detailStatusFields[type].includes(key) || detailNumericFields[type].includes(key)) return Number(value) !== 0 && !detailStatusFields[type].includes(key);
+          return String(value ?? "").trim() !== "";
+        }))
+        .map(({ detail }) => detail);
+    }
+
+    function restoreAdditionalDetails(type, details = []) {
+      (Array.isArray(details) ? details : []).forEach((detail) => {
+        const section = addDetailSection(type, detail, false);
+        if (section) section.dataset.preserveExistingDetail = "true";
+      });
+    }
+
+    function updateDetailReceivable(type, section) {
+      const values = readDetailSection(section);
+      const isImport = type === "import";
+      const freightKey = isImport ? "importFreight" : "exportFreight";
+      const detentionKey = isImport ? "importDetention" : "exportDetention";
+      const commissionKey = isImport ? "importBrokerCommission" : "exportBrokerCommission";
+      const receivableKey = isImport ? "importReceivedAmount" : "exportReceivedAmount";
+      const receivableInput = section.querySelector(`[name="${receivableKey}"], [data-detail-field="${receivableKey}"]`);
+      if (receivableInput) receivableInput.value = String((Number(values[freightKey] || 0) + Number(values[detentionKey] || 0)) - Number(values[commissionKey] || 0));
+    }
 
     const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "dieselExpense", "profitLoss"];
 
     function calculateTrip() {
-      const importReceived = (Number(form.elements.importFreight?.value || 0) + Number(form.elements.importDetention?.value || 0)) - Number(form.elements.importBrokerCommission?.value || 0);
-      const exportReceived = (Number(form.elements.exportFreight?.value || 0) + Number(form.elements.exportDetention?.value || 0)) - Number(form.elements.exportBrokerCommission?.value || 0);
-      const financials = calculateTruckTripFinancials({
-        importFreight: form.elements.importFreight?.value,
-        importDetention: form.elements.importDetention?.value,
-        importBrokerCommission: form.elements.importBrokerCommission?.value,
-        exportFreight: form.elements.exportFreight?.value,
-        exportDetention: form.elements.exportDetention?.value,
-        exportBrokerCommission: form.elements.exportBrokerCommission?.value,
-        mtyBoxFreight: form.elements.mtyBoxFreight?.value,
-        exportMtyBoxFreight: form.elements.exportMtyBoxFreight?.value,
-        roundTripExpense: form.elements.roundTripExpense?.value
-      });
-      if (form.elements.importReceivedAmount) form.elements.importReceivedAmount.value = String(importReceived);
-      if (form.elements.exportReceivedAmount) form.elements.exportReceivedAmount.value = String(exportReceived);
+      const importSections = getDetailSections("import");
+      const exportSections = getDetailSections("export");
+      [...importSections, ...exportSections].forEach((section) => updateDetailReceivable(section.dataset.detailType, section));
+      const baseImport = readDetailSection(importSections[0]);
+      const baseExport = readDetailSection(exportSections[0]);
+      const tripForCalculation = {
+        ...baseImport,
+        ...baseExport,
+        roundTripExpense: form.elements.roundTripExpense?.value,
+        additionalImportDetails: collectAdditionalDetails("import"),
+        additionalExportDetails: collectAdditionalDetails("export")
+      };
+      const financials = calculateTruckTripFinancials(tripForCalculation);
       if (form.elements.grandTotal) form.elements.grandTotal.value = String(financials.grandTotal);
       if (form.elements.profitLoss) form.elements.profitLoss.value = String(financials.profitLoss);
     }
@@ -6161,6 +6324,7 @@
 
     function resetForm() {
       form.reset();
+      clearAdditionalDetailSections();
       form.elements.date.value = getTodayIsoDate();
       if (form.elements.truckNo) form.elements.truckNo.value = "";
       if (form.elements.exportTruckNo) form.elements.exportTruckNo.value = "";
@@ -6223,7 +6387,10 @@
 
     function getFilteredRows() {
       const allRows = store.truckExpenses.filter((item) => item.jobNo);
-      const truckNumbers = [...new Set(allRows.flatMap((item) => [item.truckNo, item.exportTruckNo])
+      const truckNumbers = [...new Set(allRows.flatMap((item) => [
+        ...getTruckImportDetails(item).map((detail) => detail.truckNo),
+        ...getTruckExportDetails(item).map((detail) => detail.exportTruckNo)
+      ])
         .map((value) => String(value || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const selectedTruckNo = String(customerFilter?.value || "").trim();
       if (customerFilter) {
@@ -6235,19 +6402,22 @@
       const to = parseDateValue(endDateFilter?.value);
       const expenseStatus = expenseStatusFilter?.value || "all";
       return allRows
-        .filter((item) => !selectedTruckNo || [item.truckNo, item.exportTruckNo]
+        .filter((item) => !selectedTruckNo || [
+          ...getTruckImportDetails(item).map((detail) => detail.truckNo),
+          ...getTruckExportDetails(item).map((detail) => detail.exportTruckNo)
+        ]
           .some((value) => String(value || "").trim() === selectedTruckNo))
         .filter((item) => {
           if (!from && !to) return true;
-          const jobDate = parseDateValue(item.date);
-          return Boolean(jobDate && (!from || jobDate >= from) && (!to || jobDate <= to));
+          const dates = [...getTruckImportDetails(item).map((detail) => detail.date), ...getTruckExportDetails(item).map((detail) => detail.exportLoadDate)]
+            .map(parseDateValue).filter(Boolean);
+          return dates.some((jobDate) => (!from || jobDate >= from) && (!to || jobDate <= to));
         })
         .filter((item) => expenseStatus === "all" ||
           (expenseStatus === "missing" ? Number(item.roundTripExpense || 0) <= 0 : Number(item.roundTripExpense || 0) > 0))
-        .filter((item) => !query || Object.entries(item).some(([key, value]) =>
-          !["image", "imagePath"].includes(key) && value != null && typeof value !== "object" &&
-          String(value).toLowerCase().includes(query)) ||
-          [item.date, item.exportLoadDate].some((value) => formatShortDate(value).toLowerCase().includes(query)))
+        .filter((item) => !query || [item.jobNo, ...getTruckImportDetails(item), ...getTruckExportDetails(item)]
+          .some((detail) => Object.values(typeof detail === "object" ? detail : { value: detail })
+            .some((value) => value != null && typeof value !== "object" && String(value).toLowerCase().includes(query))))
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
     }
 
@@ -6260,38 +6430,45 @@
       }
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="57">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="58">No truck trip records available yet.</td></tr>`;
         return;
       }
-      body.innerHTML = rows.map((item, index) => {
+      let serialNumber = 0;
+      body.innerHTML = rows.flatMap((item) => {
         const financials = calculateTruckTripFinancials(item);
-        return `
-        <tr>
-          <td>${index + 1}</td><td>${text(item.jobNo)}</td><td>${formatShortDate(item.date)}</td><td>${text(item.truckNo)}</td>
-          <td>${text(item.customer)}</td><td>${text(item.origin)}</td><td>${text(item.destination)}</td><td>${text(item.size)}</td><td>${text(item.weight)}</td><td>${text(item.cargoDescription)}</td>
-          <td>${money(item.mtyBoxFreight)}</td><td>${text(item.mtyBroker)}</td>
-          <td>${money(item.importFreight)}</td><td>${money(item.importDetention || 0)}</td><td>${money(item.importBrokerCommission)}</td><td>${text(item.importBroker)}</td><td>${money(item.importReceivedAmount)}</td>
-          <td>${text(item.importPaymentTerm || "-")}</td><td>${text(item.importChequeDetails || "-")}</td><td>${item.importPaymentReceivedDate ? formatShortDate(item.importPaymentReceivedDate) : "-"}</td><td><span class="badge ${item.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.importPaymentStatus || "Awaited")}</span></td><td>${item.mtyPaymentDate ? formatShortDate(item.mtyPaymentDate) : "-"}</td><td><span class="badge ${item.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.mtyPaymentStatus || "Awaited")}</span></td><td>${money(item.importCustomerCollection || 0)}</td><td>${item.importPaymentDate ? formatShortDate(item.importPaymentDate) : "-"}</td><td>${text(item.importChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.importRemarks || item.remarks || "-")}</td>
-          <td>${item.exportLoadDate ? formatShortDate(item.exportLoadDate) : "-"}</td><td>${text(item.exportTruckNo || item.truckNo)}</td><td>${text(item.exportCustomer || item.customer || "-")}</td><td>${text(item.exportOrigin)}</td><td>${text(item.exportDestination)}</td><td>${text(item.exportSize)}</td><td>${text(item.exportWeight)}</td><td>${text(item.exportCargoDescription || item.cargoDescription || "-")}</td>
-          <td>${money(item.exportMtyBoxFreight || 0)}</td><td>${text(item.exportMtyBroker || "-")}</td>
-          <td>${money(item.exportFreight)}</td><td>${money(item.exportDetention || 0)}</td><td>${money(item.exportBrokerCommission)}</td><td>${text(item.exportBroker)}</td><td>${money(item.exportReceivedAmount)}</td>
-          <td>${text(item.exportPaymentTerm || "-")}</td><td>${text(item.exportChequeDetails || "-")}</td><td>${item.exportPaymentReceivedDate ? formatShortDate(item.exportPaymentReceivedDate) : "-"}</td><td><span class="badge ${item.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportPaymentStatus || "Awaited")}</span></td><td>${item.exportMtyPaymentDate ? formatShortDate(item.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${item.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(item.exportMtyPaymentStatus || "Awaited")}</span></td><td>${money(item.exportCustomerCollection || 0)}</td><td>${item.exportPaymentDate ? formatShortDate(item.exportPaymentDate) : "-"}</td><td>${text(item.exportChequeDetails2 || "-")}</td><td class="remarks-cell">${text(item.exportRemarks || item.remarks || "-")}</td><td>${money(financials.grandTotal)}</td><td class="${Number(item.roundTripExpense || 0) > 0 ? "" : "truck-expense-missing"}" title="${Number(item.roundTripExpense || 0) > 0 ? "Round trip expense entered" : "Round trip expense not entered"}">${Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing"}</td><td>${money(financials.profitLoss)}</td>
-          <td>${item.image ? `
+        const imports = getTruckImportDetails(item);
+        const exports = getTruckExportDetails(item);
+        const detailCount = Math.max(imports.length, exports.length);
+        return Array.from({ length: detailCount }, (_, detailIndex) => {
+          const importDetail = imports[detailIndex] || {};
+          const exportDetail = exports[detailIndex] || {};
+          const isFirstLine = detailIndex === 0;
+          const importInvoice = detailIndex < imports.length ? `<button class="btn small" data-import-invoice="${escapeHtml(item.id)}" data-detail-index="${detailIndex}">Import Invoice${detailIndex ? ` ${detailIndex + 1}` : ""}</button>` : "";
+          const exportInvoice = detailIndex < exports.length ? `<button class="btn small" data-export-invoice="${escapeHtml(item.id)}" data-detail-index="${detailIndex}">Export Invoice${detailIndex ? ` ${detailIndex + 1}` : ""}</button>` : "";
+          return `
+        <tr class="${detailCount > 1 ? "truck-trip-row-multiple" : ""}">
+          <td>${isFirstLine ? ++serialNumber : ""}</td><td>${text(item.jobNo)}</td>
+          <td>${importDetail.date ? formatShortDate(importDetail.date) : "-"}</td><td>${text(importDetail.truckNo || "-")}</td>
+          <td>${text(importDetail.customer || "-")}</td><td>${text(importDetail.origin || "-")}</td><td>${text(importDetail.destination || "-")}</td><td>${text(importDetail.size || "-")}</td><td>${text(importDetail.weight || "-")}</td><td>${text(importDetail.cargoDescription || "-")}</td>
+          <td>${money(importDetail.mtyBoxFreight || 0)}</td><td>${text(importDetail.mtyBroker || "-")}</td>
+          <td>${money(importDetail.importFreight || 0)}</td><td>${money(importDetail.importDetention || 0)}</td><td>${money(importDetail.importBrokerCommission || 0)}</td><td>${text(importDetail.importBroker || "-")}</td><td>${money(importDetail.importReceivedAmount || 0)}</td>
+          <td>${text(importDetail.importPaymentTerm || "-")}</td><td>${text(importDetail.importChequeDetails || "-")}</td><td>${importDetail.importPaymentReceivedDate ? formatShortDate(importDetail.importPaymentReceivedDate) : "-"}</td><td><span class="badge ${importDetail.importPaymentStatus === "Credit" ? "good" : "bad"}">${text(importDetail.importPaymentStatus || "Awaited")}</span></td><td>${importDetail.mtyPaymentDate ? formatShortDate(importDetail.mtyPaymentDate) : "-"}</td><td><span class="badge ${importDetail.mtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(importDetail.mtyPaymentStatus || "Awaited")}</span></td><td>${money(importDetail.importCustomerCollection || 0)}</td><td>${importDetail.importPaymentDate ? formatShortDate(importDetail.importPaymentDate) : "-"}</td><td>${text(importDetail.importChequeDetails2 || "-")}</td><td class="remarks-cell">${text(importDetail.importRemarks || "-")}</td>
+          <td>${exportDetail.exportLoadDate ? formatShortDate(exportDetail.exportLoadDate) : "-"}</td><td>${text(exportDetail.exportTruckNo || "-")}</td><td>${text(exportDetail.exportCustomer || "-")}</td><td>${text(exportDetail.exportOrigin || "-")}</td><td>${text(exportDetail.exportDestination || "-")}</td><td>${text(exportDetail.exportSize || "-")}</td><td>${text(exportDetail.exportWeight || "-")}</td><td>${text(exportDetail.exportCargoDescription || "-")}</td>
+          <td>${money(exportDetail.exportMtyBoxFreight || 0)}</td><td>${text(exportDetail.exportMtyBroker || "-")}</td>
+          <td>${money(exportDetail.exportFreight || 0)}</td><td>${money(exportDetail.exportDetention || 0)}</td><td>${money(exportDetail.exportBrokerCommission || 0)}</td><td>${text(exportDetail.exportBroker || "-")}</td><td>${money(exportDetail.exportReceivedAmount || 0)}</td>
+          <td>${text(exportDetail.exportPaymentTerm || "-")}</td><td>${text(exportDetail.exportChequeDetails || "-")}</td><td>${exportDetail.exportPaymentReceivedDate ? formatShortDate(exportDetail.exportPaymentReceivedDate) : "-"}</td><td><span class="badge ${exportDetail.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(exportDetail.exportPaymentStatus || "Awaited")}</span></td><td>${exportDetail.exportMtyPaymentDate ? formatShortDate(exportDetail.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${exportDetail.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(exportDetail.exportMtyPaymentStatus || "Awaited")}</span></td><td>${money(exportDetail.exportCustomerCollection || 0)}</td><td>${exportDetail.exportPaymentDate ? formatShortDate(exportDetail.exportPaymentDate) : "-"}</td><td>${text(exportDetail.exportChequeDetails2 || "-")}</td><td class="remarks-cell">${text(exportDetail.exportRemarks || "-")}</td>
+          <td>${isFirstLine ? money(financials.grandTotal) : "-"}</td><td class="${Number(item.roundTripExpense || 0) > 0 ? "" : "truck-expense-missing"}" title="${Number(item.roundTripExpense || 0) > 0 ? "Round trip expense entered" : "Round trip expense not entered"}">${isFirstLine ? (Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing") : "-"}</td><td>${isFirstLine ? money(item.dieselExpense || 0) : "-"}</td><td>${isFirstLine ? money(financials.profitLoss) : "-"}</td>
+          <td>${isFirstLine && item.image ? `
             <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image">
               <img src="${escapeHtml(item.image)}" alt="Truck details attachment" />
-            </button>` : item.imagePath ? `
+            </button>` : isFirstLine && item.imagePath ? `
             <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image" data-lazy-truck-img="${escapeHtml(item.imagePath)}">
               <span class="loading-placeholder">...</span>
             </button>` : "-"}</td>
-          <td>
-            <div class="table-actions">
-              <button class="btn small" data-import-invoice="${item.id}">Import Invoice</button>
-              <button class="btn small" data-export-invoice="${item.id}">Export Invoice</button>
-              <button class="btn small" data-edit-trip="${item.id}">Edit</button>
-            </div>
-          </td>
+          <td><div class="table-actions">${importInvoice}${exportInvoice}${isFirstLine ? `<button class="btn small" data-edit-trip="${escapeHtml(item.id)}">Edit</button>` : ""}</div></td>
         </tr>
       `;
+        });
       }).join("");
 
       body.querySelectorAll("[data-lazy-truck-img]").forEach((btn) => {
@@ -6310,6 +6487,7 @@
 
     function fillForm(item) {
       if (!item) return;
+      clearAdditionalDetailSections();
       Object.keys(item).forEach((key) => {
         if (form.elements[key]) form.elements[key].value = item[key] !== null && item[key] !== undefined ? item[key] : "";
       });
@@ -6353,6 +6531,8 @@
       if (form.elements.exportMtyPaymentStatus && !form.elements.exportMtyPaymentStatus.value) {
         form.elements.exportMtyPaymentStatus.value = item.exportMtyPaymentStatus || "Awaited";
       }
+      restoreAdditionalDetails("import", item.additionalImportDetails);
+      restoreAdditionalDetails("export", item.additionalExportDetails);
       exportTruckTouchedManually = Boolean(item.exportTruckNo && item.exportTruckNo !== item.truckNo);
       calculateTrip();
       setTripImage(item.image || "");
@@ -6361,8 +6541,29 @@
       form.querySelector("[data-submit-label]").textContent = "Update Trip";
     }
 
-    ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "exportFreight", "exportDetention", "exportBrokerCommission", "exportMtyBoxFreight", "roundTripExpense"].forEach((name) => {
-      form.elements[name]?.addEventListener("input", calculateTrip);
+    form.querySelectorAll("[data-add-truck-detail]").forEach((button) => {
+      button.addEventListener("click", () => addDetailSection(button.dataset.addTruckDetail));
+    });
+    form.addEventListener("click", (event) => {
+      const removeButton = event.target.closest("[data-remove-truck-detail]");
+      if (!removeButton) return;
+      const section = removeButton.closest("[data-truck-detail-section]");
+      if (!section || section.dataset.detailIndex === "0" || section.dataset.preserveExistingDetail === "true") return;
+      section.remove();
+      ["import", "export"].forEach((type) => {
+        getDetailSections(type).forEach((detailSection, index) => {
+          detailSection.dataset.detailIndex = String(index);
+          const heading = detailSection.querySelector(".truck-detail-section-head h3");
+          if (heading) heading.textContent = `${type === "import" ? "Import" : "Export"} Details ${index + 1}`;
+        });
+      });
+      calculateTrip();
+    });
+    form.addEventListener("input", (event) => {
+      if (event.target.matches("input, select, textarea") && !["tripImageFile"].includes(event.target.name)) calculateTrip();
+    });
+    form.addEventListener("change", (event) => {
+      if (event.target.matches("select, input[type='date']")) calculateTrip();
     });
 
     imageInput?.addEventListener("change", () => {
@@ -6393,6 +6594,8 @@
       const calculatedData = Object.fromEntries(new FormData(form).entries());
       const normalized = Object.fromEntries(Object.entries(calculatedData).filter(([key]) => key !== "tripImageFile"));
       numberFields.forEach((name) => { normalized[name] = Number(calculatedData[name] || 0); });
+      normalized.additionalImportDetails = collectAdditionalDetails("import");
+      normalized.additionalExportDetails = collectAdditionalDetails("export");
       const existingItem = editingId
         ? store.truckExpenses.find((item) => item.id === editingId)
         : null;
@@ -6425,22 +6628,23 @@
 
     body.addEventListener("click", async (event) => {
       const imageButton = event.target.closest("[data-view-truck-image]");
-      const importInvoiceId = event.target.getAttribute("data-import-invoice");
-      const exportInvoiceId = event.target.getAttribute("data-export-invoice");
-      const editId = event.target.getAttribute("data-edit-trip");
+      const importInvoiceButton = event.target.closest("[data-import-invoice]");
+      const exportInvoiceButton = event.target.closest("[data-export-invoice]");
+      const editButton = event.target.closest("[data-edit-trip]");
       if (imageButton) {
         const item = store.truckExpenses.find((entry) => entry.id === imageButton.dataset.viewTruckImage);
         if (item?.image) openTruckImageModal(item.image);
         return;
       }
-      if (importInvoiceId || exportInvoiceId) {
-        const item = store.truckExpenses.find((entry) => entry.id === (importInvoiceId || exportInvoiceId));
-        if (item) buildTruckDetailsInvoicePdf(item, importInvoiceId ? "import" : "export").catch(() => {
+      if (importInvoiceButton || exportInvoiceButton) {
+        const invoiceButton = importInvoiceButton || exportInvoiceButton;
+        const item = store.truckExpenses.find((entry) => entry.id === invoiceButton.dataset[importInvoiceButton ? "importInvoice" : "exportInvoice"]);
+        if (item) buildTruckDetailsInvoicePdf(item, importInvoiceButton ? "import" : "export", Number(invoiceButton.dataset.detailIndex || 0)).catch(() => {
           notice.textContent = "Invoice download failed. Please try again.";
         });
         return;
       }
-      if (editId) fillForm(store.truckExpenses.find((item) => item.id === editId));
+      if (editButton) fillForm(store.truckExpenses.find((item) => item.id === editButton.dataset.editTrip));
     });
 
     downloadButton?.addEventListener("click", async () => {
@@ -6470,21 +6674,53 @@
           const financials = calculateTruckTripFinancials(item);
           sum.grand += financials.grandTotal;
           sum.expense += financials.roundTripExpense;
+          sum.diesel += Number(item.dieselExpense || 0);
           sum.profit += financials.profitLoss;
           return sum;
-        }, { grand: 0, expense: 0, profit: 0 });
-        const amountColumnIndices = [5, 6, 7, 8, 9, 10, 11, 12];
+        }, { grand: 0, expense: 0, diesel: 0, profit: 0 });
+        const summaryRows = rows.flatMap((item) => {
+          const imports = getTruckImportDetails(item);
+          const exports = getTruckExportDetails(item);
+          const lineCount = Math.max(imports.length, exports.length);
+          const jobTotals = calculateTruckTripFinancials(item);
+          return Array.from({ length: lineCount }, (_, detailIndex) => {
+            const importDetail = imports[detailIndex] || {};
+            const exportDetail = exports[detailIndex] || {};
+            const importReceivable = Number(importDetail.importReceivedAmount ?? (Number(importDetail.importFreight || 0) + Number(importDetail.importDetention || 0) - Number(importDetail.importBrokerCommission || 0)));
+            const exportReceivable = Number(exportDetail.exportReceivedAmount ?? (Number(exportDetail.exportFreight || 0) + Number(exportDetail.exportDetention || 0) - Number(exportDetail.exportBrokerCommission || 0)));
+            const firstLine = detailIndex === 0;
+            return [
+              item.jobNo,
+              importDetail.date ? formatShortDate(importDetail.date) : "-",
+              importDetail.truckNo || "-",
+              importDetail.weight || "-",
+              exportDetail.exportLoadDate ? formatShortDate(exportDetail.exportLoadDate) : "-",
+              exportDetail.exportWeight || "-",
+              money(importDetail.importFreight || 0),
+              money(exportDetail.exportFreight || 0),
+              money(importReceivable),
+              money(exportReceivable),
+              money(Number(importDetail.mtyBoxFreight || 0) + Number(exportDetail.exportMtyBoxFreight || 0)),
+              firstLine ? money(jobTotals.grandTotal) : "-",
+              firstLine ? (Number(item.roundTripExpense || 0) > 0 ? money(jobTotals.roundTripExpense) : "Missing") : "-",
+              firstLine ? money(item.dieselExpense || 0) : "-",
+              firstLine ? money(jobTotals.profitLoss) : "-"
+            ];
+          });
+        });
+        const amountColumnIndices = [6, 7, 8, 9, 10, 11, 12, 13, 14];
         pdf.autoTable({
           startY: titleY + 16,
           margin: { left: 24, right: 24, top: 36, bottom: 65 },
           theme: "grid",
           showFoot: "lastPage",
           head: [[
-            "S.No",
+            "Job No",
             "Import Date",
             "Import Truck",
+            "Import Weight",
             "Export Date",
-            "Export Truck",
+            "Export Weight",
             "Import Freight",
             "Export Freight",
             "Import Receivable",
@@ -6492,13 +6728,11 @@
             "MTY Freight",
             "Grand Total",
             "Round Trip\nExpense",
+            "Diesel\nConsumption",
             "P&L"
           ]],
-          body: rows.map((item, index) => {
-            const financials = calculateTruckTripFinancials(item);
-            return [String(index + 1), formatShortDate(item.date), item.truckNo || "-", formatShortDate(item.exportLoadDate), item.exportTruckNo || item.truckNo || "-", money(item.importFreight), money(item.exportFreight), money(item.importReceivedAmount), money(item.exportReceivedAmount), money(Number(item.mtyBoxFreight || 0) + Number(item.exportMtyBoxFreight || 0)), money(financials.grandTotal), Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing", money(financials.profitLoss)];
-          }),
-          foot: [["", "", "", "", "", "", "", "", "", "Total", money(totals.grand), money(totals.expense), money(totals.profit)]],
+          body: summaryRows,
+          foot: [["", "", "", "", "", "", "", "", "", "", "Total", money(totals.grand), money(totals.expense), money(totals.diesel), money(totals.profit)]],
           styles: {
             fontSize: 10,
             cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
@@ -6531,19 +6765,21 @@
             valign: "middle"
           },
           columnStyles: {
-            0: { cellWidth: 34, halign: "center" },
-            1: { cellWidth: 80, halign: "center" },
-            2: { cellWidth: 94, halign: "center" },
-            3: { cellWidth: 80, halign: "center" },
-            4: { cellWidth: 94, halign: "center" },
-            5: { cellWidth: 90, halign: "right" },
-            6: { cellWidth: 90, halign: "right" },
-            7: { cellWidth: 100, halign: "right" },
-            8: { cellWidth: 100, halign: "right" },
-            9: { cellWidth: 90, halign: "right" },
-            10: { cellWidth: 100, halign: "right" },
-            11: { cellWidth: 100, halign: "right" },
-            12: { cellWidth: 90, halign: "right" }
+            0: { cellWidth: 90, halign: "center" },
+            1: { cellWidth: 64, halign: "center" },
+            2: { cellWidth: 70, halign: "center" },
+            3: { cellWidth: 50, halign: "center" },
+            4: { cellWidth: 64, halign: "center" },
+            5: { cellWidth: 50, halign: "center" },
+            6: { cellWidth: 83, halign: "right" },
+            7: { cellWidth: 83, halign: "right" },
+            8: { cellWidth: 83, halign: "right" },
+            9: { cellWidth: 83, halign: "right" },
+            10: { cellWidth: 83, halign: "right" },
+            11: { cellWidth: 83, halign: "right" },
+            12: { cellWidth: 83, halign: "right" },
+            13: { cellWidth: 83, halign: "right" },
+            14: { cellWidth: 83, halign: "right" }
           },
           didParseCell: (data) => {
             if (data.section === "head") {
@@ -6622,14 +6858,10 @@
     if (!groupsContainer || !count) return;
 
     function hasAllPaymentsCredited(item) {
-      const importStatus = String(item.importPaymentStatus || "Awaited").trim().toLowerCase();
-      const exportStatus = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase();
-      const mtyStatus = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase();
-      const exportMtyStatus = String(item.exportMtyPaymentStatus || "Awaited").trim().toLowerCase();
-      return importStatus === "credit"
-        && exportStatus === "credit"
-        && mtyStatus === "credit"
-        && (Number(item.exportMtyBoxFreight || 0) === 0 || exportMtyStatus === "credit");
+      const credited = (status) => String(status || "Awaited").trim().toLowerCase() === "credit";
+      return getTruckImportDetails(item).every((detail) => credited(detail.importPaymentStatus) && credited(detail.mtyPaymentStatus))
+        && getTruckExportDetails(item).every((detail) => credited(detail.exportPaymentStatus)
+          && (Number(detail.exportMtyBoxFreight || 0) === 0 || credited(detail.exportMtyPaymentStatus)));
     }
 
     function render() {
@@ -6637,20 +6869,26 @@
         if (!item.jobNo) return false;
         return isCompletedSummary ? hasAllPaymentsCredited(item) : !hasAllPaymentsCredited(item);
       });
-      const truckNumbers = [...new Set(trips.map((item) => String(item.truckNo || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const truckNumbers = [...new Set(trips.flatMap((item) => [
+        ...getTruckImportDetails(item).map((detail) => String(detail.truckNo || "").trim()),
+        ...getTruckExportDetails(item).map((detail) => String(detail.exportTruckNo || "").trim())
+      ]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const selectedTruckNo = String(customerFilter?.value || "").trim();
       if (customerFilter) {
         customerFilter.innerHTML = `<option value="">All Trucks</option>${truckNumbers.map((truckNo) => `<option value="${escapeHtml(truckNo)}">${text(truckNo)}</option>`).join("")}`;
         customerFilter.value = truckNumbers.includes(selectedTruckNo) ? selectedTruckNo : "";
       }
 
-      const candidateTripsForBrokers = trips.filter((item) => !selectedTruckNo || String(item.truckNo || "").trim() === selectedTruckNo);
+      const candidateTripsForBrokers = trips.filter((item) => !selectedTruckNo || [
+        ...getTruckImportDetails(item).map((detail) => detail.truckNo),
+        ...getTruckExportDetails(item).map((detail) => detail.exportTruckNo)
+      ].some((truckNo) => String(truckNo || "").trim() === selectedTruckNo));
 
-      const impBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.importBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-      const expBrokers = [...new Set(candidateTripsForBrokers.map((item) => String(item.exportBroker || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const impBrokers = [...new Set(candidateTripsForBrokers.flatMap((item) => getTruckImportDetails(item).map((detail) => String(detail.importBroker || "").trim())).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const expBrokers = [...new Set(candidateTripsForBrokers.flatMap((item) => getTruckExportDetails(item).map((detail) => String(detail.exportBroker || "").trim())).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       const mtyBrokers = [...new Set(candidateTripsForBrokers.flatMap((item) => [
-        String(item.mtyBroker || "").trim(),
-        String(item.exportMtyBroker || "").trim()
+        ...getTruckImportDetails(item).map((detail) => String(detail.mtyBroker || "").trim()),
+        ...getTruckExportDetails(item).map((detail) => String(detail.exportMtyBroker || "").trim())
       ]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
       const prevImp = String(importBrokerFilter?.value || "").trim();
@@ -6692,43 +6930,28 @@
           if (!searchQuery) return true;
           const haystack = [
             item.jobNo,
-            item.truckNo,
-            item.date,
             item.partyName,
-            item.customer,
             item.importParty,
             item.exportParty,
-            item.importBroker,
-            item.exportBroker,
-            item.mtyBroker,
-            item.exportMtyBroker,
-            item.importOrigin,
-            item.importDestination,
-            item.exportOrigin,
-            item.exportDestination,
             item.importContainerNo,
             item.exportContainerNo,
-            item.cargoDescription,
-            item.importRemarks,
-            item.exportRemarks
+            ...getTruckImportDetails(item).flatMap((detail) => Object.values(detail)),
+            ...getTruckExportDetails(item).flatMap((detail) => Object.values(detail))
           ].map((val) => String(val || "").toLowerCase()).join(" ");
           return haystack.includes(searchQuery);
         })
         .filter((item) => {
           if (!startDate && !endDate) return true;
-          const completedDate = parseDateValue(item.exportLoadDate || item.date);
-          if (!completedDate) return false;
-          if (startDate && completedDate < startDate) return false;
-          if (endDate && completedDate > endDate) return false;
-          return true;
+          const dates = [...getTruckImportDetails(item).map((detail) => detail.date), ...getTruckExportDetails(item).map((detail) => detail.exportLoadDate)].map(parseDateValue).filter(Boolean);
+          return dates.some((completedDate) => (!startDate || completedDate >= startDate) && (!endDate || completedDate <= endDate));
         })
         .filter((item) => {
           if (!hasSpecificBroker) return true;
-          const matchesImp = activeImpBroker && String(item.importBroker || "").trim() === activeImpBroker;
-          const matchesExp = activeExpBroker && String(item.exportBroker || "").trim() === activeExpBroker;
+          const matchesImp = activeImpBroker && getTruckImportDetails(item).some((detail) => String(detail.importBroker || "").trim() === activeImpBroker);
+          const matchesExp = activeExpBroker && getTruckExportDetails(item).some((detail) => String(detail.exportBroker || "").trim() === activeExpBroker);
           const matchesMty = activeMtyBroker && (
-            String(item.mtyBroker || "").trim() === activeMtyBroker ||
-            String(item.exportMtyBroker || "").trim() === activeMtyBroker
+            getTruckImportDetails(item).some((detail) => String(detail.mtyBroker || "").trim() === activeMtyBroker) ||
+            getTruckExportDetails(item).some((detail) => String(detail.exportMtyBroker || "").trim() === activeMtyBroker)
           );
           return Boolean(matchesImp || matchesExp || matchesMty);
         })
@@ -6744,30 +6967,21 @@
       }
 
       const totals = filteredTrips.reduce((summary, item) => {
-        const storedImportReceivable = Number(item.importReceivedAmount);
-        const storedExportReceivable = Number(item.exportReceivedAmount);
-        const rawImportReceivable = Number.isFinite(storedImportReceivable)
-          ? storedImportReceivable
-          : Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0);
-        const rawExportReceivable = Number.isFinite(storedExportReceivable)
-          ? storedExportReceivable
-          : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
-
-        const isImportCredit = String(item.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-        const isExportCredit = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-        const isImportMtyCredit = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-        const isExportMtyCredit = String(item.exportMtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-
-        const incImport = shouldIncludeLeg("Import", item.importBroker);
-        const incExport = shouldIncludeLeg("Export", item.exportBroker);
-        const incImportMty = shouldIncludeLeg("MTY", item.mtyBroker);
-        const incExportMty = shouldIncludeLeg("MTY", item.exportMtyBroker);
-
-        const importReceivable = incImport ? (isCompletedSummary ? rawImportReceivable : (isImportCredit ? 0 : rawImportReceivable)) : 0;
-        const exportReceivable = incExport ? (isCompletedSummary ? rawExportReceivable : (isExportCredit ? 0 : rawExportReceivable)) : 0;
-        const importMty = incImportMty ? (isCompletedSummary ? Number(item.mtyBoxFreight || 0) : (isImportMtyCredit ? 0 : Number(item.mtyBoxFreight || 0))) : 0;
-        const exportMty = incExportMty ? (isCompletedSummary ? Number(item.exportMtyBoxFreight || 0) : (isExportMtyCredit ? 0 : Number(item.exportMtyBoxFreight || 0))) : 0;
-        const mtyReceivable = importMty + exportMty;
+        const importReceivable = getTruckImportDetails(item).reduce((total, detail) => {
+          if (!shouldIncludeLeg("Import", detail.importBroker) || (!isCompletedSummary && String(detail.importPaymentStatus || "Awaited").toLowerCase() === "credit")) return total;
+          return total + Number(detail.importReceivedAmount ?? (Number(detail.importFreight || 0) + Number(detail.importDetention || 0) - Number(detail.importBrokerCommission || 0)));
+        }, 0);
+        const exportReceivable = getTruckExportDetails(item).reduce((total, detail) => {
+          if (!shouldIncludeLeg("Export", detail.exportBroker) || (!isCompletedSummary && String(detail.exportPaymentStatus || "Awaited").toLowerCase() === "credit")) return total;
+          return total + Number(detail.exportReceivedAmount ?? (Number(detail.exportFreight || 0) + Number(detail.exportDetention || 0) - Number(detail.exportBrokerCommission || 0)));
+        }, 0);
+        const mtyReceivable = getTruckImportDetails(item).reduce((total, detail) => {
+          if (!shouldIncludeLeg("MTY", detail.mtyBroker) || (!isCompletedSummary && String(detail.mtyPaymentStatus || "Awaited").toLowerCase() === "credit")) return total;
+          return total + Number(detail.mtyBoxFreight || 0);
+        }, 0) + getTruckExportDetails(item).reduce((total, detail) => {
+          if (!shouldIncludeLeg("MTY", detail.exportMtyBroker) || (!isCompletedSummary && String(detail.exportMtyPaymentStatus || "Awaited").toLowerCase() === "credit")) return total;
+          return total + Number(detail.exportMtyBoxFreight || 0);
+        }, 0);
 
         const financials = calculateTruckTripFinancials(item);
         const grandTotal = isCompletedSummary ? financials.grandTotal : (importReceivable + exportReceivable + mtyReceivable);
@@ -6785,7 +6999,10 @@
       if (mtyReceivableTotal) mtyReceivableTotal.textContent = `PKR ${money(totals.mtyReceivable)}`;
       if (grandTotalElement) grandTotalElement.textContent = `PKR ${money(totals.grandTotal)}`;
       if (totalTrucksElement) {
-        const totalTrucks = new Set(filteredTrips.map((item) => String(item.truckNo || "").trim()).filter(Boolean)).size;
+        const totalTrucks = new Set(filteredTrips.flatMap((item) => [
+          ...getTruckImportDetails(item).map((detail) => String(detail.truckNo || "").trim()),
+          ...getTruckExportDetails(item).map((detail) => String(detail.exportTruckNo || "").trim())
+        ]).filter(Boolean)).size;
         totalTrucksElement.textContent = String(totalTrucks);
       }
       if (totalWorkElement) totalWorkElement.textContent = `PKR ${money(totals.grandTotal)}`;
@@ -6814,30 +7031,30 @@
       let serialNumber = 0;
       groupsContainer.innerHTML = jobGroups.map((group) => {
         const legs = group.trips.flatMap((item) => {
-          const storedImport = Number(item.importReceivedAmount);
-          const rawImport = Number.isFinite(storedImport)
-            ? storedImport
-            : Number(item.importFreight || 0) - Number(item.importBrokerCommission || 0);
-          const storedExport = Number(item.exportReceivedAmount);
-          const rawExport = Number.isFinite(storedExport)
-            ? storedExport
-            : Number(item.exportFreight || 0) - Number(item.exportBrokerCommission || 0);
-          const rawMty = Number(item.mtyBoxFreight || 0);
-
-          const isImportCredit = String(item.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-          const isExportCredit = String(item.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-          const isMtyCredit = String(item.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
-
-          const importRec = isCompletedSummary ? rawImport : (isImportCredit ? 0 : rawImport);
-          const exportRec = isCompletedSummary ? rawExport : (isExportCredit ? 0 : rawExport);
-          const mtyRec = isCompletedSummary ? rawMty : (isMtyCredit ? 0 : rawMty);
-
+          const imports = getTruckImportDetails(item);
+          const exports = getTruckExportDetails(item);
           const allLegs = [
-            { tripId: item.id, type: "Import", date: item.date, truckNo: item.truckNo, origin: item.origin, destination: item.destination, size: item.size, weight: item.weight, cargo: item.cargoDescription, freight: item.importFreight, receivable: importRec, broker: item.importBroker, remarks: item.importRemarks || item.remarks },
-            { tripId: item.id, type: "Export", date: item.exportLoadDate, truckNo: item.exportTruckNo || item.truckNo, origin: item.exportOrigin, destination: item.exportDestination, size: item.exportSize, weight: item.exportWeight, cargo: item.cargoDescription, freight: item.exportFreight, receivable: exportRec, broker: item.exportBroker, remarks: item.exportRemarks || item.remarks },
-            { tripId: item.id, type: "MTY", date: "", truckNo: "", origin: "", destination: "", size: "", weight: "", cargo: "", freight: item.mtyBoxFreight, receivable: mtyRec, broker: item.mtyBroker, remarks: "" }
+            ...imports.flatMap((detail, index) => {
+              const suffix = imports.length > 1 ? ` ${index + 1}` : "";
+              const credited = String(detail.importPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+              const mtyCredited = String(detail.mtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+              const receivable = Number(detail.importReceivedAmount ?? (Number(detail.importFreight || 0) + Number(detail.importDetention || 0) - Number(detail.importBrokerCommission || 0)));
+              return [
+                { tripId: item.id, type: "Import", label: `Import${suffix}`, date: detail.date, truckNo: detail.truckNo, origin: detail.origin, destination: detail.destination, size: detail.size, weight: detail.weight, cargo: detail.cargoDescription, freight: detail.importFreight, receivable: isCompletedSummary ? receivable : (credited ? 0 : receivable), broker: detail.importBroker, remarks: detail.importRemarks },
+                { tripId: item.id, type: "MTY", label: `MTY Import${suffix}`, date: detail.date, truckNo: detail.truckNo, origin: "", destination: "", size: "", weight: "", cargo: "", freight: detail.mtyBoxFreight, receivable: isCompletedSummary || !mtyCredited ? Number(detail.mtyBoxFreight || 0) : 0, broker: detail.mtyBroker, remarks: "" }
+              ];
+            }),
+            ...exports.flatMap((detail, index) => {
+              const suffix = exports.length > 1 ? ` ${index + 1}` : "";
+              const credited = String(detail.exportPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+              const mtyCredited = String(detail.exportMtyPaymentStatus || "Awaited").trim().toLowerCase() === "credit";
+              const receivable = Number(detail.exportReceivedAmount ?? (Number(detail.exportFreight || 0) + Number(detail.exportDetention || 0) - Number(detail.exportBrokerCommission || 0)));
+              return [
+                { tripId: item.id, type: "Export", label: `Export${suffix}`, date: detail.exportLoadDate, truckNo: detail.exportTruckNo, origin: detail.exportOrigin, destination: detail.exportDestination, size: detail.exportSize, weight: detail.exportWeight, cargo: detail.exportCargoDescription, freight: detail.exportFreight, receivable: isCompletedSummary ? receivable : (credited ? 0 : receivable), broker: detail.exportBroker, remarks: detail.exportRemarks },
+                { tripId: item.id, type: "MTY", label: `MTY Export${suffix}`, date: detail.exportLoadDate, truckNo: detail.exportTruckNo, origin: "", destination: "", size: "", weight: "", cargo: "", freight: detail.exportMtyBoxFreight, receivable: isCompletedSummary || !mtyCredited ? Number(detail.exportMtyBoxFreight || 0) : 0, broker: detail.exportMtyBroker, remarks: "" }
+              ];
+            })
           ];
-
           return allLegs.filter((leg) => shouldIncludeLeg(leg.type, leg.broker));
         });
 
@@ -6865,7 +7082,7 @@
           serialNumber += 1;
           return `<tr>
                       <td>${serialNumber}</td>
-                      <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${leg.type}</span></td>
+                      <td><span class="truck-leg-type ${leg.type.toLowerCase()}">${text(leg.label)}</span></td>
                       <td>${leg.date ? formatShortDate(leg.date) : "-"}</td>
                       <td>${text(leg.truckNo)}</td>
                       <td>${text(leg.origin)}</td>
@@ -9775,36 +9992,39 @@
     const pdf = new jsPDF("p", "pt", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
+    const voucherBlueFill = [213, 232, 238];
+    const voucherBlueLine = [126, 164, 177];
+    const voucherNavy = [24, 48, 77];
 
     // Background tint matching uploaded template (#e3eee0)
     pdf.setFillColor(227, 238, 224);
     pdf.rect(0, 0, pageWidth, pageHeight, "F");
 
     // Outer double border
-    pdf.setDrawColor(0, 0, 0);
-    pdf.setLineWidth(2.5);
+    pdf.setDrawColor(...voucherBlueLine);
+    pdf.setLineWidth(1.5);
     pdf.rect(18, 18, pageWidth - 36, pageHeight - 36, "S");
-    pdf.setLineWidth(0.8);
+    pdf.setLineWidth(0.6);
     pdf.rect(22, 22, pageWidth - 44, pageHeight - 44, "S");
 
-    // Header banner: solid black box with white text
+    // Light blue header banner reduces solid ink coverage when printed.
     const bannerX = 26;
     const bannerY = 26;
     const bannerW = pageWidth - 52;
     const bannerH = 46;
-    pdf.setFillColor(0, 0, 0);
+    pdf.setFillColor(...voucherBlueFill);
     pdf.rect(bannerX, bannerY, bannerW, bannerH, "F");
 
-    pdf.setTextColor(255, 255, 255);
+    pdf.setTextColor(...voucherNavy);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(24);
     pdf.text("Payment Voucher", pageWidth / 2, bannerY + 31, { align: "center" });
 
     // Company Information
-    pdf.setTextColor(0, 0, 0);
+    pdf.setTextColor(...voucherNavy);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(18);
-    pdf.text("GTLS LOGISTICS (PVT) LTD", pageWidth / 2, bannerY + 76, { align: "center" });
+    pdf.text("Global Transport Logistic Services", pageWidth / 2, bannerY + 76, { align: "center" });
 
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9.5);
@@ -9821,6 +10041,8 @@
     const rightLabelX = 320;
     const rightValX = 370;
     const rightLineEnd = pageWidth - 36;
+    pdf.setDrawColor(...voucherBlueLine);
+    pdf.setLineWidth(0.6);
 
     // Row 1: Pay To & Pay By
     pdf.setFont("helvetica", "bold");
@@ -9881,33 +10103,33 @@
       body: tableBody,
       foot: [["", "", "", "Total", footTotalAmount]],
       headStyles: {
-        fillColor: [0, 0, 0],
-        textColor: [255, 255, 255],
+        fillColor: voucherBlueFill,
+        textColor: voucherNavy,
         fontStyle: "bold",
         fontSize: 10,
         halign: "center",
         valign: "middle",
         minCellHeight: 25,
-        lineColor: [0, 0, 0],
-        lineWidth: 0.8
+        lineColor: voucherBlueLine,
+        lineWidth: 0.55
       },
       bodyStyles: {
         fillColor: [227, 238, 224],
-        textColor: [0, 0, 0],
+        textColor: voucherNavy,
         fontSize: 9.5,
         minCellHeight: 24,
-        lineColor: [0, 0, 0],
-        lineWidth: 0.8,
+        lineColor: voucherBlueLine,
+        lineWidth: 0.55,
         valign: "middle"
       },
       footStyles: {
-        fillColor: [0, 0, 0],
-        textColor: [255, 255, 255],
+        fillColor: voucherBlueFill,
+        textColor: voucherNavy,
         fontStyle: "bold",
         fontSize: 10.5,
         minCellHeight: 25,
-        lineColor: [0, 0, 0],
-        lineWidth: 0.8,
+        lineColor: voucherBlueLine,
+        lineWidth: 0.55,
         valign: "middle"
       },
       columnStyles: {
@@ -9928,8 +10150,10 @@
     const finalY = pdf.lastAutoTable?.finalY || (metaStartY + 260);
 
     // Bottom Fields: A/C No. & The Sum of
+    pdf.setDrawColor(...voucherBlueLine);
     const bottomY = finalY + 36;
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(...voucherNavy);
     pdf.setFontSize(10.5);
     pdf.text("A/C No.", 36, bottomY);
     pdf.line(84, bottomY + 2, 230, bottomY + 2);
@@ -9948,6 +10172,7 @@
     const sigLineW = 160;
 
     // Prepared By
+    pdf.setDrawColor(...voucherBlueLine);
     pdf.setLineWidth(0.8);
     pdf.line(50, signY, 50 + sigLineW, signY);
     pdf.setFont("helvetica", "bold");

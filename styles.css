@@ -1567,6 +1567,106 @@ a.dashboard-kpi-card:focus-visible {
   min-width: 0;
 }
 
+.truck-details-manager {
+  grid-column: span 12;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.truck-detail-section {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line, #ead5c2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.truck-detail-section-head h3 {
+  margin: 0 0 14px;
+}
+
+.truck-detail-section-head.has-remove-button {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.truck-detail-section-head .truck-detail-remove {
+  flex: 0 0 auto;
+}
+
+.truck-details-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.truck-details-fields > .field,
+.truck-details-fields > .field.quarter,
+.truck-details-fields > .field.half,
+.truck-details-fields > .field.wide {
+  grid-column: span 1;
+  min-width: 0;
+}
+
+.truck-details-fields > .field.full {
+  grid-column: 1 / -1;
+}
+
+.truck-detail-add-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.truck-detail-extra-list {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+body[data-page="truck"] .truck-trip-table .table-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 320px;
+}
+
+body[data-page="truck"] .truck-trip-table .table-actions .btn {
+  width: auto;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+
+body[data-page="truck"] .truck-trip-table tbody td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+body[data-page="truck"] .truck-trip-table tbody tr.truck-trip-row-multiple {
+  background: #fff3e8;
+}
+
+body[data-page="truck"] .truck-trip-table tbody tr.truck-trip-row-multiple:hover {
+  background: #ffe8d2;
+}
+
+@media (max-width: 900px) {
+  .truck-details-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .truck-details-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .truck-financial-fields > .field {
   grid-column: auto;
   min-width: 0;
@@ -4351,16 +4451,50 @@ body[data-page="truck"] .truck-trip-table td {
   vertical-align: top;
 }
 
-body[data-page="truck"] .truck-trip-table th:nth-child(26),
-body[data-page="truck"] .truck-trip-table td:nth-child(26),
-body[data-page="truck"] .truck-trip-table th:nth-child(50),
-body[data-page="truck"] .truck-trip-table td:nth-child(50) {
-  border-right: 2px solid #b18462;
+body[data-page="truck"] .truck-trip-table th:nth-child(27),
+body[data-page="truck"] .truck-trip-table td:nth-child(27),
+body[data-page="truck"] .truck-trip-table th:nth-child(52),
+body[data-page="truck"] .truck-trip-table td:nth-child(52) {
+  border-right: 1px solid #d6b08f;
 }
 
 body[data-page="truck"] .truck-trip-table td.remarks-cell {
   min-width: 260px;
+  max-width: 320px;
   white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+body[data-page="truck"] .truck-trip-table td:nth-child(5),
+body[data-page="truck"] .truck-trip-table td:nth-child(6),
+body[data-page="truck"] .truck-trip-table td:nth-child(7),
+body[data-page="truck"] .truck-trip-table td:nth-child(10),
+body[data-page="truck"] .truck-trip-table td:nth-child(12),
+body[data-page="truck"] .truck-trip-table td:nth-child(16),
+body[data-page="truck"] .truck-trip-table td:nth-child(18),
+body[data-page="truck"] .truck-trip-table td:nth-child(19),
+body[data-page="truck"] .truck-trip-table td:nth-child(26),
+body[data-page="truck"] .truck-trip-table td:nth-child(30),
+body[data-page="truck"] .truck-trip-table td:nth-child(31),
+body[data-page="truck"] .truck-trip-table td:nth-child(32),
+body[data-page="truck"] .truck-trip-table td:nth-child(35),
+body[data-page="truck"] .truck-trip-table td:nth-child(37),
+body[data-page="truck"] .truck-trip-table td:nth-child(41),
+body[data-page="truck"] .truck-trip-table td:nth-child(43),
+body[data-page="truck"] .truck-trip-table td:nth-child(44),
+body[data-page="truck"] .truck-trip-table td:nth-child(51) {
+  min-width: 105px;
+  max-width: 210px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+body[data-page="truck"] .truck-trip-table td:nth-child(10),
+body[data-page="truck"] .truck-trip-table td:nth-child(35) {
+  min-width: 170px;
+  max-width: 240px;
 }
 
 body[data-page="truck"] .truck-trip-table td.truck-expense-missing {

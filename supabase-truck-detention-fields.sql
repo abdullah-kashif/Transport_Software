@@ -10,5 +10,6 @@ alter table public.truck_jobs add column if not exists export_payment_term text;
 alter table public.truck_jobs add column if not exists export_customer_collection numeric default 0;
 
 -- Ensure table permissions for all active roles
-grant usage on schema public to authenticated, anon, service_role;
-grant select, insert, update, delete on table public.truck_jobs to authenticated, anon, service_role;
+grant usage on schema public to authenticated, service_role;
+revoke all privileges on table public.truck_jobs from anon;
+grant select, insert, update, delete on table public.truck_jobs to authenticated, service_role;

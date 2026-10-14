@@ -6,7 +6,7 @@
   <title>GTLS Transport - Truck Details</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261007-27" />
+  <link rel="stylesheet" href="styles.css?v=20261014-7" />
 </head>
 <body data-page="truck">
   <div class="app">
@@ -46,7 +46,10 @@
       <section class="screen">
         <div class="screen-head"><div><h3>Create / Update Truck Trip</h3></div></div>
         <form data-truck-trip-form class="form-grid">
-          <div class="field full"><h3>Import Details</h3></div>
+          <div class="truck-details-manager" data-truck-details-manager="import">
+          <section class="truck-detail-section" data-truck-detail-section data-detail-type="import" data-detail-index="0">
+          <div class="truck-detail-section-head"><h3>Import Details 1</h3></div>
+          <div class="truck-details-fields">
           <div class="field quarter"><label>Import Truck Registration No</label><input name="truckNo" placeholder="Example: JW-5477" required /></div>
           <div class="field quarter"><label>Import Load Date</label><input name="date" type="date" required /></div>
           <div class="field quarter"><label>Customer / Payer</label><input name="customer" placeholder="Customer Name" required /></div>
@@ -72,8 +75,16 @@
           <div class="field quarter"><label>Paid Date</label><input name="importPaymentDate" type="date" /></div>
           <div class="field quarter"><label>Cheque / IBFT</label><input name="importChequeDetails2" placeholder="IBFT / Cheque No" /></div>
           <div class="field full"><label>Import Remarks</label><textarea name="importRemarks" placeholder="Import remarks..."></textarea></div>
+          </div>
+          </section>
+          <div class="truck-detail-add-row"><button class="btn" type="button" data-add-truck-detail="import">Add Import Details</button></div>
+          <div class="truck-detail-extra-list" data-truck-detail-extra-list="import"></div>
+          </div>
 
-          <div class="field full"><h3>Export Details</h3></div>
+          <div class="truck-details-manager" data-truck-details-manager="export">
+          <section class="truck-detail-section" data-truck-detail-section data-detail-type="export" data-detail-index="0">
+          <div class="truck-detail-section-head"><h3>Export Details 1</h3></div>
+          <div class="truck-details-fields">
           <div class="field quarter"><label>Export Truck Registration No</label><input name="exportTruckNo" placeholder="Example: JW-5477" /></div>
           <div class="field quarter"><label>Export Load Date</label><input name="exportLoadDate" type="date" /></div>
           <div class="field quarter"><label>Customer / Payer</label><input name="exportCustomer" placeholder="Customer Name" /></div>
@@ -99,12 +110,17 @@
           <div class="field quarter"><label>Paid Date</label><input name="exportPaymentDate" type="date" /></div>
           <div class="field quarter"><label>Cheque / IBFT</label><input name="exportChequeDetails2" placeholder="IBFT / Cheque No" /></div>
           <div class="field full"><label>Export Remarks</label><textarea name="exportRemarks" placeholder="Export remarks..."></textarea></div>
+          </div>
+          </section>
+          <div class="truck-detail-add-row"><button class="btn" type="button" data-add-truck-detail="export">Add Export Details</button></div>
+          <div class="truck-detail-extra-list" data-truck-detail-extra-list="export"></div>
+          </div>
 
           <div class="truck-financial-fields">
             <div class="field truck-financial-image"><label>Truck Details Image</label><div class="maintenance-image-field"><input name="tripImageFile" type="file" accept="image/*" data-truck-image-input /><button class="maintenance-image-remove" type="button" data-remove-truck-image hidden aria-label="Remove selected image" title="Remove image">&times;</button></div><div class="maintenance-image-preview" data-truck-image-preview hidden></div></div>
             <div class="field"><label>Grand Total</label><input name="grandTotal" type="text" readonly /></div>
             <div class="field"><label>Round Trip Expense</label><input name="roundTripExpense" type="number" value="0" min="0" /></div>
-            <div class="field"><label>Diesel Expense</label><input name="dieselExpense" type="number" value="0" min="0" step="0.01" /></div>
+            <div class="field"><label>Diesel Consumption</label><input name="dieselExpense" type="number" value="0" min="0" step="0.01" /></div>
             <div class="field"><label>P&amp;L</label><input name="profitLoss" type="text" readonly /></div>
           </div>
           <div class="field full actions"><button class="btn primary" type="submit" data-submit-label>Save Trip</button><button class="btn" type="button" data-reset-form>Clear Form</button></div>
@@ -127,7 +143,7 @@
           </div>
         </div>
         <div class="table-wrap"><table class="ledger-table truck-trip-table"><thead><tr>
-              <th>S.No</th><th>Job No</th><th>Import Load Date</th><th>Import Truck Registration No</th><th>Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Detention</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Receivable Amount</th><th>Payment Term</th><th>Cheque / IBFT</th><th>Payment Received Date</th><th>Import Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Customer Collection</th><th>Paid Date</th><th>Cheque / IBFT</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Export Freight</th><th>Detention</th><th>Broker Commission</th><th>Export - Broker</th><th>Export Receivable Amount</th><th>Payment Term</th><th>Cheque / IBFT</th><th>Payment Received Date</th><th>Export Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Customer Collection</th><th>Paid Date</th><th>Cheque / IBFT</th><th>Export Remarks</th><th>Grand Total</th><th>Round Trip Expense</th><th>P&amp;L</th><th>Image</th><th>Actions</th>
+              <th>S.No</th><th>Job No</th><th>Import Load Date</th><th>Import Truck Registration No</th><th>Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Import Freight</th><th>Detention</th><th>Broker Commission</th><th>Import - Broker</th><th>Import Receivable Amount</th><th>Payment Term</th><th>Cheque / IBFT</th><th>Payment Received Date</th><th>Import Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Customer Collection</th><th>Paid Date</th><th>Cheque / IBFT</th><th>Import Remarks</th><th>Export Load Date</th><th>Export Truck Registration No</th><th>Export Customer/Payer</th><th>Origin</th><th>Destination</th><th>Size</th><th>Weight</th><th>Cargo Description</th><th>MTY Box Freight</th><th>MTY Broker</th><th>Export Freight</th><th>Detention</th><th>Broker Commission</th><th>Export - Broker</th><th>Export Receivable Amount</th><th>Payment Term</th><th>Cheque / IBFT</th><th>Payment Received Date</th><th>Export Payment Status</th><th>MTY Payment Received Date</th><th>MTY Payment Status</th><th>Customer Collection</th><th>Paid Date</th><th>Cheque / IBFT</th><th>Export Remarks</th><th>Grand Total</th><th>Round Trip Expense</th><th>Diesel Consumption</th><th>P&amp;L</th><th>Image</th><th>Actions</th>
         </tr></thead><tbody data-truck-trip-rows></tbody></table></div>
       </section>
     </main>
@@ -140,6 +156,6 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261007-27"></script>
+<script src="app.js?v=20261014-9"></script>
 </body>
 </html>

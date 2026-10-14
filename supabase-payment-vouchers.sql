@@ -17,8 +17,9 @@ create table if not exists public.payment_vouchers (
   updated_at timestamptz default now()
 );
 
-grant usage on schema public to authenticated, anon, service_role;
-grant select, insert, update, delete on table public.payment_vouchers to authenticated, anon, service_role;
+grant usage on schema public to authenticated, service_role;
+revoke all privileges on table public.payment_vouchers from anon;
+grant select, insert, update, delete on table public.payment_vouchers to authenticated, service_role;
 
 alter table public.payment_vouchers enable row level security;
 drop policy if exists "payment_vouchers_module_access" on public.payment_vouchers;

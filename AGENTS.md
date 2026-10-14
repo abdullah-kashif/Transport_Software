@@ -7,6 +7,18 @@
 
 ---
 
+- **2026-10-14**: Hardened Supabase database access. Added `supabase-security-hardening.sql` to revoke anonymous grants, remove `anon` / `PUBLIC` policies, including inherited Storage access, and replace broad Booking / Two Pay policies with active-user module-scoped RLS. Updated the master setup and legacy permission, Payment Voucher, Equipment, and Truck migrations so they do not grant database access to `anon`; existing rows are unchanged. Run the hardening migration in the live Supabase SQL Editor after older permission scripts have been applied.
+- **2026-10-14**: Truck Details now labels the existing trip-level diesel field “Diesel Consumption”, displays it in the on-screen ledger and filtered PDF summary immediately before P&L, and totals it in the PDF footer. Removed only the Export Truck column from that summary PDF. Existing `diesel_expense` storage and P&L calculation remain unchanged. Bumped `app.js` cache keys across HTML pages to `20261014-1`.
+- **2026-10-14**: Truck Trip Ledger summary PDF now includes Import Weight after Import Truck and Export Weight after Export Date, sourced independently from the corresponding form fields. Rebalanced the A3 summary table widths and bumped `app.js` cache keys to `20261014-2` across HTML pages.
+- **2026-10-14**: Truck Details supports additional Import and Export sections using Add buttons. Existing `truck_jobs` columns remain the first details; extra entries are stored as typed rows in `truck_import_details` / `truck_export_details` with a per-job detail number. The migration copies existing JSONB entries into the new tables and retains the source JSON columns for rollback and verification. Per-detail invoices, repeated ledger rows, summaries, totals, alerts, and edit hydration cover all detail rows.
+- **2026-10-14**: Added a Remove Details button to newly added, unsaved Truck Details sections so an accidental Add click can be undone. Saved detail sections stay protected from removal. Bumped `app.js` to `20261014-5` and `styles.css` to `20261014-2` across HTML pages. Run `supabase-truck-multiple-details.sql` before syncing added forms.
+- **2026-10-14**: Truck Trip Ledger now repeats the plain Job No on each detail row, shows S.No once per job, places matching invoice actions on their own rows, and avoids tall rows from vertically stacked invoice buttons. The summary PDF uses plain Job No without slash suffixes. Bumped `app.js` to `20261014-6` and `styles.css` to `20261014-3` across HTML pages.
+- **2026-10-14**: Moved Truck Trip Ledger vertical separators to after Import Remarks and Export Remarks, marking the boundaries between Import, Export, and job-level detail columns. Bumped `styles.css` to `20261014-4` across HTML pages.
+- **2026-10-14**: Highlighted all Truck Trip Ledger rows for jobs with multiple Import or Export details using a soft warm tint that matches the application theme. Bumped `app.js` to `20261014-7` and `styles.css` to `20261014-5` across HTML pages.
+- **2026-10-14**: Changed the Payment Voucher PDF's solid black title, table header, and total fills to light blue with navy text. Softened its borders and table grid lines to blue to reduce dark ink coverage while keeping labels legible. Bumped `app.js` to `20261014-8` across HTML pages.
+- **2026-10-14**: Long text in Truck Trip Ledger party, route, cargo, broker, payment detail, and remarks cells now wraps within bounded widths; compact values such as dates and amounts stay on one line. Bumped `styles.css` to `20261014-6` across HTML pages.
+- **2026-10-14**: Refined Truck Trip Ledger section separators after Import Remarks and Export Remarks with a thinner, lighter theme-orange line. Bumped `styles.css` to `20261014-7` across HTML pages.
+- **2026-10-14**: Changed the Payment Voucher PDF company heading to “Global Transport Logistic Services”. Bumped the `app.js` cache key to `20261014-9` across HTML pages.
 - **2026-10-07 (Update 12)**: Shared summary cards now use Two Pay Records-style colored title badges for clear screen and print visibility. Added the English Builty module (`builty.html`) with searchable local register and excluded driver signature, charges, total rent, and remaining rent fields. Styles cache is `20261007-12`.
 - **2026-10-07 (Update 13)**: Applied Two Pay Records typography and badge styling to all summary cards, renamed the visible module label to Bilty, and fixed Bilty navigation initialization before PJAX listeners. Styles cache is `20261007-13`.
 - **2026-10-07 (Update 14)**: Rebuilt the Bilty page on the standard GTLS application shell and module layout so its hero, notification area, form, toolbar, and register match the other modules.
@@ -41,19 +53,19 @@
 | **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3847) |
 | **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 4019) |
 | **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5364) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 5919) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6535) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6535) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 6877) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7104) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7449) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 7834) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8063) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8093) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8341) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 8493) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 8493) |
-| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10070) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 6165) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6838) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6838) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 7161) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7547) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7892) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 8277) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8603) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8633) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8881) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 9033) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 9033) |
+| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10310) |
 
 ---
 
@@ -63,8 +75,8 @@
 - **State Store**: `loadStore()` (~Line 176) & `saveStore(store, options)` (~Line 381).
 - **Audit Logging**: `collectAuditChanges()` (~Line 339), `appendAuditLog()` (~Line 321), `pruneActivityLogs()` (~Line 263).
 - **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 475), `signInWithSupabase()` (~Line 506), `enforceSoftwareAccess(page)` (~Line 2269).
-- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 5895), `convertNumberToWords(amount)` (~Line 9650).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 5767), `buildPaymentVoucherPdf()` (~Line 9690), `buildPaymentVoucherSummaryPdf()` (~Line 9850).
+- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 6149), `convertNumberToWords(amount)` (~Line 9951).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 6041), `buildPaymentVoucherPdf()` (~Line 9987), `buildPaymentVoucherSummaryPdf()` (~Line 10199).
 - **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1447), `hydrateOperationalStore()` (~Line 1469), `syncTruckJobs()` (~Line 1129), `syncPaymentVouchers()` (~Line 1354).
 - **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
 
@@ -96,7 +108,7 @@
 
 - **2026-10-07 (Update 3)**: New Payment Voucher Module with Dynamic Multi-Row Line Items, Auto Words Conversion, 1-to-1 PDF & Remote Supabase Persistence:
   1. **New Module (`payment-voucher.html`)**: Added dedicated Payment Voucher module with header metadata (`PV No.`, `Date`, `Pay To`, `Pay By`, `A/C No.`, `Prepared By`, `Received By`), dynamic multi-item line matrix (`Serial No.`, `Payment Method`, `Description`, `Unit Price`, `Amount`), real-time Total Amount & Words conversion (`The Sum of: Rupees ... Only`), top KPI summary counters, and full Voucher Register with search, payee filter, date range, date order, and edit/delete actions.
-  2. **1-to-1 Template PDF Export (`buildPaymentVoucherPdf`)**: Generates an exact single-page A4 PDF mirroring the user's template: light green tint (`#e3eee0`), outer double border, solid black top banner "Payment Voucher", company header, underlined metadata lines, black-headed table padded to 7+ grid rows, black total bar, A/C No. & Words underline, and dual signature lines for Prepared By & Received By. Also added `buildPaymentVoucherSummaryPdf` for filtered landscape summary reports.
+  2. **1-to-1 Template PDF Export (`buildPaymentVoucherPdf`)**: Generates a single-page A4 PDF based on the user's template: light green tint (`#e3eee0`), outer double border, light blue top banner, company header, underlined metadata lines, light blue table header and total row with 7+ grid rows, A/C No. & Words underline, and dual signature lines for Prepared By & Received By. Also added `buildPaymentVoucherSummaryPdf` for filtered landscape summary reports.
   3. **Remote Persistence & Security**: Created `public.payment_vouchers` table in `supabase-payment-vouchers.sql` and `MASTER_SUPABASE_SETUP.sql` with RLS policies, permissions, bidirectional sync (`syncPaymentVouchers`), and background hydration.
   4. **RBAC & Navigation**: Added `payment-voucher` to `ACCESS_OPTIONS`, `appPages`, `getNavigationIcon`, `ensurePaymentVoucherNavigation()`, and updated all 18 HTML files with sidebar links and cache bump (`v=20261007-3`).
 
@@ -279,7 +291,7 @@
   5. Refactored Trucker/Broker Summary PDF Export (`buildBrokerSummaryPdf`): moved Trucker/Broker name from table columns into the header title area (`TRUCKER / BROKER: [NAME]`), removed `Payment/Cheque/IBFT`, `Payment Date`, and `Trucker/Broker` from table columns, and formatted table to show `Booking No`, `Booking Date`, `Truck No`, `Container Size`, `Amount`, `Route`, and `Container Ref` with a total Amount row on the final page.
   6. Fixed responsive box styling in `styles.css`: updated `.booking-ledger-toolbar` to wrap gracefully preventing stat boxes and `Download Summary` from overflowing or clipping on laptop screens, adjusted `.broker-table-head` and `.broker-row` min-width to 980px, optimized column ratios, and enforced `white-space: nowrap` on `PAYMENT STATUS` so all 10 columns fit seamlessly.
   7. Renamed `Detention` field and column to `Detention/Other Charges` across the main Booking Form (`booking.html` label), Booking Ledger table header, Sales Tax Invoice PDF (`buildBookingInvoicePdf`), and form validation error messaging, and made it completely optional in form submission (defaults to 0 if left blank), preserving backward-compatible data persistence in `bookings.detention`.
-  8. Resolved Supabase sync permission error (`permission denied for table bookings`) by preparing SQL permissions migration `supabase-booking-permissions-fix.sql` granting schema and table-level `ALL` privileges on `public.bookings`, `public.booking_containers`, `public.booking_brokers`, and sequences to `authenticated`, `anon`, and `service_role`, establishing clean RLS policies and storage object grants. Integrated table grants directly into `MASTER_SUPABASE_SETUP.sql`.
+  8. Historical fix for the Supabase sync permission error (`permission denied for table bookings`) granted booking tables to `anon` as well as authenticated users. This was unsafe and is superseded by the 2026-10-14 module-scoped RLS hardening. The current `supabase-booking-permissions-fix.sql` and `MASTER_SUPABASE_SETUP.sql` grant database access only to authenticated users and `service_role`.
   9. Updated Trucker/Broker Summary filter: replaced `Customer` filter label with `Trucker/Broker` (`data-broker-summary-broker`), populated options dynamically with unique Trucker/Broker names (`renderBrokerOptions`), scoped `Total Paid` and `Total Payable` KPIs directly to the selected Trucker/Broker, and filtered summary rows accordingly.
   10. Renamed `Container Ref` to `Container No` across the Trucker/Broker Summary table header (`broker-summary.html`), on-page data rows, and PDF export table header (`buildBrokerSummaryPdf`), using helper `getBrokerRowContainerNo` to resolve and display the exact container number.
   11. Reordered Trucker/Broker Summary PDF Export columns (`buildBrokerSummaryPdf`): repositioned `Container No` to appear immediately after `Truck No`, followed by `Container Size`, `Amount`, and `Route`, with corresponding footer total alignment.

@@ -3,5 +3,6 @@
 
 alter table public.equipment_fleet add column if not exists type_of_body text;
 
--- Ensure authenticated and anon roles have access to equipment_fleet
-grant select, insert, update, delete on table public.equipment_fleet to authenticated, anon, service_role;
+-- Keep this additive migration restricted to authenticated app users.
+revoke all privileges on table public.equipment_fleet from anon;
+grant select, insert, update, delete on table public.equipment_fleet to authenticated, service_role;

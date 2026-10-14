@@ -34,36 +34,39 @@ create index if not exists idx_booking_brokers_date on public.booking_brokers(br
 alter table public.booking_brokers enable row level security;
 
 -- Grants
-grant select, insert, update, delete on table public.booking_brokers to authenticated;
-grant usage on schema public to authenticated;
+revoke all privileges on table public.booking_brokers from anon;
+grant select, insert, update, delete on table public.booking_brokers to authenticated, service_role;
+grant usage on schema public to authenticated, service_role;
 
 -- RLS Policies matching booking_containers
+drop policy if exists "booking_brokers_all_access" on public.booking_brokers;
+drop policy if exists "booking_brokers_all" on public.booking_brokers;
 drop policy if exists "booking_brokers_module_select" on public.booking_brokers;
 create policy "booking_brokers_module_select" on public.booking_brokers for select to authenticated
 using (
-  public.has_module_access('dashboard') or
-  public.has_module_access('booking') or
-  public.has_module_access('ledger') or
-  public.has_module_access('khata')
+  public.is_active_user() and (
+    public.has_module_access('dashboard') or
+    public.has_module_access('booking') or
+    public.has_module_access('ledger') or
+    public.has_module_access('khata')
+  )
 );
 
 drop policy if exists "booking_brokers_module_insert" on public.booking_brokers;
 create policy "booking_brokers_module_insert" on public.booking_brokers for insert to authenticated
 with check (
-  public.has_module_access('booking')
+  public.is_active_user() and public.has_module_access('booking')
 );
 
 drop policy if exists "booking_brokers_module_update" on public.booking_brokers;
 create policy "booking_brokers_module_update" on public.booking_brokers for update to authenticated
 using (
-  public.has_module_access('booking')
+  public.is_active_user() and public.has_module_access('booking')
 )
 with check (
-  public.has_module_access('booking')
+  public.is_active_user() and public.has_module_access('booking')
 );
 
 drop policy if exists "booking_brokers_module_delete" on public.booking_brokers;
 create policy "booking_brokers_module_delete" on public.booking_brokers for delete to authenticated
-using (
-  public.has_module_access('booking')
-);
+using (public.is_active_user() and public.has_module_access('booking'));
