@@ -1562,7 +1562,7 @@ a.dashboard-kpi-card:focus-visible {
 .truck-financial-fields {
   grid-column: span 12;
   display: grid;
-  grid-template-columns: minmax(155px, .88fr) repeat(4, minmax(135px, 1fr));
+  grid-template-columns: minmax(155px, .88fr) repeat(5, minmax(135px, 1fr));
   gap: 14px;
   min-width: 0;
 }
@@ -5900,6 +5900,58 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
 
 .voucher-stats {
   margin-bottom: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.voucher-stats .span-3 {
+  grid-column: span 1;
+}
+
+.voucher-fund-form {
+  padding: 18px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.voucher-fund-table-wrap {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-2);
+}
+
+.voucher-fund-table {
+  min-width: 900px;
+}
+
+.voucher-fund-table th,
+.voucher-fund-table td {
+  white-space: nowrap;
+}
+
+.voucher-fund-table td:nth-child(5) {
+  max-width: 280px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.voucher-stats [data-voucher-available-balance].negative-balance {
+  color: #b42318;
+}
+
+@media (max-width: 1024px) {
+  .voucher-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .voucher-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 .voucher-items-section {

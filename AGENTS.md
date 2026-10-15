@@ -1,5 +1,13 @@
 # GTLS Transport Software - AI & Agent Instructions
 
+- **2026-10-15**: Two Pay Records now labels Detention Charges as “Detention / Other Charges” in the form, register, and PDFs, and removes Road Freight / Paid from user-facing forms, register, and PDFs. Existing `road_freight_paid` values remain mapped and preserved when editing older records; new records store 0 for compatibility. No database migration is needed. Bumped `app.js` cache keys to `20261015-5` across HTML pages.
+
+- **2026-10-15**: Added a relational fund ledger to Payment Voucher. A single opening balance and subsequent Funds Added entries are stored in `payment_voucher_funds`; available balance is calculated through today from the opening date, so earlier vouchers are not deducted twice. Added module-scoped authenticated RLS, a single-opening-balance index, entry edit/delete, Supabase hydration, and non-pruning upsert sync. Payment Voucher deletes now target only the selected remote ID so stale local lists cannot delete unrelated records. Run `supabase-payment-voucher-funds.sql` before using the new fund ledger; existing voucher rows are unchanged. Bumped app/styles caches to `20261015-4` / `20261015-2` across HTML pages.
+
+- **2026-10-15**: Payment Voucher PDFs now use a compact custom page height fitted to the voucher table and signatures, reducing unused blank space below. Height grows for additional rows and wrapped descriptions, and falls back to A4 when needed. Bumped `app.js` cache keys to `20261015-3` across HTML pages.
+- **2026-10-15**: In the downloadable Truck Trip Ledger summary, removed Export Date and added Import Destination after Import Truck. Kept Import / Export weights tied to their respective detail forms and rebalanced PDF widths. Bumped `app.js` cache keys to `20261015-2` across HTML pages.
+- **2026-10-15**: Added a trip-level Salary field immediately before P&L in Truck Details. Salary saves and hydrates through `truck_jobs.salary`, defaults to 0 for existing records, and stays outside P&L calculations. Added `supabase-truck-salary.sql` and the idempotent column to the master setup. Bumped `app.js` and `styles.css` cache keys to `20261015-1` across HTML pages.
+
 > **CRITICAL INSTRUCTION FOR ALL AI SESSIONS**:
 > **DO NOT spend tokens/credits scanning all project files or searching the codebase blindly.**
 > The entire architecture, file map, database schema, state keys, and business calculation engine are fully documented in [`PROJECT_ARCHITECTURE.md`](file:///h:/Transport_Software-main/PROJECT_ARCHITECTURE.md).
@@ -65,7 +73,7 @@
 | **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8881) |
 | **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 9033) |
 | **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 9033) |
-| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10310) |
+| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10370) |
 
 ---
 
@@ -76,8 +84,8 @@
 - **Audit Logging**: `collectAuditChanges()` (~Line 339), `appendAuditLog()` (~Line 321), `pruneActivityLogs()` (~Line 263).
 - **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 475), `signInWithSupabase()` (~Line 506), `enforceSoftwareAccess(page)` (~Line 2269).
 - **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 6149), `convertNumberToWords(amount)` (~Line 9951).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 6041), `buildPaymentVoucherPdf()` (~Line 9987), `buildPaymentVoucherSummaryPdf()` (~Line 10199).
-- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1447), `hydrateOperationalStore()` (~Line 1469), `syncTruckJobs()` (~Line 1129), `syncPaymentVouchers()` (~Line 1354).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 6041), `buildPaymentVoucherPdf()` (~Line 10036), `buildPaymentVoucherSummaryPdf()` (~Line 10259).
+- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1660), `hydrateOperationalStore()` (~Line 1685), `syncTruckJobs()` (~Line 1205), `syncPaymentVouchers()` (~Line 1440), `syncPaymentVoucherFunds()` (~Line 1460).
 - **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
 
 ---

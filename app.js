@@ -81,6 +81,7 @@
     vendorKhatas: [],
     twoPayRecords: [],
     paymentVouchers: [],
+    paymentVoucherFunds: [],
     builtyRecords: []
   };
 
@@ -122,9 +123,9 @@
     let truckJobNumber = 1;
     store.truckExpenses = (store.truckExpenses || []).map((item, index) => {
       const currentJobNo = String(item.jobNo || "").trim();
-      if (!currentJobNo) return { ...item, id: `TRIP-${index + 1}`, additionalImportDetails: Array.isArray(item.additionalImportDetails) ? item.additionalImportDetails : [], additionalExportDetails: Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : [] };
+      if (!currentJobNo) return { ...item, id: `TRIP-${index + 1}`, salary: Number(item.salary || 0), additionalImportDetails: Array.isArray(item.additionalImportDetails) ? item.additionalImportDetails : [], additionalExportDetails: Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : [] };
       if (!truckJobIds.has(currentJobNo)) truckJobIds.set(currentJobNo, `Job-${truckJobNumber++}`);
-      return { ...item, id: `TRIP-${index + 1}`, jobNo: truckJobIds.get(currentJobNo), additionalImportDetails: Array.isArray(item.additionalImportDetails) ? item.additionalImportDetails : [], additionalExportDetails: Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : [] };
+      return { ...item, id: `TRIP-${index + 1}`, jobNo: truckJobIds.get(currentJobNo), salary: Number(item.salary || 0), additionalImportDetails: Array.isArray(item.additionalImportDetails) ? item.additionalImportDetails : [], additionalExportDetails: Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : [] };
     });
 
     store.readableIdVersion = 2;
@@ -236,6 +237,10 @@
       store.paymentVouchers = [];
     }
 
+    if (!Array.isArray(store.paymentVoucherFunds)) {
+      store.paymentVoucherFunds = [];
+    }
+
     if (!Array.isArray(store.activityLogs)) {
       store.activityLogs = [];
     }
@@ -287,7 +292,8 @@
     { key: "adminUsers", module: "Admin Users" },
     { key: "customerKhatas", module: "Accounts Receivable", nested: true },
     { key: "vendorKhatas", module: "Accounts Payable", nested: true },
-    { key: "paymentVouchers", module: "Payment Voucher" }
+    { key: "paymentVouchers", module: "Payment Voucher" },
+    { key: "paymentVoucherFunds", module: "Payment Voucher" }
   ];
 
   function getAuditRecords(store, source) {
@@ -981,6 +987,7 @@
       customerKhatas: collectionChanged(previousStore, store, "customerKhatas"),
       vendorKhatas: collectionChanged(previousStore, store, "vendorKhatas"),
       paymentVouchers: collectionChanged(previousStore, store, "paymentVouchers"),
+      paymentVoucherFunds: collectionChanged(previousStore, store, "paymentVoucherFunds"),
       builtyRecords: collectionChanged(previousStore, store, "builtyRecords"),
       activityLogs: collectionChanged(previousStore, store, "activityLogs")
     };
@@ -1239,7 +1246,7 @@
         export_mty_payment_date: formatIsoDate(item.exportMtyPaymentDate) || null,
         export_mty_payment_status: item.exportMtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
         export_remarks: item.exportRemarks || null, grand_total: Number(item.grandTotal || 0),
-        round_trip_expense: Number(item.roundTripExpense || 0), diesel_expense: Number(item.dieselExpense || 0),
+        round_trip_expense: Number(item.roundTripExpense || 0), diesel_expense: Number(item.dieselExpense || 0), salary: Number(item.salary || 0),
         profit_loss: Number(item.profitLoss || 0), image_path: imagePath || null,
         updated_at: new Date().toISOString()
       });
@@ -1357,7 +1364,7 @@
     await syncRows("employees", "employee_no", rows);
   }
 
-  async function syncTwoPayRecords(records) {
+  async function syncTwoPayRecords(records, changedRecordIds = []) {
     const rows = (records || []).map((item) => ({
       id: item.id,
       date: formatIsoDate(item.date) || null,
@@ -1392,6 +1399,65 @@
       updated_at: new Date().toISOString()
     }));
     await syncRows("two_pay_records", "id", rows);
+
+    const changedIds = new Set((changedRecordIds || []).map((id) => String(id)));
+    if (!changedIds.size) return;
+    const changedRecords = (records || []).filter((item) => changedIds.has(String(item.id)));
+    for (const item of changedRecords) {
+      if (Array.isArray(item.twoPayContainerRows)) {
+        await syncTwoPayChildRows("two_pay_containers", item.id, item.twoPayContainerRows, (line, index) => ({
+          id: line.id,
+          two_pay_record_id: item.id,
+          container_no: line.containerNo || null,
+          container_size: line.containerSize || null,
+          truck_no: line.truckNo || null,
+          quantity: Number(line.quantity || 0),
+          road_freight_two_pay: Number(line.roadFreightTwoPay || 0),
+          global_receivable: Number(line.globalReceivable || 0),
+          sort_order: index
+        }));
+      }
+      if (Array.isArray(item.twoPayBrokerRows)) {
+        await syncTwoPayChildRows("two_pay_brokers", item.id, item.twoPayBrokerRows, (line, index) => ({
+          id: line.id,
+          two_pay_record_id: item.id,
+          trucker_broker: line.truckerBroker || null,
+          container_ref: line.containerRef && line.containerRef !== "All Containers" ? line.containerRef : null,
+          truck_no: line.truckNo && line.truckNo !== "All Trucks" ? line.truckNo : null,
+          container_size: line.containerSize && line.containerSize !== "All Sizes" ? line.containerSize : null,
+          amount: line.amount === "" || line.amount == null ? null : Number(line.amount),
+          payment_details: line.paymentDetails || null,
+          payment_date: formatIsoDate(line.paymentDate) || null,
+          payment_status: line.paymentStatus === "Paid" ? "Paid" : "Payable",
+          sort_order: index
+        }));
+      }
+    }
+  }
+
+  async function syncTwoPayChildRows(table, recordId, detailRows, mapRow) {
+    const client = getSupabaseClient();
+    const rows = (detailRows || []).map((line, index) => ({
+      ...mapRow(line, index),
+      id: line.id || makeUuid(),
+      two_pay_record_id: recordId
+    }));
+    const { data: existing, error: readError } = await client.from(table)
+      .select("id")
+      .eq("two_pay_record_id", recordId);
+    if (readError) throw readError;
+    if (rows.length) {
+      const { error } = await client.from(table).upsert(rows, { onConflict: "id" });
+      if (error) throw error;
+    }
+    const keepIds = new Set(rows.map((row) => String(row.id)));
+    const staleIds = (existing || []).filter((row) => !keepIds.has(String(row.id))).map((row) => row.id);
+    if (staleIds.length) {
+      const { error } = await client.from(table).delete()
+        .eq("two_pay_record_id", recordId)
+        .in("id", staleIds);
+      if (error) throw error;
+    }
   }
 
   function mapTwoPayRecordFromSupabase(row = {}, local = {}) {
@@ -1430,6 +1496,40 @@
     };
   }
 
+  function makeUuid() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+      const random = Math.random() * 16 | 0;
+      return (character === "x" ? random : (random & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  function mapTwoPayContainerFromSupabase(row = {}) {
+    return {
+      id: row.id || makeUuid(),
+      containerNo: row.container_no || "",
+      containerSize: row.container_size || "40 FT",
+      truckNo: row.truck_no || "",
+      quantity: Number(row.quantity || 1),
+      roadFreightTwoPay: Number(row.road_freight_two_pay || 0),
+      globalReceivable: Number(row.global_receivable || 0)
+    };
+  }
+
+  function mapTwoPayBrokerFromSupabase(row = {}) {
+    return {
+      id: row.id || makeUuid(),
+      truckerBroker: row.trucker_broker || "",
+      containerRef: row.container_ref || "All Containers",
+      truckNo: row.truck_no || "All Trucks",
+      containerSize: row.container_size || "All Sizes",
+      amount: row.amount == null ? "" : Number(row.amount),
+      paymentDetails: row.payment_details || "",
+      paymentDate: row.payment_date || "",
+      paymentStatus: row.payment_status === "Paid" ? "Paid" : "Payable"
+    };
+  }
+
   async function syncPaymentVouchers(records) {
     const rows = (records || []).map((item) => ({
       id: String(item.id || item.pvNo || "").trim(),
@@ -1445,7 +1545,29 @@
       items: Array.isArray(item.items) ? item.items : [],
       updated_at: new Date().toISOString()
     })).filter((row) => row.id && row.pay_to);
-    await syncRows("payment_vouchers", "id", rows, { pruneMissing: true });
+    // Full-list pruning can erase remote records when this browser has stale state.
+    await syncRows("payment_vouchers", "id", rows);
+  }
+
+  async function syncPaymentVoucherFunds(records) {
+    const rows = (records || []).map((item) => ({
+      id: String(item.id || "").trim(),
+      entry_type: item.entryType === "opening_balance" ? "opening_balance" : "fund_added",
+      entry_date: formatIsoDate(item.entryDate) || getTodayIsoDate(),
+      source_account: String(item.sourceAccount || "").trim() || null,
+      reference: String(item.reference || "").trim() || null,
+      remarks: String(item.remarks || "").trim() || null,
+      amount: Number(item.amount || 0),
+      updated_at: new Date().toISOString()
+    })).filter((row) => row.id && row.amount > 0);
+    await syncRows("payment_voucher_funds", "id", rows);
+  }
+
+  async function deleteRemoteOperationalRow(table, id) {
+    const client = getSupabaseClient();
+    if (!client || !id) return;
+    const { error } = await client.from(table).delete().eq("id", String(id));
+    if (error) throw error;
   }
 
   async function syncBuiltyRecords(records) {
@@ -1500,6 +1622,19 @@
       totalAmount: Number(row.total_amount ?? local.totalAmount ?? 0),
       amountInWords: row.amount_in_words ?? local.amountInWords ?? "",
       items: Array.isArray(row.items) ? row.items : (Array.isArray(local.items) ? local.items : [])
+    };
+  }
+
+  function mapPaymentVoucherFundFromSupabase(row = {}) {
+    return {
+      id: String(row.id || ""),
+      entryType: row.entry_type === "opening_balance" ? "opening_balance" : "fund_added",
+      entryDate: row.entry_date || "",
+      sourceAccount: row.source_account || "",
+      reference: row.reference || "",
+      remarks: row.remarks || "",
+      amount: Number(row.amount || 0),
+      updatedAt: row.updated_at || ""
     };
   }
 
@@ -1622,7 +1757,7 @@
     if (changed.equipmentFleet && hasModuleAccessForSync("equipment")) jobs.push(syncEquipment(store.equipmentFleet));
     if (changed.maintenanceJobs && hasModuleAccessForSync("maintenance")) jobs.push(syncMaintenance(store.maintenanceJobs));
     if (changed.employees && hasModuleAccessForSync("employee")) jobs.push(syncEmployees(store.employees));
-    if (changed.twoPayRecords && hasModuleAccessForSync("two-pay-records")) jobs.push(syncTwoPayRecords(store.twoPayRecords));
+    if (changed.twoPayRecords && hasModuleAccessForSync("two-pay-records")) jobs.push(syncTwoPayRecords(store.twoPayRecords, changed.twoPayRecordIds));
     if (changed.customerKhatas && hasModuleAccessForSync("khata")) {
       const records = Array.isArray(changed.customerKhataRecords) ? changed.customerKhataRecords : store.customerKhatas;
       jobs.push(syncAccounts(records, "receivable", { pruneMissing: !Array.isArray(changed.customerKhataRecords) }));
@@ -1632,6 +1767,7 @@
       jobs.push(syncAccounts(records, "payable", { pruneMissing: !Array.isArray(changed.vendorKhataRecords) }));
     }
     if (changed.paymentVouchers && hasModuleAccessForSync("payment-voucher")) jobs.push(syncPaymentVouchers(store.paymentVouchers));
+    if (changed.paymentVoucherFunds && hasModuleAccessForSync("payment-voucher")) jobs.push(syncPaymentVoucherFunds(store.paymentVoucherFunds));
     if (changed.builtyRecords && hasModuleAccessForSync("builty")) jobs.push(syncBuiltyRecords(store.builtyRecords));
     if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs || []));
     const results = await Promise.allSettled(jobs);
@@ -1654,7 +1790,7 @@
       }
       return data || [];
     };
-    const [trucks, truckImportDetails, truckExportDetails, equipment, maintenance, employees, twoPayRecords, accounts, logs, paymentVouchers, builtyRecords] = await Promise.all([
+    const [trucks, truckImportDetails, truckExportDetails, equipment, maintenance, employees, twoPayRecords, twoPayContainers, twoPayBrokers, accounts, logs, paymentVouchers, paymentVoucherFunds, builtyRecords] = await Promise.all([
       load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
       load("truck_import_details", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "detail_number"),
       load("truck_export_details", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "detail_number"),
@@ -1662,9 +1798,12 @@
       load("maintenance_jobs", hasModuleAccessForSync("maintenance"), "repair_date"),
       load("employees", hasModuleAccessForSync("employee"), "joining_date"),
       load("two_pay_records", hasModuleAccessForSync("two-pay-records"), "date"),
+      load("two_pay_containers", hasModuleAccessForSync("two-pay-records"), "sort_order"),
+      load("two_pay_brokers", hasModuleAccessForSync("two-pay-records"), "sort_order"),
       load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
       load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at"),
       load("payment_vouchers", hasModuleAccessForSync("payment-voucher"), "voucher_date"),
+      load("payment_voucher_funds", hasModuleAccessForSync("payment-voucher"), "entry_date"),
       load("builty_records", hasModuleAccessForSync("builty"), "bilty_date")
     ]);
     if (hydrationVersion !== operationalMutationVersion) return;
@@ -1737,7 +1876,7 @@
             exportMtyPaymentDate: r.export_mty_payment_date || local.exportMtyPaymentDate || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || local.exportMtyPaymentStatus || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense ?? local.dieselExpense ?? 0),
+            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense ?? local.dieselExpense ?? 0), salary: Number(r.salary ?? local.salary ?? 0),
             additionalImportDetails: getAdditionalDetails(importDetailsByJob, key, r.additional_import_details, local.additionalImportDetails),
             additionalExportDetails: getAdditionalDetails(exportDetailsByJob, key, r.additional_export_details, local.additionalExportDetails),
             profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || local.imagePath || "",
@@ -1783,7 +1922,7 @@
             exportMtyPaymentDate: r.export_mty_payment_date || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense || 0),
+            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense || 0), salary: Number(r.salary || 0),
             additionalImportDetails: getAdditionalDetails(importDetailsByJob, key, r.additional_import_details, []),
             additionalExportDetails: getAdditionalDetails(exportDetailsByJob, key, r.additional_export_details, []),
             profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
@@ -1991,7 +2130,45 @@
       // A successful Supabase response is authoritative for this register.
       // This removes records that were manually deleted in Supabase instead of
       // leaving a stale browser-cache copy visible after a hard refresh.
-      replaceArrayContents(store.twoPayRecords, twoPayRecords.map((remote) => mapTwoPayRecordFromSupabase(remote)));
+      const containersByRecord = new Map();
+      const brokersByRecord = new Map();
+      (twoPayContainers || []).forEach((row) => {
+        const key = String(row.two_pay_record_id);
+        if (!containersByRecord.has(key)) containersByRecord.set(key, []);
+        containersByRecord.get(key).push(row);
+      });
+      (twoPayBrokers || []).forEach((row) => {
+        const key = String(row.two_pay_record_id);
+        if (!brokersByRecord.has(key)) brokersByRecord.set(key, []);
+        brokersByRecord.get(key).push(row);
+      });
+      const mappedTwoPayRecords = twoPayRecords.map((remote) => {
+        const key = String(remote.id);
+        const local = store.twoPayRecords.find((record) => String(record.id) === key) || {};
+        const record = mapTwoPayRecordFromSupabase(remote, local);
+        const remoteContainers = Array.isArray(twoPayContainers)
+          ? (containersByRecord.get(key) || []).sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0)).map(mapTwoPayContainerFromSupabase)
+          : null;
+        const hasLegacyContainer = [record.containerNo, record.truckNo].some((value) => String(value || "").trim()) ||
+          Number(record.roadFreightTwoPay || 0) !== 0 || Number(record.globalReceivable || 0) !== 0;
+        record.twoPayContainerRows = remoteContainers?.length
+          ? remoteContainers
+          : (hasLegacyContainer
+            ? [mapTwoPayContainerFromSupabase({
+              container_no: record.containerNo,
+              container_size: record.size,
+              truck_no: record.truckNo,
+              quantity: 1,
+              road_freight_two_pay: record.roadFreightTwoPay,
+              global_receivable: record.globalReceivable
+            })]
+            : (remoteContainers || local.twoPayContainerRows || []));
+        record.twoPayBrokerRows = Array.isArray(twoPayBrokers)
+          ? (brokersByRecord.get(key) || []).sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0)).map(mapTwoPayBrokerFromSupabase)
+          : (local.twoPayBrokerRows || []);
+        return record;
+      });
+      replaceArrayContents(store.twoPayRecords, mappedTwoPayRecords);
     }
 
     if (Array.isArray(builtyRecords)) {
@@ -2039,6 +2216,10 @@
 
     if (Array.isArray(paymentVouchers)) {
       replaceArrayContents(store.paymentVouchers, paymentVouchers.map((remote) => mapPaymentVoucherFromSupabase(remote)));
+    }
+
+    if (Array.isArray(paymentVoucherFunds)) {
+      replaceArrayContents(store.paymentVoucherFunds, paymentVoucherFunds.map(mapPaymentVoucherFundFromSupabase));
     }
 
     saveStore(store, { skipAudit: true, skipRemote: true });
@@ -6284,7 +6465,7 @@
       if (receivableInput) receivableInput.value = String((Number(values[freightKey] || 0) + Number(values[detentionKey] || 0)) - Number(values[commissionKey] || 0));
     }
 
-    const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "dieselExpense", "profitLoss"];
+    const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "dieselExpense", "salary", "profitLoss"];
 
     function calculateTrip() {
       const importSections = getDetailSections("import");
@@ -6492,6 +6673,7 @@
         if (form.elements[key]) form.elements[key].value = item[key] !== null && item[key] !== undefined ? item[key] : "";
       });
       if (form.elements.dieselExpense) form.elements.dieselExpense.value = String(item.dieselExpense ?? 0);
+      if (form.elements.salary) form.elements.salary.value = String(item.salary ?? 0);
       if (form.elements.importDetention) {
         form.elements.importDetention.value = item.importDetention !== undefined && item.importDetention !== null ? String(item.importDetention) : "0";
       }
@@ -6693,8 +6875,8 @@
               item.jobNo,
               importDetail.date ? formatShortDate(importDetail.date) : "-",
               importDetail.truckNo || "-",
+              importDetail.destination || "-",
               importDetail.weight || "-",
-              exportDetail.exportLoadDate ? formatShortDate(exportDetail.exportLoadDate) : "-",
               exportDetail.exportWeight || "-",
               money(importDetail.importFreight || 0),
               money(exportDetail.exportFreight || 0),
@@ -6718,8 +6900,8 @@
             "Job No",
             "Import Date",
             "Import Truck",
+            "Import Destination",
             "Import Weight",
-            "Export Date",
             "Export Weight",
             "Import Freight",
             "Export Freight",
@@ -6768,18 +6950,18 @@
             0: { cellWidth: 90, halign: "center" },
             1: { cellWidth: 64, halign: "center" },
             2: { cellWidth: 70, halign: "center" },
-            3: { cellWidth: 50, halign: "center" },
-            4: { cellWidth: 64, halign: "center" },
+            3: { cellWidth: 100, halign: "left" },
+            4: { cellWidth: 50, halign: "center" },
             5: { cellWidth: 50, halign: "center" },
-            6: { cellWidth: 83, halign: "right" },
-            7: { cellWidth: 83, halign: "right" },
-            8: { cellWidth: 83, halign: "right" },
-            9: { cellWidth: 83, halign: "right" },
-            10: { cellWidth: 83, halign: "right" },
-            11: { cellWidth: 83, halign: "right" },
-            12: { cellWidth: 83, halign: "right" },
-            13: { cellWidth: 83, halign: "right" },
-            14: { cellWidth: 83, halign: "right" }
+            6: { cellWidth: 79, halign: "right" },
+            7: { cellWidth: 79, halign: "right" },
+            8: { cellWidth: 79, halign: "right" },
+            9: { cellWidth: 79, halign: "right" },
+            10: { cellWidth: 79, halign: "right" },
+            11: { cellWidth: 79, halign: "right" },
+            12: { cellWidth: 79, halign: "right" },
+            13: { cellWidth: 79, halign: "right" },
+            14: { cellWidth: 79, halign: "right" }
           },
           didParseCell: (data) => {
             if (data.section === "head") {
@@ -7168,15 +7350,183 @@
     const totalBalance = document.querySelector("[data-two-pay-total-balance]");
     const totalPartyPending = document.querySelector("[data-two-pay-total-party-pending]");
     const downloadSummaryButton = document.querySelector("[data-download-two-pay-summary]");
+    const containerRowsElement = form?.querySelector("[data-two-pay-container-rows]");
+    const addContainerRowButton = form?.querySelector("[data-add-two-pay-container]");
+    const containerQuantityTotal = form?.querySelector("[data-two-pay-container-quantity]");
+    const containerFreightTotal = form?.querySelector("[data-two-pay-container-freight]");
+    const containerReceivableTotal = form?.querySelector("[data-two-pay-container-receivable]");
+    const brokerRowsElement = form?.querySelector("[data-two-pay-broker-rows]");
+    const addBrokerRowButton = form?.querySelector("[data-add-two-pay-broker]");
+    const brokerAmountTotal = form?.querySelector("[data-two-pay-broker-total]");
     if (!form || !body) return;
     let editingId = "";
 
     const numericFields = [
-      "roadFreightPaid", "roadFreightTwoPay", "taxAmount", "detentionCharges", "billingAmount",
+      "taxAmount", "detentionCharges", "billingAmount",
       "globalReceivable", "partyCollection", "partyCollectionPaidAmount", "receivedAmount"
     ];
     const getPartyBalance = (item) => Number(item.partyCollection || 0) - Number(item.partyCollectionPaidAmount || 0);
     const getPartyPending = (item) => Math.max(0, getPartyBalance(item));
+
+    function normalizeContainerRow(line = {}) {
+      const quantity = Number(line.quantity);
+      return {
+        id: line.id || makeUuid(),
+        containerNo: String(line.containerNo || "").trim(),
+        containerSize: String(line.containerSize || line.size || "40 FT").trim() || "40 FT",
+        truckNo: String(line.truckNo || "").trim(),
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+        roadFreightTwoPay: Number(line.roadFreightTwoPay || 0),
+        globalReceivable: Number(line.globalReceivable || 0)
+      };
+    }
+
+    function getRecordContainerRows(item = {}) {
+      if (Array.isArray(item.twoPayContainerRows)) return item.twoPayContainerRows.map(normalizeContainerRow);
+      const legacy = normalizeContainerRow({
+        containerNo: item.containerNo,
+        containerSize: item.size,
+        truckNo: item.truckNo,
+        quantity: 1,
+        roadFreightTwoPay: item.roadFreightTwoPay,
+        globalReceivable: item.globalReceivable
+      });
+      return [legacy.containerNo, legacy.truckNo].some(Boolean) || legacy.roadFreightTwoPay !== 0 || legacy.globalReceivable !== 0
+        ? [legacy]
+        : [];
+    }
+
+    function normalizeBrokerRow(line = {}) {
+      const rawAmount = line.amount;
+      return {
+        id: line.id || makeUuid(),
+        truckerBroker: String(line.truckerBroker || "").trim(),
+        containerRef: String(line.containerRef || "All Containers").trim() || "All Containers",
+        truckNo: String(line.truckNo || "All Trucks").trim() || "All Trucks",
+        containerSize: String(line.containerSize || "All Sizes").trim() || "All Sizes",
+        amount: rawAmount == null || String(rawAmount).trim() === "" || !Number.isFinite(Number(rawAmount)) ? "" : Number(rawAmount),
+        paymentDetails: String(line.paymentDetails || "").trim(),
+        paymentDate: String(line.paymentDate || "").trim(),
+        paymentStatus: line.paymentStatus === "Paid" ? "Paid" : "Payable"
+      };
+    }
+
+    function getRecordBrokerRows(item = {}) {
+      return Array.isArray(item.twoPayBrokerRows) ? item.twoPayBrokerRows.map(normalizeBrokerRow) : [];
+    }
+
+    function collectContainerRows(includeBlank = false) {
+      const lines = Array.from(containerRowsElement?.querySelectorAll("[data-two-pay-container-row]") || []).map((row) => normalizeContainerRow({
+        id: row.dataset.rowId,
+        containerNo: row.querySelector("[name='twoPayContainerNo']")?.value,
+        containerSize: row.querySelector("[name='twoPayContainerSize']")?.value,
+        truckNo: row.querySelector("[name='twoPayContainerTruckNo']")?.value,
+        quantity: row.querySelector("[name='twoPayContainerQuantity']")?.value,
+        roadFreightTwoPay: row.querySelector("[name='twoPayContainerFreight']")?.value,
+        globalReceivable: row.querySelector("[name='twoPayContainerReceivable']")?.value
+      }));
+      return includeBlank ? lines : lines.filter((line) => line.containerNo || line.truckNo || line.roadFreightTwoPay !== 0 || line.globalReceivable !== 0);
+    }
+
+    function updateContainerTotals(lines = collectContainerRows()) {
+      const quantity = lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+      const freight = lines.reduce((sum, line) => sum + Number(line.roadFreightTwoPay || 0), 0);
+      const receivable = lines.reduce((sum, line) => sum + Number(line.globalReceivable || 0), 0);
+      if (containerQuantityTotal) containerQuantityTotal.textContent = money(quantity);
+      if (containerFreightTotal) containerFreightTotal.textContent = `PKR ${money(freight)}`;
+      if (containerReceivableTotal) containerReceivableTotal.textContent = `PKR ${money(receivable)}`;
+    }
+
+    function renderContainerRows(lines = []) {
+      if (!containerRowsElement) return;
+      const visibleLines = lines.length ? lines.map(normalizeContainerRow) : [normalizeContainerRow()];
+      const standardSizes = ["20 FT", "40 FT", "45 FT", "LCL"];
+      containerRowsElement.innerHTML = visibleLines.map((line, index) => {
+        const sizes = [...standardSizes];
+        if (line.containerSize && !sizes.includes(line.containerSize)) sizes.push(line.containerSize);
+        return `
+          <div class="container-row two-pay-container-row" data-two-pay-container-row data-row-id="${escapeHtml(line.id)}">
+            <div class="field-lite"><label>Container No</label><input name="twoPayContainerNo" value="${escapeHtml(line.containerNo)}" /></div>
+            <div class="field-lite"><label>Container Size</label><select name="twoPayContainerSize">${sizes.map((size) => `<option value="${escapeHtml(size)}" ${line.containerSize === size ? "selected" : ""}>${escapeHtml(size)}</option>`).join("")}</select></div>
+            <div class="field-lite"><label>Truck No</label><input name="twoPayContainerTruckNo" value="${escapeHtml(line.truckNo)}" /></div>
+            <div class="field-lite"><label>Quantity</label><input name="twoPayContainerQuantity" type="number" min="0" step="any" value="${escapeHtml(String(line.quantity))}" /></div>
+            <div class="field-lite"><label>Road Freight / Two Pay</label><input name="twoPayContainerFreight" type="number" min="0" step="0.01" value="${escapeHtml(String(line.roadFreightTwoPay))}" /></div>
+            <div class="field-lite"><label>Global / Receivable</label><input name="twoPayContainerReceivable" type="number" min="0" step="0.01" value="${escapeHtml(String(line.globalReceivable))}" /></div>
+            <div class="row-action"><button class="btn small danger" type="button" data-remove-two-pay-container="${escapeHtml(line.id)}" ${visibleLines.length === 1 ? "disabled" : ""}>Remove</button></div>
+          </div>
+        `;
+      }).join("");
+      updateContainerTotals(collectContainerRows());
+      refreshBrokerOptions();
+    }
+
+    function collectBrokerRows(includeBlank = false) {
+      const lines = Array.from(brokerRowsElement?.querySelectorAll("[data-two-pay-broker-row]") || []).map((row) => normalizeBrokerRow({
+        id: row.dataset.rowId,
+        truckerBroker: row.querySelector("[name='twoPayTruckerBroker']")?.value,
+        containerRef: row.querySelector("[name='twoPayBrokerContainerRef']")?.value,
+        truckNo: row.querySelector("[name='twoPayBrokerTruckNo']")?.value,
+        containerSize: row.querySelector("[name='twoPayBrokerContainerSize']")?.value,
+        amount: row.querySelector("[name='twoPayBrokerAmount']")?.value,
+        paymentDetails: row.querySelector("[name='twoPayBrokerPaymentDetails']")?.value,
+        paymentDate: row.querySelector("[name='twoPayBrokerPaymentDate']")?.value,
+        paymentStatus: row.querySelector("[name='twoPayBrokerPaymentStatus']")?.value
+      }));
+      return includeBlank ? lines : lines.filter((line) => line.truckerBroker || line.amount !== "" || line.paymentDetails || line.paymentDate || line.paymentStatus === "Paid");
+    }
+
+    function updateBrokerTotal(lines = collectBrokerRows()) {
+      const amount = lines.reduce((sum, line) => sum + (line.amount === "" ? 0 : Number(line.amount || 0)), 0);
+      if (brokerAmountTotal) brokerAmountTotal.textContent = `PKR ${money(amount)}`;
+    }
+
+    function refreshBrokerOptions() {
+      if (!brokerRowsElement) return;
+      const containers = collectContainerRows();
+      const unique = (key) => [...new Set(containers.map((line) => String(line[key] || "").trim()).filter(Boolean))];
+      const sets = [
+        ["twoPayBrokerContainerRef", "All Containers", unique("containerNo")],
+        ["twoPayBrokerTruckNo", "All Trucks", unique("truckNo")],
+        ["twoPayBrokerContainerSize", "All Sizes", unique("containerSize")]
+      ];
+      brokerRowsElement.querySelectorAll("[data-two-pay-broker-row]").forEach((row) => {
+        sets.forEach(([name, defaultLabel, options]) => {
+          const select = row.querySelector(`[name='${name}']`);
+          if (!select) return;
+          const current = select.value || defaultLabel;
+          const values = current !== defaultLabel && !options.includes(current) ? [...options, current] : options;
+          select.innerHTML = `<option value="${defaultLabel}">${defaultLabel}</option>${values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}`;
+          select.value = current;
+        });
+      });
+    }
+
+    function renderBrokerRows(lines = []) {
+      if (!brokerRowsElement) return;
+      const visibleLines = lines.length ? lines.map(normalizeBrokerRow) : [normalizeBrokerRow()];
+      brokerRowsElement.innerHTML = visibleLines.map((line, index) => {
+        const containers = collectContainerRows();
+        const makeOptions = (name, defaultLabel, values, current) => {
+          const filtered = [...new Set(values.filter(Boolean))];
+          if (current !== defaultLabel && !filtered.includes(current)) filtered.push(current);
+          return `<select name="${name}"><option value="${defaultLabel}" ${current === defaultLabel ? "selected" : ""}>${defaultLabel}</option>${filtered.map((value) => `<option value="${escapeHtml(value)}" ${current === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>`;
+        };
+        return `
+          <div class="broker-row" data-two-pay-broker-row data-row-id="${escapeHtml(line.id)}">
+            <div class="field-lite"><label>Trucker/Broker</label><input name="twoPayTruckerBroker" value="${escapeHtml(line.truckerBroker)}" placeholder="Trucker or broker name" /></div>
+            <div class="field-lite"><label>Container Ref</label>${makeOptions("twoPayBrokerContainerRef", "All Containers", containers.map((entry) => entry.containerNo), line.containerRef)}</div>
+            <div class="field-lite"><label>Truck No</label>${makeOptions("twoPayBrokerTruckNo", "All Trucks", containers.map((entry) => entry.truckNo), line.truckNo)}</div>
+            <div class="field-lite"><label>Container Size</label>${makeOptions("twoPayBrokerContainerSize", "All Sizes", containers.map((entry) => entry.containerSize), line.containerSize)}</div>
+            <div class="field-lite"><label>Amount</label><input name="twoPayBrokerAmount" type="number" min="0" step="0.01" value="${escapeHtml(String(line.amount))}" placeholder="Amount" /></div>
+            <div class="field-lite"><label>Payment/Cheque/IBFT</label><input name="twoPayBrokerPaymentDetails" value="${escapeHtml(line.paymentDetails)}" placeholder="Payment / cheque / IBFT reference" /></div>
+            <div class="field-lite"><label>Payment Date</label><input name="twoPayBrokerPaymentDate" type="date" value="${escapeHtml(formatIsoDate(line.paymentDate) || "")}" /></div>
+            <div class="field-lite"><label>Payment Status</label><select name="twoPayBrokerPaymentStatus"><option value="Payable" ${line.paymentStatus === "Payable" ? "selected" : ""}>Payable</option><option value="Paid" ${line.paymentStatus === "Paid" ? "selected" : ""}>Paid</option></select></div>
+            <div class="row-action"><button class="btn small danger" type="button" data-remove-two-pay-broker="${escapeHtml(line.id)}">Remove</button></div>
+          </div>
+        `;
+      }).join("");
+      updateBrokerTotal(collectBrokerRows());
+    }
 
     function createId() {
       if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -7195,6 +7545,8 @@
     function resetForm() {
       form.reset();
       numericFields.forEach((name) => { if (form.elements[name]) form.elements[name].value = "0"; });
+      renderContainerRows([]);
+      renderBrokerRows([]);
       updateBalances();
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Two Pay Record";
@@ -7204,6 +7556,8 @@
       Object.keys(item || {}).forEach((key) => {
         if (form.elements[key]) form.elements[key].value = item[key] ?? "";
       });
+      renderContainerRows(getRecordContainerRows(item));
+      renderBrokerRows(getRecordBrokerRows(item));
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Two Pay Record";
       updateBalances();
@@ -7221,7 +7575,9 @@
           : String(item.customerName || "").trim().toLowerCase() === selectedCustomer))
         .filter((item) => !from || String(item.date || "") >= from)
         .filter((item) => !to || String(item.date || "") <= to)
-        .filter((item) => !query || [item.date, item.customerName, item.customerAddress, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks]
+        .filter((item) => !query || [item.date, item.customerName, item.customerAddress, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks,
+          ...(item.twoPayContainerRows || []).flatMap((line) => [line.containerNo, line.containerSize, line.truckNo, line.quantity]),
+          ...(item.twoPayBrokerRows || []).flatMap((line) => [line.truckerBroker, line.containerRef, line.truckNo, line.containerSize, line.amount, line.paymentDetails, line.paymentDate, line.paymentStatus])]
           .some((value) => String(value || "").toLowerCase().includes(query)))
         .sort((left, right) => {
           const result = String(left.date || "").localeCompare(String(right.date || ""));
@@ -7232,10 +7588,15 @@
     function getTwoPayPdfValues(item) {
       return [
         formatShortDate(item.date), item.blNo || "-", item.consigneeName || "-",
-        money(item.roadFreightPaid), money(item.roadFreightTwoPay), money(item.detentionCharges),
+        money(item.roadFreightTwoPay), money(item.detentionCharges),
         money(item.billingAmount), money(item.globalReceivable), item.billNo || "-", money(item.partyCollection),
         money(item.receivedAmount), money(item.receivedBalance), item.remarks || "-"
       ];
+    }
+
+    function renderStackedValues(values, fallback = "-") {
+      const displayValues = values.length ? values : [fallback];
+      return displayValues.map((value) => `<div>${text(value == null || value === "" ? "-" : String(value))}</div>`).join("");
     }
 
     async function buildTwoPayRecordPdf(item) {
@@ -7263,20 +7624,19 @@
       pdf.setFontSize(10.5);
       const addressLines = pdf.splitTextToSize(`Customer Address: ${invoiceAddress}`, pageWidth - 72);
       pdf.text(addressLines, 36, 140 + customerLines.length * 15);
+      const containerDetails = getRecordContainerRows(item);
+      const brokerDetails = getRecordBrokerRows(item);
       pdf.autoTable({
         startY: 148 + (customerLines.length - 1) * 15 + addressLines.length * 17,
-        margin: { left: 32, right: 32, bottom: 75 },
+        margin: { left: 32, right: 32, bottom: 125 },
         theme: "grid",
         showHead: "firstPage",
         head: [["Field", "Value"]],
         body: [
           ["Date", formatShortDate(item.date)], ["Customer Name", item.customerName || "-"], ["Origin", item.origin || "-"], ["BL No", item.blNo || "-"],
-          ["Container No", item.containerNo || "-"], ["Lot Of", item.lotOf || "-"], ["Destination", item.destination || "-"],
-          ["Consignee Name", item.consigneeName || "-"], ["Size", item.size || "-"], ["Description", item.description || "-"],
-          ["Truck No", item.truckNo || "-"], ["Road Freight / Paid", money(item.roadFreightPaid)],
-          ["Road Freight / Two Pay", money(item.roadFreightTwoPay)], ["Tax Amount", money(item.taxAmount)],
-          ["Detention Charges", money(item.detentionCharges)], ["Billing Amount", money(item.billingAmount)],
-          ["Global / Receivable", money(item.globalReceivable)], ["Bill No", item.billNo || "-"],
+          ["Lot Of", item.lotOf || "-"], ["Destination", item.destination || "-"], ["Consignee Name", item.consigneeName || "-"],
+          ["Description", item.description || "-"], ["Tax Amount", money(item.taxAmount)],
+          ["Detention / Other Charges", money(item.detentionCharges)], ["Billing Amount", money(item.billingAmount)], ["Bill No", item.billNo || "-"],
           ["Party Collection", money(item.partyCollection)], ["Party Collection Paid Amount", money(item.partyCollectionPaidAmount)],
           ["Party Collection Paid Date", item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"],
           ["Party Balance", money(getPartyBalance(item))], ["Party Remarks", item.partyRemarks || "-"],
@@ -7288,6 +7648,45 @@
         headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 9, fontStyle: "bold", cellPadding: { top: 4, bottom: 4, left: 6, right: 6 } },
         columnStyles: { 0: { cellWidth: 185, fontStyle: "bold" }, 1: { cellWidth: 345 } }
       });
+
+      let detailStartY = pdf.lastAutoTable.finalY + 12;
+      if (containerDetails.length) {
+        pdf.autoTable({
+          startY: detailStartY,
+          margin: { left: 32, right: 32, bottom: 125 },
+          theme: "grid",
+          head: [
+            [{ content: "Container Details", colSpan: 6, styles: { halign: "left", fillColor: [24, 48, 77], textColor: [255, 255, 255] } }],
+            ["Container No", "Container Size", "Truck No", "Quantity", "Road Freight / Two Pay", "Global / Receivable"]
+          ],
+          body: containerDetails.map((line) => [line.containerNo || "-", line.containerSize || "-", line.truckNo || "-", money(line.quantity), money(line.roadFreightTwoPay), money(line.globalReceivable)]),
+          styles: { fontSize: 7.7, cellPadding: 4, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak", valign: "middle" },
+          headStyles: { fontSize: 7.8, fontStyle: "bold", halign: "center", valign: "middle", cellPadding: 4 },
+          columnStyles: {
+            0: { cellWidth: 100 }, 1: { cellWidth: 70, halign: "center" }, 2: { cellWidth: 76 },
+            3: { cellWidth: 48, halign: "right" }, 4: { cellWidth: 90, halign: "right" }, 5: { cellWidth: 95, halign: "right" }
+          }
+        });
+        detailStartY = pdf.lastAutoTable.finalY + 12;
+      }
+      if (brokerDetails.length) {
+        pdf.autoTable({
+          startY: detailStartY,
+          margin: { left: 32, right: 32, bottom: 125 },
+          theme: "grid",
+          head: [
+            [{ content: "Trucker / Broker Details", colSpan: 8, styles: { halign: "left", fillColor: [24, 48, 77], textColor: [255, 255, 255] } }],
+            ["Trucker/Broker", "Container Ref", "Truck No", "Container Size", "Amount", "Payment/Cheque/IBFT", "Payment Date", "Payment Status"]
+          ],
+          body: brokerDetails.map((line) => [line.truckerBroker || "-", line.containerRef, line.truckNo, line.containerSize, line.amount === "" ? "-" : money(line.amount), line.paymentDetails || "-", line.paymentDate ? formatShortDate(line.paymentDate) : "-", line.paymentStatus]),
+          styles: { fontSize: 7.2, cellPadding: 3.5, lineColor: [226, 210, 193], textColor: [25, 40, 58], overflow: "linebreak", valign: "middle" },
+          headStyles: { fontSize: 7.2, fontStyle: "bold", halign: "center", valign: "middle", cellPadding: 3.5 },
+          columnStyles: {
+            0: { cellWidth: 78 }, 1: { cellWidth: 58 }, 2: { cellWidth: 55 }, 3: { cellWidth: 58 },
+            4: { cellWidth: 52, halign: "right" }, 5: { cellWidth: 98 }, 6: { cellWidth: 56, halign: "center" }, 7: { cellWidth: 60, halign: "center" }
+          }
+        });
+      }
 
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, pageHeight - 112, pageWidth, 112, "F");
@@ -7338,9 +7737,8 @@
         "Date",
         "BL No",
         "Consignee Name",
-        "Road\nFreight\n/ Paid",
         "Road\nFreight\n/ Two Pay",
-        "Detention\nCharges",
+        "Detention /\nOther Charges",
         "Billing\nAmount",
         "Global /\nReceivable",
         "Bill No",
@@ -7350,14 +7748,14 @@
         "Received\nRemarks"
       ];
       const footer = Array(headers.length).fill("");
-      footer[6] = "Total";
-      footer[7] = money(totals.billing);
-      footer[8] = money(totals.receivable);
-      footer[10] = money(totals.partyCollection);
-      footer[11] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
-      footer[12] = money(totals.balance);
+      footer[5] = "Total";
+      footer[6] = money(totals.billing);
+      footer[7] = money(totals.receivable);
+      footer[9] = money(totals.partyCollection);
+      footer[10] = money(rows.reduce((sum, item) => sum + Number(item.receivedAmount || 0), 0));
+      footer[11] = money(totals.balance);
 
-      const amountColumnIndices = [4, 5, 6, 7, 8, 10, 11, 12];
+      const amountColumnIndices = [4, 5, 6, 7, 9, 10, 11];
 
       pdf.autoTable({
         startY: titleY + 25 + customerLines.length * 19 + 9,
@@ -7403,16 +7801,15 @@
           1: { cellWidth: 54, halign: "center" },
           2: { cellWidth: 60 },
           3: { cellWidth: 74 },
-          4: { cellWidth: 60, halign: "right" },
-          5: { cellWidth: 66, halign: "right" },
-          6: { cellWidth: 60, halign: "right" },
-          7: { cellWidth: 66, halign: "right" },
-          8: { cellWidth: 68, halign: "right" },
-          9: { cellWidth: 55, halign: "center" },
-          10: { cellWidth: 60, halign: "right" },
+          4: { cellWidth: 66, halign: "right" },
+          5: { cellWidth: 60, halign: "right" },
+          6: { cellWidth: 66, halign: "right" },
+          7: { cellWidth: 68, halign: "right" },
+          8: { cellWidth: 55, halign: "center" },
+          9: { cellWidth: 60, halign: "right" },
+          10: { cellWidth: 64, halign: "right" },
           11: { cellWidth: 64, halign: "right" },
-          12: { cellWidth: 64, halign: "right" },
-          13: { cellWidth: 72 }
+          12: { cellWidth: 72 }
         }, pageWidth - 24),
         didParseCell: (data) => {
           if (data.section === "head") {
@@ -7461,13 +7858,21 @@
       if (totalReceivable) totalReceivable.textContent = `PKR ${money(receivable)}`;
       if (totalBalance) totalBalance.textContent = `PKR ${money(balance)}`;
       if (totalPartyPending) totalPartyPending.textContent = `PKR ${money(partyPending)}`;
-      body.innerHTML = rows.length ? rows.map((item, index) => `
+        body.innerHTML = rows.length ? rows.map((item, index) => {
+        const containers = getRecordContainerRows(item);
+        const brokers = getRecordBrokerRows(item);
+        const totalQuantity = containers.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+        return `
         <tr>
-          <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.customerName || "-")}</td><td>${text(item.customerAddress || "-")}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td><td>${text(item.containerNo || "-")}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${text(item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${text(item.truckNo || "-")}</td>
-          <td>${money(item.roadFreightPaid)}</td><td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td><td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(getPartyBalance(item))}${getPartyPending(item) > 0 ? ' <span class="badge warn">Pending</span>' : ""}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
+          <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.customerName || "-")}</td><td>${text(item.customerAddress || "-")}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td>
+          <td>${renderStackedValues(containers.map((line) => line.containerNo), item.containerNo || "-")}</td><td>${totalQuantity ? money(totalQuantity) : "-"}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${renderStackedValues(containers.map((line) => line.containerSize), item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${renderStackedValues(containers.map((line) => line.truckNo), item.truckNo || "-")}</td>
+          <td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td>
+          <td>${renderStackedValues(brokers.map((line) => line.truckerBroker))}</td><td>${renderStackedValues(brokers.map((line) => line.containerRef))}</td><td>${renderStackedValues(brokers.map((line) => line.truckNo))}</td><td>${renderStackedValues(brokers.map((line) => line.containerSize))}</td><td>${renderStackedValues(brokers.map((line) => line.amount === "" ? "-" : money(line.amount)))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentDetails))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentDate ? formatShortDate(line.paymentDate) : "-"))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentStatus))}</td>
+          <td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(getPartyBalance(item))}${getPartyPending(item) > 0 ? ' <span class="badge warn">Pending</span>' : ""}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
           <td><div class="table-actions"><button class="btn small" type="button" data-download-two-pay="${escapeHtml(item.id)}">Invoice</button><button class="btn small" type="button" data-edit-two-pay="${escapeHtml(item.id)}">Edit</button></div></td>
         </tr>
-      `).join("") : `<tr><td colspan="31" class="empty-state">No Two Pay records available.</td></tr>`;
+      `;
+      }).join("") : `<tr><td colspan="39" class="empty-state">No Two Pay records available.</td></tr>`;
     }
 
     [search, customerFilter, startDate, endDate, order].filter(Boolean).forEach((control) => {
@@ -7476,25 +7881,84 @@
     ["partyCollection", "partyCollectionPaidAmount", "billingAmount", "receivedAmount"].forEach((name) => {
       form.elements[name]?.addEventListener("input", updateBalances);
     });
+    addContainerRowButton?.addEventListener("click", () => {
+      const lines = collectContainerRows(true);
+      lines.push(normalizeContainerRow());
+      renderContainerRows(lines);
+    });
+    containerRowsElement?.addEventListener("click", (event) => {
+      const removeId = event.target.closest("[data-remove-two-pay-container]")?.dataset.removeTwoPayContainer;
+      if (!removeId) return;
+      renderContainerRows(collectContainerRows(true).filter((line) => String(line.id) !== String(removeId)));
+    });
+    containerRowsElement?.addEventListener("input", () => {
+      updateContainerTotals();
+      refreshBrokerOptions();
+    });
+    containerRowsElement?.addEventListener("change", () => {
+      updateContainerTotals();
+      refreshBrokerOptions();
+    });
+    addBrokerRowButton?.addEventListener("click", () => {
+      const lines = collectBrokerRows(true);
+      lines.push(normalizeBrokerRow());
+      renderBrokerRows(lines);
+    });
+    brokerRowsElement?.addEventListener("click", (event) => {
+      const removeId = event.target.closest("[data-remove-two-pay-broker]")?.dataset.removeTwoPayBroker;
+      if (!removeId) return;
+      renderBrokerRows(collectBrokerRows(true).filter((line) => String(line.id) !== String(removeId)));
+    });
+    brokerRowsElement?.addEventListener("input", () => updateBrokerTotal());
+    brokerRowsElement?.addEventListener("change", (event) => {
+      if (event.target?.name === "twoPayBrokerContainerRef") {
+        const selectedRef = event.target.value;
+        const linkedContainer = collectContainerRows().find((line) => line.containerNo === selectedRef);
+        const row = event.target.closest("[data-two-pay-broker-row]");
+        if (linkedContainer && row) {
+          const truckSelect = row.querySelector("[name='twoPayBrokerTruckNo']");
+          const sizeSelect = row.querySelector("[name='twoPayBrokerContainerSize']");
+          if (truckSelect && [...truckSelect.options].some((option) => option.value === linkedContainer.truckNo)) truckSelect.value = linkedContainer.truckNo;
+          if (sizeSelect && [...sizeSelect.options].some((option) => option.value === linkedContainer.containerSize)) sizeSelect.value = linkedContainer.containerSize;
+        }
+      }
+      updateBrokerTotal();
+    });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       updateBalances();
       const raw = Object.fromEntries(new FormData(form).entries());
       const normalized = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, String(value || "").trim()]));
+      ["twoPayContainerNo", "twoPayContainerSize", "twoPayContainerTruckNo", "twoPayContainerQuantity", "twoPayContainerFreight", "twoPayContainerReceivable",
+        "twoPayTruckerBroker", "twoPayBrokerContainerRef", "twoPayBrokerTruckNo", "twoPayBrokerContainerSize", "twoPayBrokerAmount", "twoPayBrokerPaymentDetails", "twoPayBrokerPaymentDate", "twoPayBrokerPaymentStatus"]
+        .forEach((name) => { delete normalized[name]; });
+      const containerLines = collectContainerRows();
+      const brokerLines = collectBrokerRows();
       numericFields.forEach((name) => { normalized[name] = Number(normalized[name] || 0); });
+      normalized.twoPayContainerRows = containerLines;
+      normalized.twoPayBrokerRows = brokerLines;
+      normalized.containerNo = containerLines[0]?.containerNo || "";
+      normalized.size = containerLines[0]?.containerSize || "";
+      normalized.truckNo = containerLines[0]?.truckNo || "";
+      normalized.roadFreightTwoPay = containerLines.reduce((sum, line) => sum + Number(line.roadFreightTwoPay || 0), 0);
+      normalized.globalReceivable = containerLines.reduce((sum, line) => sum + Number(line.globalReceivable || 0), 0);
+      normalized.quantity = containerLines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
       normalized.partyBalance = normalized.partyCollection - normalized.partyCollectionPaidAmount;
       normalized.receivedBalance = normalized.billingAmount - normalized.receivedAmount;
       normalized.id = editingId || createId();
       if (editingId) {
         const index = store.twoPayRecords.findIndex((item) => item.id === editingId);
         if (index === -1) return;
+        // Keep the legacy field hidden and intact when an older record is edited.
+        normalized.roadFreightPaid = Number(store.twoPayRecords[index].roadFreightPaid || 0);
         store.twoPayRecords[index] = normalized;
       } else {
+        normalized.roadFreightPaid = 0;
         store.twoPayRecords.unshift(normalized);
       }
       try {
         saveStore(store, { skipRemote: true });
-        await syncStoreImmediately(store, { twoPayRecords: true, activityLogs: true });
+        await syncStoreImmediately(store, { twoPayRecords: true, twoPayRecordIds: [normalized.id], activityLogs: true });
         notice.textContent = editingId ? "Two Pay record updated successfully." : "Two Pay record saved successfully.";
         notice.classList.remove("error");
       } catch (error) {
@@ -9989,12 +10453,43 @@
       throw new Error("The PDF library could not be loaded.");
     }
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF("p", "pt", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+    const pageWidth = new jsPDF("p", "pt", "a4").internal.pageSize.getWidth();
     const voucherBlueFill = [213, 232, 238];
     const voucherBlueLine = [126, 164, 177];
     const voucherNavy = [24, 48, 77];
+
+    // Pad to at least 7 rows to match the template image.
+    const rawItems = Array.isArray(voucher.items) && voucher.items.length ? voucher.items : [
+      { serialNo: 1, paymentMethod: "Cash", unitPrice: voucher.totalAmount, description: "Payment", amount: voucher.totalAmount }
+    ];
+    const totalRowCount = Math.max(7, rawItems.length);
+    const tableBody = [];
+    for (let i = 0; i < totalRowCount; i++) {
+      const item = rawItems[i];
+      if (item) {
+        tableBody.push([
+          String(item.serialNo || i + 1),
+          item.paymentMethod || "-",
+          item.unitPrice ? money(item.unitPrice) : "-",
+          item.description || "-",
+          money(item.amount)
+        ]);
+      } else {
+        tableBody.push([String(i + 1), "", "", "", ""]);
+      }
+    }
+
+    const bannerY = 26;
+    const metaStartY = bannerY + 148;
+    const tableStartY = metaStartY + 42;
+    const wrappedDescriptionLines = tableBody.reduce((count, row) => {
+      const lineCount = Math.max(1, Math.ceil(String(row[3] || "").length / 40));
+      return count + lineCount - 1;
+    }, 0);
+    const standardA4Height = 841.89;
+    const compactPageHeight = Math.ceil(tableStartY + 25 + (totalRowCount * 24) + (wrappedDescriptionLines * 12) + 25 + 36 + 75 + 16 + 28);
+    const pdf = new jsPDF("p", "pt", compactPageHeight < standardA4Height ? [pageWidth, compactPageHeight] : "a4");
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
     // Background tint matching uploaded template (#e3eee0)
     pdf.setFillColor(227, 238, 224);
@@ -10009,7 +10504,6 @@
 
     // Light blue header banner reduces solid ink coverage when printed.
     const bannerX = 26;
-    const bannerY = 26;
     const bannerW = pageWidth - 52;
     const bannerH = 46;
     pdf.setFillColor(...voucherBlueFill);
@@ -10033,7 +10527,6 @@
     pdf.text("E-mail ID: info@gtls.com.pk", pageWidth / 2, bannerY + 121, { align: "center" });
 
     // Metadata lines: Pay To, PV No., Pay By, Date
-    const metaStartY = bannerY + 148;
     const leftLabelX = 36;
     const leftValX = 84;
     const leftLineEnd = 290;
@@ -10072,31 +10565,10 @@
     pdf.setFont("helvetica", "normal");
     pdf.text(formatShortDate(voucher.voucherDate) || "-", rightValX + 4, metaStartY + 24);
 
-    // Table rows: Pad to at least 7 rows to match template image
-    const rawItems = Array.isArray(voucher.items) && voucher.items.length ? voucher.items : [
-      { serialNo: 1, paymentMethod: "Cash", unitPrice: voucher.totalAmount, description: "Payment", amount: voucher.totalAmount }
-    ];
-    const totalRowCount = Math.max(7, rawItems.length);
-    const tableBody = [];
-    for (let i = 0; i < totalRowCount; i++) {
-      const item = rawItems[i];
-      if (item) {
-        tableBody.push([
-          String(item.serialNo || i + 1),
-          item.paymentMethod || "-",
-          item.unitPrice ? money(item.unitPrice) : "-",
-          item.description || "-",
-          money(item.amount)
-        ]);
-      } else {
-        tableBody.push([String(i + 1), "", "", "", ""]);
-      }
-    }
-
     const footTotalAmount = money(voucher.totalAmount);
 
     pdf.autoTable({
-      startY: metaStartY + 42,
+      startY: tableStartY,
       margin: { left: 26, right: 26 },
       theme: "grid",
       head: [["Serial No.", "Payment Method", "Unit Price", "Description", "Amount"]],
@@ -10168,7 +10640,7 @@
     pdf.text(String(words), 312, bottomY);
 
     // Signatures at bottom: Prepared By & Received By
-    const signY = Math.min(pageHeight - 65, bottomY + 75);
+    const signY = Math.min(pageHeight - 40, bottomY + 75);
     const sigLineW = 160;
 
     // Prepared By
@@ -10312,6 +10784,7 @@
 
   function paymentVoucherPage(store) {
     const form = document.querySelector("[data-voucher-form]");
+    const fundForm = document.querySelector("[data-voucher-fund-form]");
     const itemsBody = document.querySelector("[data-voucher-items-body]");
     const addItemBtn = document.querySelector("[data-add-voucher-item]");
     const wordsDisplay = document.querySelector("[data-voucher-form-words]");
@@ -10324,6 +10797,13 @@
     const totalAmountEl = document.querySelector("[data-voucher-total-amount]");
     const cashCountEl = document.querySelector("[data-voucher-cash-count]");
     const bankCountEl = document.querySelector("[data-voucher-bank-count]");
+    const openingBalanceEl = document.querySelector("[data-voucher-opening-balance]");
+    const availableBalanceEl = document.querySelector("[data-voucher-available-balance]");
+    const fundTypeSelect = document.querySelector("[data-voucher-fund-type]");
+    const fundSubmitBtn = document.querySelector("[data-voucher-fund-submit]");
+    const fundResetBtn = document.querySelector("[data-voucher-fund-reset]");
+    const fundTableBody = document.querySelector("[data-voucher-fund-rows]");
+    const fundNotice = document.querySelector("[data-voucher-fund-notice]");
 
     const searchInput = document.querySelector("[data-voucher-search]");
     const payeeFilter = document.querySelector("[data-voucher-payee-filter]");
@@ -10334,15 +10814,73 @@
     const downloadSummaryBtn = document.querySelector("[data-download-voucher-summary]");
     const tableBody = document.querySelector("[data-voucher-rows]");
 
-    if (!form || !tableBody) return;
+    if (!form || !tableBody || !fundForm || !fundTableBody) return;
 
     let editingId = "";
+    let editingFundId = "";
 
     function setNotice(message = "", isError = false) {
       if (!notice) return;
       notice.textContent = message;
       notice.hidden = !message;
       notice.classList.toggle("error", isError);
+    }
+
+    function setFundNotice(message = "", isError = false) {
+      if (!fundNotice) return;
+      fundNotice.textContent = message;
+      fundNotice.hidden = !message;
+      fundNotice.classList.toggle("error", isError);
+    }
+
+    function resetFundForm() {
+      fundForm.reset();
+      editingFundId = "";
+      fundForm.elements.entryDate.value = getTodayIsoDate();
+      const hasOpening = (store.paymentVoucherFunds || []).some((entry) => entry.entryType === "opening_balance");
+      fundTypeSelect.value = hasOpening ? "fund_added" : "opening_balance";
+      const openingOption = fundTypeSelect.querySelector('option[value="opening_balance"]');
+      if (openingOption) openingOption.disabled = hasOpening;
+      if (fundSubmitBtn) fundSubmitBtn.textContent = "Save Funds Entry";
+      setFundNotice("");
+    }
+
+    function getVoucherFundTotals() {
+      const funds = store.paymentVoucherFunds || [];
+      const openingEntry = funds.find((entry) => entry.entryType === "opening_balance");
+      const openingBalance = Number(openingEntry?.amount || 0);
+      const openingDate = String(openingEntry?.entryDate || "");
+      const today = getTodayIsoDate();
+      const isInBalancePeriod = (date) => {
+        const normalizedDate = String(date || "");
+        return Boolean(normalizedDate && normalizedDate <= today && (!openingDate || normalizedDate >= openingDate));
+      };
+      const addedFunds = funds.filter((entry) => entry.entryType === "fund_added" && isInBalancePeriod(entry.entryDate))
+        .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+      const disbursed = (store.paymentVouchers || [])
+        .filter((voucher) => isInBalancePeriod(voucher.voucherDate))
+        .reduce((sum, voucher) => sum + Number(voucher.totalAmount || 0), 0);
+      return { openingBalance, addedFunds, disbursed, availableBalance: openingBalance + addedFunds - disbursed };
+    }
+
+    function renderFundEntries() {
+      const entries = [...(store.paymentVoucherFunds || [])].sort((a, b) =>
+        String(b.entryDate || "").localeCompare(String(a.entryDate || "")) || String(b.id || "").localeCompare(String(a.id || ""))
+      );
+      if (!entries.length) {
+        fundTableBody.innerHTML = '<tr><td colspan="7" class="empty-state">No fund balance entries yet.</td></tr>';
+        return;
+      }
+      fundTableBody.innerHTML = entries.map((entry) => `
+        <tr>
+          <td>${formatShortDate(entry.entryDate)}</td>
+          <td><span class="badge ${entry.entryType === "opening_balance" ? "neutral" : "good"}">${entry.entryType === "opening_balance" ? "Opening Fund Balance" : "Funds Added"}</span></td>
+          <td>${text(entry.sourceAccount || "-")}</td>
+          <td>${text(entry.reference || "-")}</td>
+          <td>${text(entry.remarks || "-")}</td>
+          <td class="text-right"><strong>${money(entry.amount)}</strong></td>
+          <td><div class="table-actions"><button class="btn small" type="button" data-edit-voucher-fund="${escapeHtml(entry.id)}">Edit</button><button class="btn small danger" type="button" data-delete-voucher-fund="${escapeHtml(entry.id)}">Delete</button></div></td>
+        </tr>`).join("");
     }
 
     function createItemRow(item = {}) {
@@ -10535,6 +11073,100 @@
 
     resetBtn?.addEventListener("click", resetForm);
 
+    fundForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const entryType = fundTypeSelect.value === "opening_balance" ? "opening_balance" : "fund_added";
+      const amount = Number(fundForm.elements.amount.value || 0);
+      const existingOpening = (store.paymentVoucherFunds || []).find((entry) =>
+        entry.entryType === "opening_balance" && String(entry.id) !== String(editingFundId)
+      );
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setFundNotice("Enter an amount greater than zero.", true);
+        return;
+      }
+      if (entryType === "opening_balance" && existingOpening) {
+        setFundNotice("An opening balance already exists. Select Funds Added to record another amount.", true);
+        return;
+      }
+
+      const wasEditing = Boolean(editingFundId);
+      const normalized = {
+        id: editingFundId || (window.crypto?.randomUUID ? window.crypto.randomUUID() : `FUND-${Date.now()}`),
+        entryType,
+        entryDate: fundForm.elements.entryDate.value || getTodayIsoDate(),
+        sourceAccount: fundForm.elements.sourceAccount.value.trim(),
+        reference: fundForm.elements.reference.value.trim(),
+        remarks: fundForm.elements.remarks.value.trim(),
+        amount,
+        updatedAt: new Date().toISOString()
+      };
+      if (editingFundId) {
+        const index = store.paymentVoucherFunds.findIndex((entry) => String(entry.id) === String(editingFundId));
+        if (index < 0) {
+          setFundNotice("Funds entry nahi mili; list refresh karke dobara koshish karein.", true);
+          return;
+        }
+        store.paymentVoucherFunds[index] = normalized;
+      } else {
+        store.paymentVoucherFunds.unshift(normalized);
+      }
+
+      saveStore(store, { skipRemote: true });
+      let saveMessage = wasEditing ? "Funds entry updated successfully." : "Funds entry saved successfully.";
+      let saveFailed = false;
+      try {
+        await syncStoreImmediately(store, { paymentVoucherFunds: true, activityLogs: true });
+      } catch (error) {
+        saveMessage = `Entry saved on this device, but Supabase sync failed: ${error.message}`;
+        saveFailed = true;
+      }
+      resetFundForm();
+      setFundNotice(saveMessage, saveFailed);
+      render();
+    });
+
+    fundResetBtn?.addEventListener("click", resetFundForm);
+    fundTableBody.addEventListener("click", async (event) => {
+      const editId = event.target.closest("[data-edit-voucher-fund]")?.dataset.editVoucherFund;
+      const deleteId = event.target.closest("[data-delete-voucher-fund]")?.dataset.deleteVoucherFund;
+      if (editId) {
+        const entry = (store.paymentVoucherFunds || []).find((item) => String(item.id) === String(editId));
+        if (!entry) return;
+        editingFundId = entry.id;
+        fundForm.elements.entryType.value = entry.entryType;
+        const openingOption = fundTypeSelect.querySelector('option[value="opening_balance"]');
+        if (openingOption) openingOption.disabled = false;
+        fundForm.elements.entryDate.value = entry.entryDate || getTodayIsoDate();
+        fundForm.elements.sourceAccount.value = entry.sourceAccount || "";
+        fundForm.elements.reference.value = entry.reference || "";
+        fundForm.elements.remarks.value = entry.remarks || "";
+        fundForm.elements.amount.value = String(entry.amount || "");
+        if (fundSubmitBtn) fundSubmitBtn.textContent = "Update Funds Entry";
+        fundForm.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      if (!deleteId) return;
+      const entry = (store.paymentVoucherFunds || []).find((item) => String(item.id) === String(deleteId));
+      if (!entry) return;
+      const confirmed = await requestDeleteConfirmation({
+        title: "Delete Fund Balance Entry?",
+        message: `Delete this ${entry.entryType === "opening_balance" ? "opening balance" : "funds added"} entry of PKR ${money(entry.amount)}? The available balance will be recalculated.`
+      });
+      if (!confirmed) return;
+      try {
+        await deleteRemoteOperationalRow("payment_voucher_funds", deleteId);
+      } catch (error) {
+        setFundNotice(`Entry was not deleted because Supabase could not confirm it: ${error.message}`, true);
+        return;
+      }
+      store.paymentVoucherFunds = store.paymentVoucherFunds.filter((item) => String(item.id) !== String(deleteId));
+      saveStore(store, { skipRemote: true });
+      syncActivityLogs(store.activityLogs || []).catch((error) => console.warn("Payment Voucher fund deletion audit sync failed:", error.message));
+      if (editingFundId === deleteId) resetFundForm();
+      setFundNotice("Fund balance entry deleted and the available balance recalculated.");
+      render();
+    });
+
     function getFilteredRows() {
       const query = String(searchInput?.value || "").trim().toLowerCase();
       const payee = String(payeeFilter?.value || "").trim().toLowerCase();
@@ -10594,6 +11226,13 @@
       if (cashCountEl) cashCountEl.textContent = cashCount;
       if (bankCountEl) bankCountEl.textContent = bankCount;
       if (countBadge) countBadge.textContent = `${rows.length} voucher(s)`;
+      const fundTotals = getVoucherFundTotals();
+      if (openingBalanceEl) openingBalanceEl.textContent = `PKR ${money(fundTotals.openingBalance)}`;
+      if (availableBalanceEl) {
+        availableBalanceEl.textContent = `PKR ${money(fundTotals.availableBalance)}`;
+        availableBalanceEl.classList.toggle("negative-balance", fundTotals.availableBalance < 0);
+      }
+      renderFundEntries();
 
       if (!rows.length) {
         tableBody.innerHTML = `<tr><td colspan="13" class="empty-state">No payment vouchers found.</td></tr>`;
@@ -10667,14 +11306,16 @@
 
         const idx = store.paymentVouchers.findIndex((v) => String(v.id) === String(deleteId));
         if (idx !== -1) {
+          try {
+            await deleteRemoteOperationalRow("payment_vouchers", deleteId);
+          } catch (err) {
+            setNotice(`Voucher was not deleted because Supabase could not confirm it: ${err.message}`, true);
+            return;
+          }
           store.paymentVouchers.splice(idx, 1);
           saveStore(store, { skipRemote: true });
-          try {
-            await syncStoreImmediately(store, { paymentVouchers: true, activityLogs: true });
-            setNotice(`Payment Voucher ${voucher.pvNo || voucher.id} deleted successfully.`);
-          } catch (err) {
-            setNotice(`Voucher deleted locally, but remote sync failed: ${err.message}`, true);
-          }
+          syncActivityLogs(store.activityLogs || []).catch((error) => console.warn("Payment Voucher deletion audit sync failed:", error.message));
+          setNotice(`Payment Voucher ${voucher.pvNo || voucher.id} deleted successfully.`);
           if (editingId === deleteId) resetForm();
           render();
         }
@@ -10696,6 +11337,7 @@
     });
 
     window.activePageRender = render;
+    resetFundForm();
     resetForm();
     render();
   }

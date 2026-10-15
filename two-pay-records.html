@@ -7,7 +7,7 @@
   <title>GTLS Transport - Two Pay Records</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261014-7" />
+  <link rel="stylesheet" href="styles.css?v=20261015-2" />
 </head>
 
 <body data-page="two-pay-records">
@@ -85,25 +85,37 @@
           <div class="field"><label>Customer Address</label><input name="customerAddress" /></div>
           <div class="field"><label>Origin</label><input name="origin" /></div>
           <div class="field"><label>BL No</label><input name="blNo" /></div>
-          <div class="field"><label>Container No</label><input name="containerNo" /></div>
+          <div class="field full">
+            <div class="container-block two-pay-container-block">
+              <h4>Container Details</h4>
+              <div class="container-table-head two-pay-container-table-head" aria-hidden="true">
+                <span>Container No</span>
+                <span>Container Size</span>
+                <span>Truck No</span>
+                <span>Quantity</span>
+                <span>Road Freight / Two Pay</span>
+                <span>Global / Receivable</span>
+                <span>Action</span>
+              </div>
+              <div data-two-pay-container-rows class="container-rows two-pay-container-rows"></div>
+              <div class="two-pay-container-footer" aria-live="polite">
+                <span>Total Quantity: <strong data-two-pay-container-quantity>0</strong></span>
+                <span>Road Freight / Two Pay: <strong data-two-pay-container-freight>PKR 0</strong></span>
+                <span>Global / Receivable: <strong data-two-pay-container-receivable>PKR 0</strong></span>
+              </div>
+              <button class="btn" type="button" data-add-two-pay-container>Add Container Row</button>
+            </div>
+          </div>
           <div class="field"><label>Lot Of</label><input name="lotOf" /></div>
           <div class="field"><label>Destination</label><input name="destination" /></div>
           <div class="field"><label>Consignee Name</label><input name="consigneeName" /></div>
-          <div class="field"><label>Size</label><input name="size" placeholder="20 / 40" /></div>
           <div class="field"><label>Description</label><input name="description" /></div>
-          <div class="field"><label>Truck No</label><input name="truckNo" /></div>
-          <div class="field"><label>Road Freight / Paid</label><input name="roadFreightPaid" type="number" step="0.01"
-              min="0" value="0" /></div>
-          <div class="field"><label>Road Freight / Two Pay</label><input name="roadFreightTwoPay" type="number"
-              step="0.01" min="0" value="0" /></div>
           <div class="field"><label>Tax Amount</label><input name="taxAmount" type="number" step="0.01" min="0"
               value="0" /></div>
-          <div class="field"><label>Detention Charges</label><input name="detentionCharges" type="number" step="0.01"
+          <div class="field"><label>Detention / Other Charges</label><input name="detentionCharges" type="number" step="0.01"
               min="0" value="0" /></div>
           <div class="field"><label>Billing Amount</label><input name="billingAmount" type="number" step="0.01" min="0"
               value="0" /></div>
-          <div class="field"><label>Global / Receivable</label><input name="globalReceivable" type="number" step="0.01"
-              min="0" value="0" /></div>
           <div class="field"><label>Bill No</label><input name="billNo" /></div>
           <div class="field"><label>Party Collection</label><input name="partyCollection" type="number" step="0.01"
               min="0" value="0" /></div>
@@ -114,6 +126,29 @@
           <div class="field"><label>Party Balance</label><input name="partyBalance" type="number" readonly value="0" />
           </div>
           <div class="field"><label>Party Remarks</label><input name="partyRemarks" /></div>
+          <div class="field full">
+            <div class="broker-block two-pay-broker-block">
+              <h4>Trucker / Broker Details</h4>
+              <div class="broker-table-head" aria-hidden="true">
+                <span>Trucker/Broker</span>
+                <span>Container Ref</span>
+                <span>Truck No</span>
+                <span>Container Size</span>
+                <span>Amount</span>
+                <span>Payment/Cheque/IBFT</span>
+                <span>Payment Date</span>
+                <span>Payment Status</span>
+                <span>Action</span>
+              </div>
+              <div data-two-pay-broker-rows class="broker-rows"></div>
+              <div class="broker-footer two-pay-broker-footer">
+                <button class="btn" type="button" data-add-two-pay-broker>Add Broker Row</button>
+                <div class="broker-summary" aria-live="polite">
+                  <span>Total Broker Amount: <strong data-two-pay-broker-total>PKR 0</strong></span>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="field"><label>Received Amount</label><input name="receivedAmount" type="number" step="0.01"
               min="0" value="0" /></div>
           <div class="field"><label>Receivable Balance</label><input name="receivedBalance" type="number" readonly
@@ -163,18 +198,26 @@
                 <th>Origin</th>
                 <th>BL No</th>
                 <th>Container No</th>
+                <th>Quantity</th>
                 <th>Lot Of</th>
                 <th>Destination</th>
                 <th>Consignee Name</th>
                 <th>Size</th>
                 <th>Description</th>
                 <th>Truck No</th>
-                <th>Road Freight / Paid</th>
                 <th>Road Freight / Two Pay</th>
                 <th>Tax Amount</th>
-                <th>Detention Charges</th>
+                <th>Detention / Other Charges</th>
                 <th>Billing Amount</th>
                 <th>Global / Receivable</th>
+                <th>Trucker/Broker</th>
+                <th>Container Ref</th>
+                <th>Broker Truck No</th>
+                <th>Broker Container Size</th>
+                <th>Broker Amount</th>
+                <th>Payment/Cheque/IBFT</th>
+                <th>Broker Payment Date</th>
+                <th>Broker Payment Status</th>
                 <th>Bill No</th>
                 <th>Party Collection</th>
                 <th>Party Collection Paid Amount</th>
@@ -199,7 +242,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261014-9"></script>
+<script src="app.js?v=20261015-5"></script>
 </body>
 
 </html>

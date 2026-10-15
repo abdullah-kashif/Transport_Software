@@ -19,6 +19,7 @@ alter table public.truck_jobs add column if not exists export_customer_collectio
 alter table public.truck_jobs add column if not exists import_payment_received_date date;
 alter table public.truck_jobs add column if not exists export_payment_received_date date;
 alter table public.truck_jobs add column if not exists diesel_expense numeric default 0;
+alter table public.truck_jobs add column if not exists salary numeric not null default 0;
 alter table public.truck_jobs add column if not exists additional_import_details jsonb not null default '[]'::jsonb;
 alter table public.truck_jobs add column if not exists additional_export_details jsonb not null default '[]'::jsonb;
 
@@ -304,6 +305,21 @@ create table if not exists public.payment_vouchers (
   updated_at timestamptz default now()
 );
 
+create table if not exists public.payment_voucher_funds (
+  id text primary key,
+  entry_type text not null check (entry_type in ('opening_balance', 'fund_added')),
+  entry_date date not null,
+  source_account text,
+  reference text,
+  remarks text,
+  amount numeric(14, 2) not null check (amount > 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists payment_voucher_funds_single_opening_balance
+  on public.payment_voucher_funds (entry_type)
+  where entry_type = 'opening_balance';
+
 grant select, insert, update, delete on table public.payment_vouchers to authenticated, service_role;
 
 alter table public.two_pay_records enable row level security;
@@ -319,6 +335,15 @@ with check (public.is_active_user() and public.has_module_access('two-pay-record
 alter table public.payment_vouchers enable row level security;
 drop policy if exists "payment_vouchers_module_access" on public.payment_vouchers;
 create policy "payment_vouchers_module_access" on public.payment_vouchers
+for all to authenticated
+using (public.is_active_user() and public.has_module_access('payment-voucher'))
+with check (public.is_active_user() and public.has_module_access('payment-voucher'));
+
+alter table public.payment_voucher_funds enable row level security;
+revoke all privileges on table public.payment_voucher_funds from anon, public;
+grant select, insert, update, delete on table public.payment_voucher_funds to authenticated, service_role;
+drop policy if exists payment_voucher_funds_module_access on public.payment_voucher_funds;
+create policy payment_voucher_funds_module_access on public.payment_voucher_funds
 for all to authenticated
 using (public.is_active_user() and public.has_module_access('payment-voucher'))
 with check (public.is_active_user() and public.has_module_access('payment-voucher'));
