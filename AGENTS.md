@@ -1,5 +1,7 @@
 # GTLS Transport Software - AI & Agent Instructions
 
+- **2026-10-16**: Booking Details invoice PDFs now print the fixed company NTN `NTN NO: 7235793-0` directly below the date. The existing customer NTN is unchanged; no form or database change. Bumped `app.js` cache keys to `20261016-1` across HTML pages.
+
 - **2026-10-15**: Two Pay Records now labels Detention Charges as “Detention / Other Charges” in the form, register, and PDFs, and removes Road Freight / Paid from user-facing forms, register, and PDFs. Existing `road_freight_paid` values remain mapped and preserved when editing older records; new records store 0 for compatibility. No database migration is needed. Bumped `app.js` cache keys to `20261015-5` across HTML pages.
 
 - **2026-10-15**: Added a relational fund ledger to Payment Voucher. A single opening balance and subsequent Funds Added entries are stored in `payment_voucher_funds`; available balance is calculated through today from the opening date, so earlier vouchers are not deducted twice. Added module-scoped authenticated RLS, a single-opening-balance index, entry edit/delete, Supabase hydration, and non-pruning upsert sync. Payment Voucher deletes now target only the selected remote ID so stale local lists cannot delete unrelated records. Run `supabase-payment-voucher-funds.sql` before using the new fund ledger; existing voucher rows are unchanged. Bumped app/styles caches to `20261015-4` / `20261015-2` across HTML pages.

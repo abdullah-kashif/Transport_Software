@@ -3501,6 +3501,7 @@
     pdf.text(consigneeText, left, 222);
     pdf.text(`NTN NO : ${text(booking.gatePass || "-")}`, left, 240);
     pdf.text(`Date: ${formatShortDate(booking.date)}`, right, 222, { align: "right" });
+    pdf.text("NTN NO: 7235793-0", right, 240, { align: "right" });
 
     pdf.autoTable({
       startY: 274,

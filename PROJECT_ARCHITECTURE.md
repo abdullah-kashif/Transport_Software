@@ -285,6 +285,7 @@ Powered by `jspdf` and `jspdf-autotable`, with embedded corporate letterheads:
 1. **Sales Tax Invoice PDF** (`buildBookingInvoicePdf` in [`app.js`](file:///h:/Transport_Software-main/app.js)):
    - Generated on official letterhead [`assets/Invoice.jpg`](file:///h:/Transport_Software-main/assets/Invoice.jpg).
    - Features booking particulars, container numbers/sizes breakdown, road haulage charges, 15% sales tax calculation, NTN, and authorized signature.
+   - Prints the fixed company NTN `NTN NO: 7235793-0` directly below the invoice date; this is a PDF-only label and is not a booking field or database value.
    - Directly below Category, displays Quantity (sum of all container quantities) and Unit Price (sum of all container unit prices, not a weighted average or total freight). Uses the existing numeric formatting with up to two decimal places. Charges continue to use the sum of quantity times unit price. For remote historical records without complete per-container pricing, Quantity uses the saved booking quantity and Unit Price displays `-` until the rows are updated.
 2. **Customer Summary PDF** (`buildSummaryRecordPdf` in [`app.js`](file:///h:/Transport_Software-main/app.js)):
    - Multi-booking tabular ledger with date, booking no, invoice no, container summary, freight, sales tax, and total.
@@ -338,6 +339,8 @@ Powered by `jspdf` and `jspdf-autotable`, with embedded corporate letterheads:
 P&L example: a Receivable Amount of 257.90 with two broker rows of 100 each gives the job a Net P&L of 57.90 (`257.90 - 200`). Broker-row P&L is not presented because profitability is evaluated at the job level.
 
 ### Recent Changes Log
+
+| **2026-10-16** | Fixed company NTN on Booking invoice | Added the fixed company NTN `NTN NO: 7235793-0` directly below the date on each Booking Details invoice PDF. The existing customer NTN line remains unchanged; no form, database, or Supabase changes. Bumped `app.js` cache keys to `20261016-1`. | `app.js`, HTML pages, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 
 | **2026-10-15** | Two Pay Records field cleanup | Renamed Detention Charges to Detention / Other Charges in the form, register, record PDF, and summary PDF. Removed Road Freight / Paid from user-facing form, register, and PDFs while retaining its Supabase mapping and preserving existing values when older records are edited; new records use 0 for compatibility. No database migration is needed. Bumped `app.js` cache keys to `20261015-5`. | `two-pay-records.html`, `app.js`, HTML pages, `PROJECT_ARCHITECTURE.md`, `AGENTS.md` |
 
