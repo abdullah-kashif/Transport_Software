@@ -2338,6 +2338,50 @@ input[type="file"]:focus-visible {
   min-height: 100%;
 }
 
+.two-pay-container-block {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.two-pay-container-block::-webkit-scrollbar {
+  height: 7px;
+}
+
+.two-pay-container-block::-webkit-scrollbar-track {
+  background: rgba(24, 48, 77, 0.05);
+  border-radius: 8px;
+}
+
+.two-pay-container-block::-webkit-scrollbar-thumb {
+  background: #dfbea2;
+  border-radius: 8px;
+}
+
+.two-pay-container-table-head,
+.two-pay-container-row {
+  min-width: 1120px;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(120px, 0.85fr) minmax(130px, 1fr) minmax(90px, 0.65fr) minmax(165px, 1.1fr) minmax(165px, 1.1fr) minmax(78px, 0.55fr);
+}
+
+.two-pay-container-rows {
+  min-width: 1120px;
+}
+
+.two-pay-container-footer {
+  min-width: 1120px;
+  margin: 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.two-pay-container-footer strong {
+  color: var(--ink);
+}
+
 [data-add-container-row] {
   margin-top: 14px;
 }
@@ -4974,6 +5018,20 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
 
   .container-row .row-action {
     justify-content: flex-start;
+  }
+
+  body[data-page="two-pay-records"] .two-pay-container-block {
+    overflow-x: visible;
+  }
+
+  body[data-page="two-pay-records"] .two-pay-container-table-head {
+    display: none;
+  }
+
+  body[data-page="two-pay-records"] .two-pay-container-rows,
+  body[data-page="two-pay-records"] .two-pay-container-row,
+  body[data-page="two-pay-records"] .two-pay-container-footer {
+    min-width: 0;
   }
 
   .broker-table-head {

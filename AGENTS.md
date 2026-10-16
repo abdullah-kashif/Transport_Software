@@ -1,6 +1,8 @@
 # GTLS Transport Software - AI & Agent Instructions
 
-- **2026-10-16**: Booking Details invoice PDFs now print the fixed company NTN `NTN NO: 7235793-0` directly below the date. The existing customer NTN is unchanged; no form or database change. Bumped `app.js` cache keys to `20261016-1` across HTML pages.
+- **2026-10-16**: Two Pay Records now supports repeatable, removable Container Details and Trucker / Broker Details, with register/PDF values and totals. The form places both sections below Received Remarks, with Container Details first. Child rows use `two_pay_containers` and `two_pay_brokers`, preserve old parent container values, and have authenticated module-scoped RLS. Run `supabase-two-pay-detail-rows.sql` before deploying; the additive backfill does not delete parent records. App sync deletes only detail IDs explicitly removed in the form, and local details remain available after failed Supabase reads or writes. This data is separate from Booking. Bumped app/style cache keys to `20261016-2` / `20261016-1` across HTML pages.
+
+- **2026-10-16**: Booking Details invoice PDFs now print the fixed company NTN `NTN NO: 7235793-0` directly below the date. The existing customer NTN is unchanged; no form or database change. The app cache was subsequently advanced to `20261016-2` for the Two Pay Records update.
 
 - **2026-10-15**: Two Pay Records now labels Detention Charges as “Detention / Other Charges” in the form, register, and PDFs, and removes Road Freight / Paid from user-facing forms, register, and PDFs. Existing `road_freight_paid` values remain mapped and preserved when editing older records; new records store 0 for compatibility. No database migration is needed. Bumped `app.js` cache keys to `20261015-5` across HTML pages.
 
@@ -66,7 +68,7 @@
 | **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 6165) |
 | **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6838) |
 | **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6838) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 7161) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 7353) |
 | **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7547) |
 | **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7892) |
 | **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 8277) |

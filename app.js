@@ -1364,7 +1364,7 @@
     await syncRows("employees", "employee_no", rows);
   }
 
-  async function syncTwoPayRecords(records, changedRecordIds = []) {
+  async function syncTwoPayRecords(records, changedRecordIds = [], removedChildRows = {}) {
     const rows = (records || []).map((item) => ({
       id: item.id,
       date: formatIsoDate(item.date) || null,
@@ -1404,58 +1404,64 @@
     if (!changedIds.size) return;
     const changedRecords = (records || []).filter((item) => changedIds.has(String(item.id)));
     for (const item of changedRecords) {
-      if (Array.isArray(item.twoPayContainerRows)) {
-        await syncTwoPayChildRows("two_pay_containers", item.id, item.twoPayContainerRows, (line, index) => ({
-          id: line.id,
-          two_pay_record_id: item.id,
-          container_no: line.containerNo || null,
-          container_size: line.containerSize || null,
-          truck_no: line.truckNo || null,
-          quantity: Number(line.quantity || 0),
-          road_freight_two_pay: Number(line.roadFreightTwoPay || 0),
-          global_receivable: Number(line.globalReceivable || 0),
-          sort_order: index
-        }));
-      }
-      if (Array.isArray(item.twoPayBrokerRows)) {
-        await syncTwoPayChildRows("two_pay_brokers", item.id, item.twoPayBrokerRows, (line, index) => ({
-          id: line.id,
-          two_pay_record_id: item.id,
-          trucker_broker: line.truckerBroker || null,
-          container_ref: line.containerRef && line.containerRef !== "All Containers" ? line.containerRef : null,
-          truck_no: line.truckNo && line.truckNo !== "All Trucks" ? line.truckNo : null,
-          container_size: line.containerSize && line.containerSize !== "All Sizes" ? line.containerSize : null,
-          amount: line.amount === "" || line.amount == null ? null : Number(line.amount),
-          payment_details: line.paymentDetails || null,
-          payment_date: formatIsoDate(line.paymentDate) || null,
-          payment_status: line.paymentStatus === "Paid" ? "Paid" : "Payable",
-          sort_order: index
-        }));
+      const removedRows = removedChildRows[String(item.id)] || {};
+      try {
+        if (Array.isArray(item.twoPayContainerRows)) {
+          await syncTwoPayChildRows("two_pay_containers", item.id, item.twoPayContainerRows, (line, index) => ({
+            id: line.id,
+            two_pay_record_id: item.id,
+            container_no: line.containerNo || null,
+            container_size: line.containerSize || null,
+            truck_no: line.truckNo || null,
+            quantity: Number(line.quantity || 0),
+            road_freight_two_pay: Number(line.roadFreightTwoPay || 0),
+            global_receivable: Number(line.globalReceivable || 0),
+            sort_order: index
+          }), removedRows.containers);
+        }
+        if (Array.isArray(item.twoPayBrokerRows)) {
+          await syncTwoPayChildRows("two_pay_brokers", item.id, item.twoPayBrokerRows, (line, index) => ({
+            id: line.id,
+            two_pay_record_id: item.id,
+            trucker_broker: line.truckerBroker || null,
+            container_ref: line.containerRef && line.containerRef !== "All Containers" ? line.containerRef : null,
+            truck_no: line.truckNo && line.truckNo !== "All Trucks" ? line.truckNo : null,
+            container_size: line.containerSize && line.containerSize !== "All Sizes" ? line.containerSize : null,
+            amount: line.amount === "" || line.amount == null ? null : Number(line.amount),
+            payment_details: line.paymentDetails || null,
+            payment_date: formatIsoDate(line.paymentDate) || null,
+            payment_status: line.paymentStatus === "Paid" ? "Paid" : "Payable",
+            sort_order: index
+          }), removedRows.brokers);
+        }
+      } catch (error) {
+        const message = String(error?.message || error?.details || "");
+        if (["42P01", "PGRST205"].includes(String(error?.code || "")) || /two_pay_(containers|brokers)/i.test(message)) {
+          throw new Error("Run supabase-two-pay-detail-rows.sql before saving Two Pay container or broker rows.");
+        }
+        throw error;
       }
     }
   }
 
-  async function syncTwoPayChildRows(table, recordId, detailRows, mapRow) {
+  async function syncTwoPayChildRows(table, recordId, detailRows, mapRow, removedIds = []) {
     const client = getSupabaseClient();
     const rows = (detailRows || []).map((line, index) => ({
       ...mapRow(line, index),
       id: line.id || makeUuid(),
-      two_pay_record_id: recordId
+      two_pay_record_id: recordId,
+      updated_at: new Date().toISOString()
     }));
-    const { data: existing, error: readError } = await client.from(table)
-      .select("id")
-      .eq("two_pay_record_id", recordId);
-    if (readError) throw readError;
+    const idsToRemove = [...new Set((Array.isArray(removedIds) ? removedIds : []).map((id) => String(id)).filter(Boolean))];
+    if (!rows.length && !idsToRemove.length) return;
     if (rows.length) {
       const { error } = await client.from(table).upsert(rows, { onConflict: "id" });
       if (error) throw error;
     }
-    const keepIds = new Set(rows.map((row) => String(row.id)));
-    const staleIds = (existing || []).filter((row) => !keepIds.has(String(row.id))).map((row) => row.id);
-    if (staleIds.length) {
+    if (idsToRemove.length) {
       const { error } = await client.from(table).delete()
         .eq("two_pay_record_id", recordId)
-        .in("id", staleIds);
+        .in("id", idsToRemove);
       if (error) throw error;
     }
   }
@@ -1757,7 +1763,7 @@
     if (changed.equipmentFleet && hasModuleAccessForSync("equipment")) jobs.push(syncEquipment(store.equipmentFleet));
     if (changed.maintenanceJobs && hasModuleAccessForSync("maintenance")) jobs.push(syncMaintenance(store.maintenanceJobs));
     if (changed.employees && hasModuleAccessForSync("employee")) jobs.push(syncEmployees(store.employees));
-    if (changed.twoPayRecords && hasModuleAccessForSync("two-pay-records")) jobs.push(syncTwoPayRecords(store.twoPayRecords, changed.twoPayRecordIds));
+    if (changed.twoPayRecords && hasModuleAccessForSync("two-pay-records")) jobs.push(syncTwoPayRecords(store.twoPayRecords, changed.twoPayRecordIds, changed.twoPayRemovedChildRows));
     if (changed.customerKhatas && hasModuleAccessForSync("khata")) {
       const records = Array.isArray(changed.customerKhataRecords) ? changed.customerKhataRecords : store.customerKhatas;
       jobs.push(syncAccounts(records, "receivable", { pruneMissing: !Array.isArray(changed.customerKhataRecords) }));
@@ -2146,15 +2152,20 @@
         const key = String(remote.id);
         const local = store.twoPayRecords.find((record) => String(record.id) === key) || {};
         const record = mapTwoPayRecordFromSupabase(remote, local);
+        const preservePendingDetails = Boolean(local.twoPayDetailsSyncPending);
+        const preserveLocalContainers = preservePendingDetails || !Array.isArray(twoPayContainers);
+        const preserveLocalBrokers = preservePendingDetails || !Array.isArray(twoPayBrokers);
         const remoteContainers = Array.isArray(twoPayContainers)
           ? (containersByRecord.get(key) || []).sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0)).map(mapTwoPayContainerFromSupabase)
           : null;
         const hasLegacyContainer = [record.containerNo, record.truckNo].some((value) => String(value || "").trim()) ||
           Number(record.roadFreightTwoPay || 0) !== 0 || Number(record.globalReceivable || 0) !== 0;
-        record.twoPayContainerRows = remoteContainers?.length
-          ? remoteContainers
-          : (hasLegacyContainer
-            ? [mapTwoPayContainerFromSupabase({
+        record.twoPayContainerRows = preserveLocalContainers && Array.isArray(local.twoPayContainerRows)
+          ? local.twoPayContainerRows
+          : (remoteContainers?.length
+            ? remoteContainers
+            : (hasLegacyContainer
+              ? [mapTwoPayContainerFromSupabase({
               container_no: record.containerNo,
               container_size: record.size,
               truck_no: record.truckNo,
@@ -2162,10 +2173,13 @@
               road_freight_two_pay: record.roadFreightTwoPay,
               global_receivable: record.globalReceivable
             })]
-            : (remoteContainers || local.twoPayContainerRows || []));
-        record.twoPayBrokerRows = Array.isArray(twoPayBrokers)
+              : (remoteContainers || local.twoPayContainerRows || [])));
+        const remoteBrokers = Array.isArray(twoPayBrokers)
           ? (brokersByRecord.get(key) || []).sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0)).map(mapTwoPayBrokerFromSupabase)
-          : (local.twoPayBrokerRows || []);
+          : null;
+        record.twoPayBrokerRows = preserveLocalBrokers && Array.isArray(local.twoPayBrokerRows)
+          ? local.twoPayBrokerRows
+          : (remoteBrokers?.length ? remoteBrokers : (remoteBrokers || local.twoPayBrokerRows || []));
         return record;
       });
       replaceArrayContents(store.twoPayRecords, mappedTwoPayRecords);
@@ -7361,6 +7375,10 @@
     const brokerAmountTotal = form?.querySelector("[data-two-pay-broker-total]");
     if (!form || !body) return;
     let editingId = "";
+    const existingContainerIds = new Set();
+    const existingBrokerIds = new Set();
+    const removedContainerIds = new Set();
+    const removedBrokerIds = new Set();
 
     const numericFields = [
       "taxAmount", "detentionCharges", "billingAmount",
@@ -7426,7 +7444,7 @@
         roadFreightTwoPay: row.querySelector("[name='twoPayContainerFreight']")?.value,
         globalReceivable: row.querySelector("[name='twoPayContainerReceivable']")?.value
       }));
-      return includeBlank ? lines : lines.filter((line) => line.containerNo || line.truckNo || line.roadFreightTwoPay !== 0 || line.globalReceivable !== 0);
+      return includeBlank ? lines : lines.filter((line) => line.containerNo || line.truckNo || line.containerSize !== "40 FT" || line.quantity !== 1 || line.roadFreightTwoPay !== 0 || line.globalReceivable !== 0);
     }
 
     function updateContainerTotals(lines = collectContainerRows()) {
@@ -7450,10 +7468,10 @@
             <div class="field-lite"><label>Container No</label><input name="twoPayContainerNo" value="${escapeHtml(line.containerNo)}" /></div>
             <div class="field-lite"><label>Container Size</label><select name="twoPayContainerSize">${sizes.map((size) => `<option value="${escapeHtml(size)}" ${line.containerSize === size ? "selected" : ""}>${escapeHtml(size)}</option>`).join("")}</select></div>
             <div class="field-lite"><label>Truck No</label><input name="twoPayContainerTruckNo" value="${escapeHtml(line.truckNo)}" /></div>
-            <div class="field-lite"><label>Quantity</label><input name="twoPayContainerQuantity" type="number" min="0" step="any" value="${escapeHtml(String(line.quantity))}" /></div>
+            <div class="field-lite"><label>Quantity</label><input name="twoPayContainerQuantity" type="number" min="1" step="any" value="${escapeHtml(String(line.quantity))}" /></div>
             <div class="field-lite"><label>Road Freight / Two Pay</label><input name="twoPayContainerFreight" type="number" min="0" step="0.01" value="${escapeHtml(String(line.roadFreightTwoPay))}" /></div>
             <div class="field-lite"><label>Global / Receivable</label><input name="twoPayContainerReceivable" type="number" min="0" step="0.01" value="${escapeHtml(String(line.globalReceivable))}" /></div>
-            <div class="row-action"><button class="btn small danger" type="button" data-remove-two-pay-container="${escapeHtml(line.id)}" ${visibleLines.length === 1 ? "disabled" : ""}>Remove</button></div>
+            <div class="row-action"><button class="btn small danger" type="button" data-remove-two-pay-container="${escapeHtml(line.id)}">Remove</button></div>
           </div>
         `;
       }).join("");
@@ -7546,6 +7564,10 @@
     function resetForm() {
       form.reset();
       numericFields.forEach((name) => { if (form.elements[name]) form.elements[name].value = "0"; });
+      existingContainerIds.clear();
+      existingBrokerIds.clear();
+      removedContainerIds.clear();
+      removedBrokerIds.clear();
       renderContainerRows([]);
       renderBrokerRows([]);
       updateBalances();
@@ -7557,8 +7579,18 @@
       Object.keys(item || {}).forEach((key) => {
         if (form.elements[key]) form.elements[key].value = item[key] ?? "";
       });
-      renderContainerRows(getRecordContainerRows(item));
-      renderBrokerRows(getRecordBrokerRows(item));
+      const containerLines = getRecordContainerRows(item);
+      const brokerLines = getRecordBrokerRows(item);
+      existingContainerIds.clear();
+      existingBrokerIds.clear();
+      removedContainerIds.clear();
+      removedBrokerIds.clear();
+      containerLines.forEach((line) => existingContainerIds.add(String(line.id)));
+      brokerLines.forEach((line) => existingBrokerIds.add(String(line.id)));
+      (Array.isArray(item.twoPayPendingRemovedContainerIds) ? item.twoPayPendingRemovedContainerIds : []).forEach((id) => removedContainerIds.add(String(id)));
+      (Array.isArray(item.twoPayPendingRemovedBrokerIds) ? item.twoPayPendingRemovedBrokerIds : []).forEach((id) => removedBrokerIds.add(String(id)));
+      renderContainerRows(containerLines);
+      renderBrokerRows(brokerLines);
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Two Pay Record";
       updateBalances();
@@ -7890,6 +7922,7 @@
     containerRowsElement?.addEventListener("click", (event) => {
       const removeId = event.target.closest("[data-remove-two-pay-container]")?.dataset.removeTwoPayContainer;
       if (!removeId) return;
+      if (existingContainerIds.has(String(removeId))) removedContainerIds.add(String(removeId));
       renderContainerRows(collectContainerRows(true).filter((line) => String(line.id) !== String(removeId)));
     });
     containerRowsElement?.addEventListener("input", () => {
@@ -7908,6 +7941,7 @@
     brokerRowsElement?.addEventListener("click", (event) => {
       const removeId = event.target.closest("[data-remove-two-pay-broker]")?.dataset.removeTwoPayBroker;
       if (!removeId) return;
+      if (existingBrokerIds.has(String(removeId))) removedBrokerIds.add(String(removeId));
       renderBrokerRows(collectBrokerRows(true).filter((line) => String(line.id) !== String(removeId)));
     });
     brokerRowsElement?.addEventListener("input", () => updateBrokerTotal());
@@ -7947,6 +7981,9 @@
       normalized.partyBalance = normalized.partyCollection - normalized.partyCollectionPaidAmount;
       normalized.receivedBalance = normalized.billingAmount - normalized.receivedAmount;
       normalized.id = editingId || createId();
+      normalized.twoPayDetailsSyncPending = true;
+      normalized.twoPayPendingRemovedContainerIds = [...removedContainerIds];
+      normalized.twoPayPendingRemovedBrokerIds = [...removedBrokerIds];
       if (editingId) {
         const index = store.twoPayRecords.findIndex((item) => item.id === editingId);
         if (index === -1) return;
@@ -7959,7 +7996,21 @@
       }
       try {
         saveStore(store, { skipRemote: true });
-        await syncStoreImmediately(store, { twoPayRecords: true, twoPayRecordIds: [normalized.id], activityLogs: true });
+        await syncStoreImmediately(store, {
+          twoPayRecords: true,
+          twoPayRecordIds: [normalized.id],
+          twoPayRemovedChildRows: {
+            [normalized.id]: {
+              containers: [...removedContainerIds],
+              brokers: [...removedBrokerIds]
+            }
+          },
+          activityLogs: true
+        });
+        normalized.twoPayDetailsSyncPending = false;
+        normalized.twoPayPendingRemovedContainerIds = [];
+        normalized.twoPayPendingRemovedBrokerIds = [];
+        saveStore(store, { skipRemote: true });
         notice.textContent = editingId ? "Two Pay record updated successfully." : "Two Pay record saved successfully.";
         notice.classList.remove("error");
       } catch (error) {
