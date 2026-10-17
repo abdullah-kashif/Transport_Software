@@ -1,5 +1,22 @@
 # GTLS Transport Software - AI & Agent Instructions
 
+- **2026-10-17**: Updated the field name and column header from "Reference" to "Banker" in Payment Voucher (`payment-voucher.html` / `app.js`). Applied across the Fund Balance Entries form label, input placeholder, Fund Balance History table header (`<th>Banker</th>`), and the Fund Balance summary PDF export header array, preserving backend column mapping for complete persistence compatibility. Bumped `payment-voucher.html` script asset cache key to `app.js?v=20261017-4`.
+
+- **2026-10-17**: Removed repetitive "Outstanding" keyword label from the balance cells in Accounts Payable (`accounts-payable.html` / `app.js`). Positive payable balances now cleanly display the numeric amount (e.g. `2,500,000`) without the wrapped red text label, preserving single-line formatting across on-screen statement tables, customer account lists, and exported PDF statements. Bumped `accounts-payable.html` asset cache key to `app.js?v=20261017-3`.
+
+- **2026-10-17**: Automated the financial calculation workflow in Two Pay Records (`two-pay-records.html` & `app.js`):
+  1. `Road Freight / Two Pay` (entered in Container Details rows) automatically calculates `Billing Amount`, which is locked to `readonly`.
+  2. Entering an amount in `Detention / Other Charges` automatically adds to `Billing Amount` (`Billing Amount = SUM(Road Freight / Two Pay) + Detention / Other Charges`).
+  3. `Road Freight / Two Pay` minus `Global / Receivable` (both from Container Details rows) automatically computes `Party Collection` (`Party Collection = SUM(Road Freight) - SUM(Global Receivable)`), also locked to `readonly`.
+  4. Entering `Party Collection Paid Amount` automatically subtracts from `Party Collection` and displays in `Party Balance` (`Party Balance = Party Collection - Party Collection Paid Amount`).
+  5. `Billing Amount` automatically populates `Receivable Balance`, and entering `Received Amount` automatically subtracts from it (`Receivable Balance = Billing Amount - Received Amount`).
+  6. Net `P&L` is calculated as `SUM(Global / Receivable) - Total Trucker/Broker Amount`, displayed in a readonly form field, live in the broker summary card with color indicator, and in a dedicated register table column.
+  7. Removed duplicate `Road Freight / Two Pay` and `Global / Receivable` fields from the upper main form grid since they exist cleanly in Container Details rows. Bumped asset cache key to `app.js?v=20261017-3`.
+
+- **2026-10-17**: Added a comprehensive filter toolbar directly above the Fund Balance Entries table in Payment Voucher (`payment-voucher.html`), matching all controls from Payment Voucher Register: General Filter search, Entry Type dropdown (All Types, Funds Added, Opening Fund Balance), From Account / Source dynamic dropdown, Start / End Date range, Date Order (Sort Z to A / Sort A to Z), live record count badge, Clear Filters button, and a Download Summary PDF button (`buildFundBalanceSummaryPdf`). Wired up reactive filtering, dynamic source population, and summary PDF generation in `app.js`. Bumped `payment-voucher.html` asset cache key to `app.js?v=20261017-1`.
+
+- **2026-10-17**: In the Booking Form (`booking.html`), selecting or entering a previously saved Customer / Payer now automatically populates their corresponding NTN into the NTN field (`name="gatePass"`). Added a reactive `<datalist id="booking-customer-options">` suggestions list linked to the Customer / Payer field, dynamically populating options from existing saved bookings and accounts. Bumped `booking.html` asset cache key to `app.js?v=20261017-1`.
+
 - **2026-10-16**: Two Pay Records now supports repeatable, removable Container Details and Trucker / Broker Details, with register/PDF values and totals. The form places both sections below Received Remarks, with Container Details first. Child rows use `two_pay_containers` and `two_pay_brokers`, preserve old parent container values, and have authenticated module-scoped RLS. Run `supabase-two-pay-detail-rows.sql` before deploying; the additive backfill does not delete parent records. App sync deletes only detail IDs explicitly removed in the form, and local details remain available after failed Supabase reads or writes. This data is separate from Booking. Bumped app/style cache keys to `20261016-2` / `20261016-1` across HTML pages.
 
 - **2026-10-16**: Booking Details invoice PDFs now print the fixed company NTN `NTN NO: 7235793-0` directly below the date. The existing customer NTN is unchanged; no form or database change. The app cache was subsequently advanced to `20261016-2` for the Two Pay Records update.
@@ -77,7 +94,7 @@
 | **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8881) |
 | **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 9033) |
 | **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 9033) |
-| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10370) |
+| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10980) |
 
 ---
 
@@ -88,7 +105,7 @@
 - **Audit Logging**: `collectAuditChanges()` (~Line 339), `appendAuditLog()` (~Line 321), `pruneActivityLogs()` (~Line 263).
 - **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 475), `signInWithSupabase()` (~Line 506), `enforceSoftwareAccess(page)` (~Line 2269).
 - **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 6149), `convertNumberToWords(amount)` (~Line 9951).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 6041), `buildPaymentVoucherPdf()` (~Line 10036), `buildPaymentVoucherSummaryPdf()` (~Line 10259).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 6041), `buildPaymentVoucherPdf()` (~Line 10036), `buildPaymentVoucherSummaryPdf()` (~Line 10259), `buildFundBalanceSummaryPdf()` (~Line 10881).
 - **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1660), `hydrateOperationalStore()` (~Line 1685), `syncTruckJobs()` (~Line 1205), `syncPaymentVouchers()` (~Line 1440), `syncPaymentVoucherFunds()` (~Line 1460).
 - **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
 

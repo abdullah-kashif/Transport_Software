@@ -94,10 +94,10 @@
           <div class="field"><label>Detention / Other Charges</label><input name="detentionCharges" type="number" step="0.01"
               min="0" value="0" /></div>
           <div class="field"><label>Billing Amount</label><input name="billingAmount" type="number" step="0.01" min="0"
-              value="0" /></div>
+              readonly value="0" /></div>
           <div class="field"><label>Bill No</label><input name="billNo" /></div>
           <div class="field"><label>Party Collection</label><input name="partyCollection" type="number" step="0.01"
-              min="0" value="0" /></div>
+              min="0" readonly value="0" /></div>
           <div class="field"><label>Party Collection Paid Amount</label><input name="partyCollectionPaidAmount"
               type="number" step="0.01" min="0" value="0" /></div>
           <div class="field"><label>Party Collection Paid Date</label><input name="partyCollectionPaidDate"
@@ -109,6 +109,7 @@
               min="0" value="0" /></div>
           <div class="field"><label>Receivable Balance</label><input name="receivedBalance" type="number" readonly
               value="0" /></div>
+          <div class="field"><label>P&amp;L</label><input name="pnl" type="number" readonly value="0" /></div>
           <div class="field"><label>Received Date</label><input name="receivedDate" type="date" /></div>
           <div class="field"><label>Received ID</label><input name="receivedId" /></div>
           <div class="field"><label>Received Remarks</label><input name="remarks"
@@ -153,6 +154,7 @@
                 <button class="btn" type="button" data-add-two-pay-broker>Add Broker Row</button>
                 <div class="broker-summary" aria-live="polite">
                   <span>Total Broker Amount: <strong data-two-pay-broker-total>PKR 0</strong></span>
+                  <span>Net P&amp;L: <strong data-two-pay-broker-pnl>PKR 0</strong></span>
                 </div>
               </div>
             </div>
@@ -218,6 +220,7 @@
                 <th>Payment/Cheque/IBFT</th>
                 <th>Broker Payment Date</th>
                 <th>Broker Payment Status</th>
+                <th>P&amp;L</th>
                 <th>Bill No</th>
                 <th>Party Collection</th>
                 <th>Party Collection Paid Amount</th>
@@ -242,7 +245,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261016-2"></script>
+<script src="app.js?v=20261017-3"></script>
 </body>
 
 </html>

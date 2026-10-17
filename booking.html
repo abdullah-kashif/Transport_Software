@@ -93,8 +93,11 @@
               placeholder="Example: ONEYSINE22550700" required /></div>
           <div class="field quarter"><label>NTN <span class="required-star">*</span></label><input name="gatePass"
               type="text" placeholder="Example: 1234567-8" required /></div>
-          <div class="field quarter"><label>Customer / Payer <span class="required-star">*</span></label><input
-              name="customer" placeholder="Customer Name" required /></div>
+          <div class="field quarter">
+            <label>Customer / Payer <span class="required-star">*</span></label>
+            <input name="customer" list="booking-customer-options" placeholder="Customer Name" autocomplete="off" required />
+            <datalist id="booking-customer-options" data-booking-customer-options></datalist>
+          </div>
           <div class="field quarter"><label>Consignee Address <span class="required-star">*</span></label><input
               name="consignee" placeholder="Consignee Address" required /></div>
           <div class="field quarter"><label>Route <span class="required-star">*</span></label><input name="route"
@@ -340,7 +343,7 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="app.js?v=20261016-2"></script>
+  <script src="app.js?v=20261017-1"></script>
 </body>
 
 </html>

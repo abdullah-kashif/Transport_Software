@@ -2166,13 +2166,13 @@
             ? remoteContainers
             : (hasLegacyContainer
               ? [mapTwoPayContainerFromSupabase({
-              container_no: record.containerNo,
-              container_size: record.size,
-              truck_no: record.truckNo,
-              quantity: 1,
-              road_freight_two_pay: record.roadFreightTwoPay,
-              global_receivable: record.globalReceivable
-            })]
+                container_no: record.containerNo,
+                container_size: record.size,
+                truck_no: record.truckNo,
+                quantity: 1,
+                road_freight_two_pay: record.roadFreightTwoPay,
+                global_receivable: record.globalReceivable
+              })]
               : (remoteContainers || local.twoPayContainerRows || [])));
         const remoteBrokers = Array.isArray(twoPayBrokers)
           ? (brokersByRecord.get(key) || []).sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0)).map(mapTwoPayBrokerFromSupabase)
@@ -4504,6 +4504,9 @@
     const salesTaxWithheldAmountField = form.querySelector("[name='salesTaxWithheldAmount']");
     const salesTaxByUsAmountField = form.querySelector("[name='salesTaxByUsAmount']");
     const receivableAmountField = form.querySelector("[name='receivableAmount']");
+    const customerInputField = form.querySelector("[name='customer']");
+    const ntnInputField = form.querySelector("[name='gatePass']");
+    const customerOptions = form.querySelector("[data-booking-customer-options]") || document.getElementById("booking-customer-options");
     const brokerRows = form.querySelector("[data-broker-rows]");
     const addBrokerRowButton = form.querySelector("[data-add-broker-row]");
     const totalBrokerAmountElement = form.querySelector("[data-total-broker-amount]") || form.querySelector("[data-broker-total-amount]");
@@ -4878,6 +4881,40 @@
       customerFilter.value = customers.includes(currentValue) ? currentValue : "";
     }
 
+    function getCustomerNtn(customerName) {
+      const target = String(customerName || "").trim().toLowerCase();
+      if (!target) return "";
+      const match = (store.bookings || []).find((b) => {
+        const c = String(b.customer || "").trim().toLowerCase();
+        const ntn = String(b.gatePass || "").trim();
+        return c === target && ntn !== "";
+      });
+      return match ? String(match.gatePass || "").trim() : "";
+    }
+
+    function populateCustomerSuggestions() {
+      if (!customerOptions) return;
+      const bookingCustomers = (store.bookings || []).map((item) => String(item.customer || "").trim());
+      const khataCustomers = (store.customerKhatas || []).map((item) => String(item.customer || item.name || "").trim());
+      const uniqueCustomers = [...new Set([...bookingCustomers, ...khataCustomers].filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      customerOptions.innerHTML = uniqueCustomers.map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
+    }
+
+    function handleCustomerAutoFill() {
+      const selected = customerInputField ? customerInputField.value : "";
+      const autoNtn = getCustomerNtn(selected);
+      if (autoNtn && ntnInputField) {
+        ntnInputField.value = autoNtn;
+        ntnInputField.classList.remove("input-error");
+        if (notice && notice.classList.contains("error") && notice.textContent.includes("NTN")) {
+          notice.hidden = true;
+          notice.textContent = "";
+          notice.classList.remove("error");
+        }
+      }
+    }
+
     function syncBookingSummaryDownloadState() {
       if (!downloadSummaryButton) return;
       downloadSummaryButton.disabled = !currentFilteredBookings.length;
@@ -4888,6 +4925,7 @@
 
     function render() {
       renderCustomerFilter();
+      populateCustomerSuggestions();
       const searchTerms = String(searchFilter?.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
       const selectedCustomer = customerFilter.value;
       const startDate = parseDateValue(startDateFilter?.value);
@@ -5138,6 +5176,12 @@
 
     customerFilter.addEventListener("change", render);
     if (dateSort) dateSort.addEventListener("change", render);
+
+    if (customerInputField) {
+      customerInputField.addEventListener("input", handleCustomerAutoFill);
+      customerInputField.addEventListener("change", handleCustomerAutoFill);
+      customerInputField.addEventListener("blur", handleCustomerAutoFill);
+    }
 
     addContainerRowButton.addEventListener("click", () => {
       const lines = collectContainerLines();
@@ -7373,6 +7417,7 @@
     const brokerRowsElement = form?.querySelector("[data-two-pay-broker-rows]");
     const addBrokerRowButton = form?.querySelector("[data-add-two-pay-broker]");
     const brokerAmountTotal = form?.querySelector("[data-two-pay-broker-total]");
+    const brokerPnlTotal = form?.querySelector("[data-two-pay-broker-pnl]");
     if (!form || !body) return;
     let editingId = "";
     const existingContainerIds = new Set();
@@ -7382,9 +7427,17 @@
 
     const numericFields = [
       "taxAmount", "detentionCharges", "billingAmount",
-      "globalReceivable", "partyCollection", "partyCollectionPaidAmount", "receivedAmount"
+      "partyCollection", "partyCollectionPaidAmount", "partyBalance",
+      "receivedAmount", "receivedBalance", "pnl"
     ];
-    const getPartyBalance = (item) => Number(item.partyCollection || 0) - Number(item.partyCollectionPaidAmount || 0);
+    const getPartyBalance = (item) => {
+      const freight = Number(item.roadFreightTwoPay || 0);
+      const receivable = Number(item.globalReceivable || 0);
+      const partyCollection = item.partyCollection !== undefined && item.partyCollection !== null && Number(item.partyCollection) !== 0
+        ? Number(item.partyCollection)
+        : (freight - receivable);
+      return partyCollection - Number(item.partyCollectionPaidAmount || 0);
+    };
     const getPartyPending = (item) => Math.max(0, getPartyBalance(item));
 
     function normalizeContainerRow(line = {}) {
@@ -7475,7 +7528,7 @@
           </div>
         `;
       }).join("");
-      updateContainerTotals(collectContainerRows());
+      updateTwoPayFinancials("containers");
       refreshBrokerOptions();
     }
 
@@ -7544,7 +7597,7 @@
           </div>
         `;
       }).join("");
-      updateBrokerTotal(collectBrokerRows());
+      updateTwoPayFinancials("brokers");
     }
 
     function createId() {
@@ -7552,14 +7605,54 @@
       return `tpr-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
-    function updateBalances() {
-      const partyCollection = Number(form.elements.partyCollection?.value || 0);
+    function updateTwoPayFinancials() {
+      const containerLines = collectContainerRows();
+      const brokerLines = collectBrokerRows();
+
+      const roadFreightTwoPay = containerLines.reduce((sum, line) => sum + Number(line.roadFreightTwoPay || 0), 0);
+      const globalReceivable = containerLines.reduce((sum, line) => sum + Number(line.globalReceivable || 0), 0);
+      const brokerAmountSum = brokerLines.reduce((sum, line) => sum + (line.amount === "" || line.amount == null ? 0 : Number(line.amount || 0)), 0);
+
+      const detention = Number(form.elements.detentionCharges?.value || 0);
       const partyPaid = Number(form.elements.partyCollectionPaidAmount?.value || 0);
-      const billing = Number(form.elements.billingAmount?.value || 0);
       const received = Number(form.elements.receivedAmount?.value || 0);
-      if (form.elements.partyBalance) form.elements.partyBalance.value = String(partyCollection - partyPaid);
-      if (form.elements.receivedBalance) form.elements.receivedBalance.value = String(billing - received);
+
+      // 1. Billing Amount = Road Freight / Two Pay + Detention / Other Charges
+      const billing = roadFreightTwoPay + detention;
+      if (form.elements.billingAmount) form.elements.billingAmount.value = String(billing);
+
+      // 2. Party Collection = Road Freight / Two Pay - Global / Receivable
+      const partyCollection = roadFreightTwoPay - globalReceivable;
+      if (form.elements.partyCollection) form.elements.partyCollection.value = String(partyCollection);
+
+      // 3. Party Balance = Party Collection - Party Collection Paid Amount
+      const partyBalance = partyCollection - partyPaid;
+      if (form.elements.partyBalance) form.elements.partyBalance.value = String(partyBalance);
+
+      // 4. Receivable Balance = Billing Amount - Received Amount
+      const receivedBalance = billing - received;
+      if (form.elements.receivedBalance) form.elements.receivedBalance.value = String(receivedBalance);
+
+      // 5. P&L = Global / Receivable - Total Broker Amount
+      const pnl = globalReceivable - brokerAmountSum;
+      if (form.elements.pnl) form.elements.pnl.value = String(pnl);
+
+      updateContainerTotals(containerLines);
+      updateBrokerTotal(brokerLines);
+
+      if (brokerPnlTotal) {
+        brokerPnlTotal.textContent = `PKR ${money(pnl)}`;
+        if (pnl < 0) {
+          brokerPnlTotal.style.color = "#ba3a2f";
+        } else if (pnl > 0) {
+          brokerPnlTotal.style.color = "#1f8a70";
+        } else {
+          brokerPnlTotal.style.color = "";
+        }
+      }
     }
+
+    const updateBalances = () => updateTwoPayFinancials();
 
     function resetForm() {
       form.reset();
@@ -7570,7 +7663,7 @@
       removedBrokerIds.clear();
       renderContainerRows([]);
       renderBrokerRows([]);
-      updateBalances();
+      updateTwoPayFinancials();
       editingId = "";
       form.querySelector("[data-submit-label]").textContent = "Save Two Pay Record";
     }
@@ -7593,7 +7686,7 @@
       renderBrokerRows(brokerLines);
       editingId = item.id;
       form.querySelector("[data-submit-label]").textContent = "Update Two Pay Record";
-      updateBalances();
+      updateTwoPayFinancials();
       form.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
@@ -7609,8 +7702,8 @@
         .filter((item) => !from || String(item.date || "") >= from)
         .filter((item) => !to || String(item.date || "") <= to)
         .filter((item) => !query || [item.date, item.customerName, item.customerAddress, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks,
-          ...(item.twoPayContainerRows || []).flatMap((line) => [line.containerNo, line.containerSize, line.truckNo, line.quantity]),
-          ...(item.twoPayBrokerRows || []).flatMap((line) => [line.truckerBroker, line.containerRef, line.truckNo, line.containerSize, line.amount, line.paymentDetails, line.paymentDate, line.paymentStatus])]
+        ...(item.twoPayContainerRows || []).flatMap((line) => [line.containerNo, line.containerSize, line.truckNo, line.quantity]),
+        ...(item.twoPayBrokerRows || []).flatMap((line) => [line.truckerBroker, line.containerRef, line.truckNo, line.containerSize, line.amount, line.paymentDetails, line.paymentDate, line.paymentStatus])]
           .some((value) => String(value || "").toLowerCase().includes(query)))
         .sort((left, right) => {
           const result = String(left.date || "").localeCompare(String(right.date || ""));
@@ -7891,60 +7984,67 @@
       if (totalReceivable) totalReceivable.textContent = `PKR ${money(receivable)}`;
       if (totalBalance) totalBalance.textContent = `PKR ${money(balance)}`;
       if (totalPartyPending) totalPartyPending.textContent = `PKR ${money(partyPending)}`;
-        body.innerHTML = rows.length ? rows.map((item, index) => {
+      body.innerHTML = rows.length ? rows.map((item, index) => {
         const containers = getRecordContainerRows(item);
         const brokers = getRecordBrokerRows(item);
         const totalQuantity = containers.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+        const brokerTotal = brokers.reduce((sum, line) => sum + (line.amount === "" || line.amount == null ? 0 : Number(line.amount || 0)), 0);
+        const pnl = Number(item.globalReceivable || 0) - brokerTotal;
         return `
         <tr>
           <td>${index + 1}</td><td>${formatShortDate(item.date)}</td><td>${text(item.customerName || "-")}</td><td>${text(item.customerAddress || "-")}</td><td>${text(item.origin || "-")}</td><td>${text(item.blNo || "-")}</td>
           <td>${renderStackedValues(containers.map((line) => line.containerNo), item.containerNo || "-")}</td><td>${totalQuantity ? money(totalQuantity) : "-"}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${renderStackedValues(containers.map((line) => line.containerSize), item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${renderStackedValues(containers.map((line) => line.truckNo), item.truckNo || "-")}</td>
           <td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td>
           <td>${renderStackedValues(brokers.map((line) => line.truckerBroker))}</td><td>${renderStackedValues(brokers.map((line) => line.containerRef))}</td><td>${renderStackedValues(brokers.map((line) => line.truckNo))}</td><td>${renderStackedValues(brokers.map((line) => line.containerSize))}</td><td>${renderStackedValues(brokers.map((line) => line.amount === "" ? "-" : money(line.amount)))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentDetails))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentDate ? formatShortDate(line.paymentDate) : "-"))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentStatus))}</td>
+          <td>${money(pnl)}</td>
           <td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(getPartyBalance(item))}${getPartyPending(item) > 0 ? ' <span class="badge warn">Pending</span>' : ""}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
           <td><div class="table-actions"><button class="btn small" type="button" data-download-two-pay="${escapeHtml(item.id)}">Invoice</button><button class="btn small" type="button" data-edit-two-pay="${escapeHtml(item.id)}">Edit</button></div></td>
         </tr>
       `;
-      }).join("") : `<tr><td colspan="39" class="empty-state">No Two Pay records available.</td></tr>`;
+      }).join("") : `<tr><td colspan="40" class="empty-state">No Two Pay records available.</td></tr>`;
     }
 
     [search, customerFilter, startDate, endDate, order].filter(Boolean).forEach((control) => {
       control.addEventListener(control === search ? "input" : "change", render);
     });
-    ["partyCollection", "partyCollectionPaidAmount", "billingAmount", "receivedAmount"].forEach((name) => {
-      form.elements[name]?.addEventListener("input", updateBalances);
+    ["detentionCharges", "partyCollectionPaidAmount", "receivedAmount"].forEach((name) => {
+      form.elements[name]?.addEventListener("input", () => updateTwoPayFinancials());
     });
     addContainerRowButton?.addEventListener("click", () => {
       const lines = collectContainerRows(true);
       lines.push(normalizeContainerRow());
       renderContainerRows(lines);
+      updateTwoPayFinancials("containers");
     });
     containerRowsElement?.addEventListener("click", (event) => {
       const removeId = event.target.closest("[data-remove-two-pay-container]")?.dataset.removeTwoPayContainer;
       if (!removeId) return;
       if (existingContainerIds.has(String(removeId))) removedContainerIds.add(String(removeId));
       renderContainerRows(collectContainerRows(true).filter((line) => String(line.id) !== String(removeId)));
+      updateTwoPayFinancials("containers");
     });
     containerRowsElement?.addEventListener("input", () => {
-      updateContainerTotals();
+      updateTwoPayFinancials("containers");
       refreshBrokerOptions();
     });
     containerRowsElement?.addEventListener("change", () => {
-      updateContainerTotals();
+      updateTwoPayFinancials("containers");
       refreshBrokerOptions();
     });
     addBrokerRowButton?.addEventListener("click", () => {
       const lines = collectBrokerRows(true);
       lines.push(normalizeBrokerRow());
       renderBrokerRows(lines);
+      updateTwoPayFinancials("brokers");
     });
     brokerRowsElement?.addEventListener("click", (event) => {
       const removeId = event.target.closest("[data-remove-two-pay-broker]")?.dataset.removeTwoPayBroker;
       if (!removeId) return;
       if (existingBrokerIds.has(String(removeId))) removedBrokerIds.add(String(removeId));
       renderBrokerRows(collectBrokerRows(true).filter((line) => String(line.id) !== String(removeId)));
+      updateTwoPayFinancials("brokers");
     });
-    brokerRowsElement?.addEventListener("input", () => updateBrokerTotal());
+    brokerRowsElement?.addEventListener("input", () => updateTwoPayFinancials("brokers"));
     brokerRowsElement?.addEventListener("change", (event) => {
       if (event.target?.name === "twoPayBrokerContainerRef") {
         const selectedRef = event.target.value;
@@ -7957,11 +8057,11 @@
           if (sizeSelect && [...sizeSelect.options].some((option) => option.value === linkedContainer.containerSize)) sizeSelect.value = linkedContainer.containerSize;
         }
       }
-      updateBrokerTotal();
+      updateTwoPayFinancials("brokers");
     });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      updateBalances();
+      updateTwoPayFinancials();
       const raw = Object.fromEntries(new FormData(form).entries());
       const normalized = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, String(value || "").trim()]));
       ["twoPayContainerNo", "twoPayContainerSize", "twoPayContainerTruckNo", "twoPayContainerQuantity", "twoPayContainerFreight", "twoPayContainerReceivable",
@@ -7978,8 +8078,12 @@
       normalized.roadFreightTwoPay = containerLines.reduce((sum, line) => sum + Number(line.roadFreightTwoPay || 0), 0);
       normalized.globalReceivable = containerLines.reduce((sum, line) => sum + Number(line.globalReceivable || 0), 0);
       normalized.quantity = containerLines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+      normalized.billingAmount = normalized.roadFreightTwoPay + normalized.detentionCharges;
+      normalized.partyCollection = normalized.roadFreightTwoPay - normalized.globalReceivable;
       normalized.partyBalance = normalized.partyCollection - normalized.partyCollectionPaidAmount;
       normalized.receivedBalance = normalized.billingAmount - normalized.receivedAmount;
+      const totalBrokerAmount = brokerLines.reduce((sum, line) => sum + (line.amount === "" || line.amount == null ? 0 : Number(line.amount || 0)), 0);
+      normalized.pnl = normalized.globalReceivable - totalBrokerAmount;
       normalized.id = editingId || createId();
       normalized.twoPayDetailsSyncPending = true;
       normalized.twoPayPendingRemovedContainerIds = [...removedContainerIds];
@@ -9696,9 +9800,9 @@
           credit: entry.type === "Credit" ? money(entry.amount) : "-",
           balance: runningBalance === 0
             ? "0"
-            : `${money(Math.abs(runningBalance))} ${runningBalance > 0
-              ? (isPayable ? "Outstanding" : "(-)")
-              : (isPayable ? "Advance" : "(+)")}`
+            : `${money(Math.abs(runningBalance))}${runningBalance > 0
+              ? (isPayable ? "" : " (-)")
+              : (isPayable ? " (Advance)" : " (+)")}`.trim()
         };
       });
 
@@ -9813,7 +9917,9 @@
         didParseCell(data) {
           if (data.section === "body" && data.column.index === 4) {
             const raw = String(data.cell.raw || "");
-            if (raw.includes("(-)") || raw.includes("Outstanding")) data.cell.styles.textColor = [255, 82, 82];
+            if (raw.includes("(-)") || raw.includes("Outstanding") || (isPayable && !raw.includes("Advance") && raw !== "0")) {
+              data.cell.styles.textColor = [255, 82, 82];
+            }
           }
         },
         margin: { left, right: left }
@@ -9956,9 +10062,9 @@
             <td>${money(totals.debit)}</td>
             <td>${money(totals.credit)}</td>
             <td class="${totals.closingBalance > 0 ? "debit-text" : totals.closingBalance < 0 ? "credit-text" : ""}">${money(Math.abs(totals.closingBalance))}${totals.closingBalance > 0
-            ? (isPayable ? " Outstanding" : " (-)")
+            ? (isPayable ? "" : " (-)")
             : totals.closingBalance < 0
-              ? (isPayable ? " Advance Paid" : " (+)")
+              ? (isPayable ? " (Advance Paid)" : " (+)")
               : ""}</td>
             <td>${(account.entries || []).length}</td>
             <td>
@@ -10029,7 +10135,7 @@
           <strong>Rs ${money(Math.abs(totals.closingBalance))}</strong>
           <small>${totals.hasEntries
           ? (totals.closingBalance > 0
-            ? (isPayable ? "Outstanding" : "Debit (-)")
+            ? (isPayable ? "Payable" : "Debit (-)")
             : totals.closingBalance < 0
               ? (isPayable ? "Advance Paid" : "Credit (+)")
               : "Settled")
@@ -10070,9 +10176,9 @@
             <td class="st-cell-balance amount-cell ${runningBalance > 0 ? "debit-text" : runningBalance < 0 ? "credit-text" : ""}" data-label="${isPayable ? "Outstanding" : "Balance"}">
               <span class="st-amount-value">${runningBalance === 0
             ? "0"
-            : `${money(Math.abs(runningBalance))} ${runningBalance > 0
-              ? (isPayable ? "Outstanding" : "(-)")
-              : (isPayable ? "Advance" : "(+)")}`}</span>
+            : `${money(Math.abs(runningBalance))}${runningBalance > 0
+              ? (isPayable ? "" : " (-)")
+              : (isPayable ? " (Advance)" : " (+)")}`.trim()}</span>
             </td>
             <td class="st-cell-actions" data-label="Actions">
               <div class="table-actions">
@@ -10570,13 +10676,13 @@
     pdf.setTextColor(...voucherNavy);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(18);
-    pdf.text("Global Transport Logistic Services", pageWidth / 2, bannerY + 76, { align: "center" });
+    pdf.text("Global Transport & Logistic Services", pageWidth / 2, bannerY + 76, { align: "center" });
 
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9.5);
     pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi", pageWidth / 2, bannerY + 93, { align: "center" });
-    pdf.text("Contact No. 021-328 62660 / 0300-1234567", pageWidth / 2, bannerY + 107, { align: "center" });
-    pdf.text("E-mail ID: info@gtls.com.pk", pageWidth / 2, bannerY + 121, { align: "center" });
+    // pdf.text("Contact No. 021-328 62660 / 0300-1234567", pageWidth / 2, bannerY + 107, { align: "center" });
+    // pdf.text("E-mail ID: info@gtls.com.pk", pageWidth / 2, bannerY + 121, { align: "center" });
 
     // Metadata lines: Pay To, PV No., Pay By, Date
     const leftLabelX = 36;
@@ -10834,6 +10940,105 @@
     pdf.save("payment-voucher-summary.pdf");
   }
 
+  async function buildFundBalanceSummaryPdf(entries, filterTitle = "All Fund Entries") {
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("l", "pt", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const letterhead = await loadInvoiceTemplateDataUrl();
+    const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    const headerHeight = 110;
+    const headerWidth = headerHeight * (1131 / 270);
+    const headerX = 36;
+    const titleY = summaryTitleY(headerHeight);
+    if (letterheadHeader) {
+      pdf.addImage(letterheadHeader, "JPEG", headerX, 10, headerWidth, headerHeight);
+    }
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text("FUND BALANCE ENTRIES SUMMARY", 36, titleY);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(11);
+    pdf.text(String(filterTitle || "All Records"), 36, titleY + 20);
+
+    const totalAmount = entries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const headers = ["S.No", "Date", "Entry Type", "From Account / Source", "Banker", "Remarks", "Amount (PKR)"];
+    const body = entries.map((e, index) => [
+      String(index + 1),
+      formatShortDate(e.entryDate),
+      e.entryType === "opening_balance" ? "Opening Fund Balance" : "Funds Added",
+      text(e.sourceAccount || "-"),
+      text(e.reference || "-"),
+      text(e.remarks || "-"),
+      money(e.amount)
+    ]);
+    const foot = ["", "", "", "", "", "Total Amount", money(totalAmount)];
+
+    pdf.autoTable({
+      startY: titleY + 34,
+      margin: { top: 36, bottom: 65, left: 28, right: 28 },
+      theme: "grid",
+      showFoot: "lastPage",
+      head: [headers],
+      body,
+      foot: [foot],
+      styles: {
+        fontSize: 9.5,
+        cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
+        lineColor: [40, 40, 40],
+        lineWidth: 0.65,
+        textColor: [0, 0, 0],
+        valign: "middle"
+      },
+      headStyles: {
+        fillColor: SUMMARY_PDF_HEADER_FILL,
+        textColor: SUMMARY_PDF_HEADER_TEXT,
+        fontSize: 9.5,
+        fontStyle: "bold",
+        minCellHeight: 34,
+        halign: "center",
+        valign: "middle"
+      },
+      footStyles: {
+        fillColor: [248, 234, 220],
+        textColor: [24, 48, 77],
+        fontStyle: "bold",
+        fontSize: 10,
+        minCellHeight: 28,
+        valign: "middle"
+      },
+      columnStyles: {
+        0: { cellWidth: 35, halign: "center" },
+        1: { cellWidth: 80, halign: "center" },
+        2: { cellWidth: 120, halign: "center" },
+        3: { cellWidth: 140 },
+        4: { cellWidth: 110 },
+        5: { cellWidth: "auto" },
+        6: { cellWidth: 110, halign: "right" }
+      },
+      didParseCell: (data) => {
+        if (data.section === "foot") {
+          if (data.column.index === 5) data.cell.styles.halign = "right";
+          if (data.column.index === 6) data.cell.styles.halign = "right";
+        }
+      }
+    });
+
+    const totalPages = pdf.internal.getNumberOfPages();
+    pdf.setPage(totalPages);
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(0.8);
+    pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
+
+    pdf.save("fund-balance-summary.pdf");
+  }
+
   function paymentVoucherPage(store) {
     const form = document.querySelector("[data-voucher-form]");
     const fundForm = document.querySelector("[data-voucher-fund-form]");
@@ -10856,6 +11061,16 @@
     const fundResetBtn = document.querySelector("[data-voucher-fund-reset]");
     const fundTableBody = document.querySelector("[data-voucher-fund-rows]");
     const fundNotice = document.querySelector("[data-voucher-fund-notice]");
+
+    const fundSearchInput = document.querySelector("[data-voucher-fund-search]");
+    const fundTypeFilter = document.querySelector("[data-voucher-fund-type-filter]");
+    const fundSourceFilter = document.querySelector("[data-voucher-fund-source-filter]");
+    const fundStartDateInput = document.querySelector("[data-voucher-fund-start-date]");
+    const fundEndDateInput = document.querySelector("[data-voucher-fund-end-date]");
+    const fundDateOrderSelect = document.querySelector("[data-voucher-fund-date-order]");
+    const fundCountBadge = document.querySelector("[data-voucher-fund-count]");
+    const downloadFundSummaryBtn = document.querySelector("[data-download-voucher-fund-summary]");
+    const clearFundFiltersBtn = document.querySelector("[data-clear-voucher-fund-filters]");
 
     const searchInput = document.querySelector("[data-voucher-search]");
     const payeeFilter = document.querySelector("[data-voucher-payee-filter]");
@@ -10915,12 +11130,59 @@
       return { openingBalance, addedFunds, disbursed, availableBalance: openingBalance + addedFunds - disbursed };
     }
 
+    function getFilteredFundRows() {
+      const query = String(fundSearchInput?.value || "").trim().toLowerCase();
+      const type = String(fundTypeFilter?.value || "").trim();
+      const source = String(fundSourceFilter?.value || "").trim().toLowerCase();
+      const start = String(fundStartDateInput?.value || "").trim();
+      const end = String(fundEndDateInput?.value || "").trim();
+      const order = fundDateOrderSelect?.value || "desc";
+
+      return (store.paymentVoucherFunds || [])
+        .filter((item) => !type || item.entryType === type)
+        .filter((item) => !source || String(item.sourceAccount || "").trim().toLowerCase() === source)
+        .filter((item) => !start || String(item.entryDate || "") >= start)
+        .filter((item) => !end || String(item.entryDate || "") <= end)
+        .filter((item) => {
+          if (!query) return true;
+          const typeLabel = item.entryType === "opening_balance" ? "opening fund balance" : "funds added";
+          const searchTargets = [
+            item.entryDate,
+            formatShortDate(item.entryDate),
+            item.entryType,
+            typeLabel,
+            item.sourceAccount,
+            item.reference,
+            item.remarks,
+            String(item.amount || ""),
+            money(item.amount)
+          ];
+          return searchTargets.some((val) => String(val || "").toLowerCase().includes(query));
+        })
+        .sort((left, right) => {
+          const comp = String(left.entryDate || "").localeCompare(String(right.entryDate || "")) || String(left.id || "").localeCompare(String(right.id || ""));
+          return order === "asc" ? comp : -comp;
+        });
+    }
+
+    function renderFundSourceFilter() {
+      if (!fundSourceFilter) return;
+      const currentSource = fundSourceFilter.value;
+      const sources = [...new Set((store.paymentVoucherFunds || [])
+        .map((item) => String(item.sourceAccount || "").trim())
+        .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+      fundSourceFilter.innerHTML = `<option value="">All Sources</option>${sources.map((s) => `<option value="${escapeHtml(s.toLowerCase())}">${escapeHtml(s)}</option>`).join("")}`;
+      fundSourceFilter.value = sources.map((s) => s.toLowerCase()).includes(currentSource) ? currentSource : "";
+    }
+
     function renderFundEntries() {
-      const entries = [...(store.paymentVoucherFunds || [])].sort((a, b) =>
-        String(b.entryDate || "").localeCompare(String(a.entryDate || "")) || String(b.id || "").localeCompare(String(a.id || ""))
-      );
+      renderFundSourceFilter();
+      const entries = getFilteredFundRows();
+      if (fundCountBadge) fundCountBadge.textContent = `${entries.length} entry(ies)`;
+
       if (!entries.length) {
-        fundTableBody.innerHTML = '<tr><td colspan="7" class="empty-state">No fund balance entries yet.</td></tr>';
+        fundTableBody.innerHTML = '<tr><td colspan="7" class="empty-state">No matching fund balance entries found.</td></tr>';
         return;
       }
       fundTableBody.innerHTML = entries.map((entry) => `
@@ -11385,6 +11647,36 @@
         await buildPaymentVoucherSummaryPdf(rows, payeeText);
       } catch (err) {
         setNotice(`Summary download failed: ${err.message}`, true);
+      }
+    });
+
+    [fundSearchInput, fundTypeFilter, fundSourceFilter, fundStartDateInput, fundEndDateInput, fundDateOrderSelect].filter(Boolean).forEach((el) => {
+      el.addEventListener(el === fundSearchInput ? "input" : "change", renderFundEntries);
+    });
+
+    clearFundFiltersBtn?.addEventListener("click", () => {
+      if (fundSearchInput) fundSearchInput.value = "";
+      if (fundTypeFilter) fundTypeFilter.value = "";
+      if (fundSourceFilter) fundSourceFilter.value = "";
+      if (fundStartDateInput) fundStartDateInput.value = "";
+      if (fundEndDateInput) fundEndDateInput.value = "";
+      if (fundDateOrderSelect) fundDateOrderSelect.value = "desc";
+      renderFundEntries();
+    });
+
+    downloadFundSummaryBtn?.addEventListener("click", async () => {
+      const rows = getFilteredFundRows();
+      if (!rows.length) {
+        setFundNotice("No fund balance entries match the selected filters.", true);
+        return;
+      }
+      try {
+        const typeText = fundTypeFilter?.value
+          ? (fundTypeFilter.value === "opening_balance" ? "Opening Fund Balance" : "Funds Added")
+          : (fundSourceFilter?.value ? `Source: ${fundSourceFilter.options[fundSourceFilter.selectedIndex]?.text}` : "All Fund Entries");
+        await buildFundBalanceSummaryPdf(rows, typeText);
+      } catch (err) {
+        setFundNotice(`Summary download failed: ${err.message}`, true);
       }
     });
 

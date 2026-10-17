@@ -129,8 +129,8 @@
             <input id="voucher-fund-amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0" required />
           </div>
           <div class="field half">
-            <label for="voucher-fund-reference">Reference</label>
-            <input id="voucher-fund-reference" name="reference" placeholder="Withdrawal slip / transaction reference" />
+            <label for="voucher-fund-reference">Banker</label>
+            <input id="voucher-fund-reference" name="reference" placeholder="Bank / Branch / Transaction reference" />
           </div>
           <div class="field half">
             <label for="voucher-fund-remarks">Remarks</label>
@@ -141,9 +141,54 @@
             <button class="btn" type="button" data-voucher-fund-reset>Clear Form</button>
           </div>
         </form>
+
+        <div class="screen-head voucher-register-head" style="margin-top: 24px;">
+          <div>
+            <h3>Fund Balance History</h3>
+          </div>
+          <div class="ledger-filter voucher-toolbar">
+            <div class="ledger-filter-control ledger-filter-search">
+              <label for="voucher-fund-search">General Filter</label>
+              <input id="voucher-fund-search" type="search" placeholder="Search fund entries..." data-voucher-fund-search />
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-fund-type-filter">Entry Type</label>
+              <select id="voucher-fund-type-filter" data-voucher-fund-type-filter>
+                <option value="">All Types</option>
+                <option value="fund_added">Funds Added</option>
+                <option value="opening_balance">Opening Fund Balance</option>
+              </select>
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-fund-source-filter">From Account / Source</label>
+              <select id="voucher-fund-source-filter" data-voucher-fund-source-filter>
+                <option value="">All Sources</option>
+              </select>
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-fund-start-date">Start Date</label>
+              <input id="voucher-fund-start-date" type="date" data-voucher-fund-start-date />
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-fund-end-date">End Date</label>
+              <input id="voucher-fund-end-date" type="date" data-voucher-fund-end-date />
+            </div>
+            <div class="ledger-filter-control">
+              <label for="voucher-fund-date-order">Date Order</label>
+              <select id="voucher-fund-date-order" data-voucher-fund-date-order>
+                <option value="desc" selected>Sort Z to A</option>
+                <option value="asc">Sort A to Z</option>
+              </select>
+            </div>
+            <span class="ledger-count" data-voucher-fund-count>0 entry(ies)</span>
+            <button class="btn primary voucher-summary-download" type="button" data-download-voucher-fund-summary>Download Summary</button>
+            <button class="btn small" type="button" data-clear-voucher-fund-filters>Clear Filters</button>
+          </div>
+        </div>
+
         <div class="table-wrap voucher-fund-table-wrap">
           <table class="ledger-table voucher-fund-table">
-            <thead><tr><th>Date</th><th>Entry Type</th><th>From Account / Source</th><th>Reference</th><th>Remarks</th><th class="text-right">Amount (PKR)</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Date</th><th>Entry Type</th><th>From Account / Source</th><th>Banker</th><th>Remarks</th><th class="text-right">Amount (PKR)</th><th>Actions</th></tr></thead>
             <tbody data-voucher-fund-rows><tr><td colspan="7" class="empty-state">No cash balance entries yet.</td></tr></tbody>
           </table>
         </div>
@@ -293,6 +338,6 @@
   <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261016-2"></script>
+<script src="app.js?v=20261017-4"></script>
 </body>
 </html>
