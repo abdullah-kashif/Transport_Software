@@ -20,6 +20,7 @@ alter table public.truck_jobs add column if not exists import_payment_received_d
 alter table public.truck_jobs add column if not exists export_payment_received_date date;
 alter table public.truck_jobs add column if not exists diesel_expense numeric default 0;
 alter table public.truck_jobs add column if not exists salary numeric not null default 0;
+alter table public.truck_jobs add column if not exists total_distance_km numeric not null default 0;
 alter table public.truck_jobs add column if not exists additional_import_details jsonb not null default '[]'::jsonb;
 alter table public.truck_jobs add column if not exists additional_export_details jsonb not null default '[]'::jsonb;
 
@@ -55,6 +56,21 @@ create index if not exists truck_import_details_import_date_idx on public.truck_
 create index if not exists truck_import_details_truck_no_idx on public.truck_import_details(import_truck_no);
 create index if not exists truck_export_details_load_date_idx on public.truck_export_details(export_load_date);
 create index if not exists truck_export_details_truck_no_idx on public.truck_export_details(export_truck_no);
+
+create table if not exists public.truck_fuel_refills (
+  id uuid primary key default gen_random_uuid(),
+  job_no text not null references public.truck_jobs(job_no) on update cascade on delete cascade,
+  fuel_station text,
+  fuel_quantity_liters numeric,
+  amount_pkr numeric,
+  refill_date date,
+  running_meter numeric,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists truck_fuel_refills_job_sort_idx
+  on public.truck_fuel_refills(job_no, sort_order);
 alter table public.equipment_fleet add column if not exists original_documents_path text;
 alter table public.equipment_fleet add column if not exists type_of_body text;
 alter table public.equipment_fleet add column if not exists ownership text;
@@ -73,6 +89,7 @@ alter table public.booking_brokers add column if not exists container_size text;
 alter table public.bookings add column if not exists broker_entries jsonb default '[]'::jsonb;
 alter table public.two_pay_records add column if not exists customer_name text;
 alter table public.two_pay_records add column if not exists customer_address text;
+alter table public.two_pay_records add column if not exists broker_remarks text;
 
 create table if not exists public.two_pay_containers (
   id uuid primary key default gen_random_uuid(),
@@ -190,6 +207,8 @@ grant select, insert, update, delete on table public.booking_brokers to authenti
 grant select, insert, update, delete on table public.truck_jobs to authenticated, service_role;
 grant select, insert, update on table public.truck_import_details, public.truck_export_details to authenticated;
 grant all on table public.truck_import_details, public.truck_export_details to service_role;
+grant select, insert, update, delete on table public.truck_fuel_refills to authenticated;
+grant all on table public.truck_fuel_refills to service_role;
 grant select, insert, update, delete on table public.employees to authenticated, service_role;
 grant select, insert, update, delete on table public.accounts to authenticated, service_role;
 grant select, insert, update, delete on table public.account_entries to authenticated, service_role;
@@ -366,6 +385,38 @@ create policy truck_export_details_update_access on public.truck_export_details
 for update to authenticated using (public.is_active_user() and public.has_module_access('truck'))
 with check (public.is_active_user() and public.has_module_access('truck'));
 
+alter table public.truck_fuel_refills enable row level security;
+drop policy if exists truck_fuel_refills_read_access on public.truck_fuel_refills;
+create policy truck_fuel_refills_read_access on public.truck_fuel_refills
+for select to authenticated using (public.is_active_user() and (
+  public.has_module_access('truck') or public.has_module_access('truck-summary')
+  or public.has_module_access('completed-truck-summary')
+));
+drop policy if exists truck_fuel_refills_insert_access on public.truck_fuel_refills;
+create policy truck_fuel_refills_insert_access on public.truck_fuel_refills
+for insert to authenticated with check (public.is_active_user() and public.has_module_access('truck'));
+drop policy if exists truck_fuel_refills_update_access on public.truck_fuel_refills;
+create policy truck_fuel_refills_update_access on public.truck_fuel_refills
+for update to authenticated using (public.is_active_user() and public.has_module_access('truck'))
+with check (public.is_active_user() and public.has_module_access('truck'));
+drop policy if exists truck_fuel_refills_delete_access on public.truck_fuel_refills;
+create policy truck_fuel_refills_delete_access on public.truck_fuel_refills
+for delete to authenticated using (public.is_active_user() and public.has_module_access('truck'));
+
+create table if not exists public.payment_voucher_bank_accounts (
+  id text primary key,
+  bank_name text not null,
+  account_title text,
+  account_number text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists payment_voucher_bank_accounts_name_number_uq
+  on public.payment_voucher_bank_accounts (
+    lower(btrim(bank_name)),
+    regexp_replace(btrim(account_number), '[[:space:]-]+', '', 'g')
+  );
+
 create table if not exists public.payment_vouchers (
   id text primary key,
   pv_no text not null,
@@ -373,6 +424,7 @@ create table if not exists public.payment_vouchers (
   pay_to text not null,
   pay_by text,
   account_no text,
+  bank_account_id text references public.payment_voucher_bank_accounts(id) on delete restrict,
   prepared_by text,
   received_by text,
   total_amount numeric default 0,
@@ -386,6 +438,7 @@ create table if not exists public.payment_voucher_funds (
   id text primary key,
   entry_type text not null check (entry_type in ('opening_balance', 'fund_added')),
   entry_date date not null,
+  bank_account_id text references public.payment_voucher_bank_accounts(id) on delete restrict,
   source_account text,
   reference text,
   remarks text,
@@ -393,9 +446,21 @@ create table if not exists public.payment_voucher_funds (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create unique index if not exists payment_voucher_funds_single_opening_balance
+alter table public.payment_vouchers
+  add column if not exists bank_account_id text references public.payment_voucher_bank_accounts(id) on delete restrict;
+alter table public.payment_voucher_funds
+  add column if not exists bank_account_id text references public.payment_voucher_bank_accounts(id) on delete restrict;
+drop index if exists public.payment_voucher_funds_single_opening_balance;
+create unique index if not exists payment_voucher_funds_single_opening_balance_per_bank
+  on public.payment_voucher_funds (bank_account_id)
+  where entry_type = 'opening_balance' and bank_account_id is not null;
+create unique index if not exists payment_voucher_funds_single_unassigned_opening
   on public.payment_voucher_funds (entry_type)
-  where entry_type = 'opening_balance';
+  where entry_type = 'opening_balance' and bank_account_id is null;
+create index if not exists payment_voucher_funds_bank_account_date_idx
+  on public.payment_voucher_funds (bank_account_id, entry_date);
+create index if not exists payment_vouchers_bank_account_date_idx
+  on public.payment_vouchers (bank_account_id, voucher_date);
 
 grant select, insert, update, delete on table public.payment_vouchers to authenticated, service_role;
 
@@ -428,6 +493,15 @@ with check (public.is_active_user() and public.has_module_access('two-pay-record
 alter table public.payment_vouchers enable row level security;
 drop policy if exists "payment_vouchers_module_access" on public.payment_vouchers;
 create policy "payment_vouchers_module_access" on public.payment_vouchers
+for all to authenticated
+using (public.is_active_user() and public.has_module_access('payment-voucher'))
+with check (public.is_active_user() and public.has_module_access('payment-voucher'));
+
+alter table public.payment_voucher_bank_accounts enable row level security;
+revoke all privileges on table public.payment_voucher_bank_accounts from anon, public;
+grant select, insert, update, delete on table public.payment_voucher_bank_accounts to authenticated, service_role;
+drop policy if exists payment_voucher_bank_accounts_module_access on public.payment_voucher_bank_accounts;
+create policy payment_voucher_bank_accounts_module_access on public.payment_voucher_bank_accounts
 for all to authenticated
 using (public.is_active_user() and public.has_module_access('payment-voucher'))
 with check (public.is_active_user() and public.has_module_access('payment-voucher'));

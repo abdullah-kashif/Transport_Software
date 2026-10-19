@@ -7,7 +7,7 @@
   <title>GTLS Transport - Two Pay Records</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261016-1" />
+  <link rel="stylesheet" href="styles.css?v=20261019-1" />
 </head>
 
 <body data-page="two-pay-records">
@@ -150,6 +150,11 @@
                 <span>Action</span>
               </div>
               <div data-two-pay-broker-rows class="broker-rows"></div>
+              <div class="two-pay-broker-remarks">
+                <label for="two-pay-broker-remarks">Remarks</label>
+                <textarea id="two-pay-broker-remarks" name="brokerRemarks" rows="2"
+                  placeholder="Enter trucker / broker details remarks..."></textarea>
+              </div>
               <div class="broker-footer two-pay-broker-footer">
                 <button class="btn" type="button" data-add-two-pay-broker>Add Broker Row</button>
                 <div class="broker-summary" aria-live="polite">
@@ -220,7 +225,7 @@
                 <th>Payment/Cheque/IBFT</th>
                 <th>Broker Payment Date</th>
                 <th>Broker Payment Status</th>
-                <th>P&amp;L</th>
+                <th>Broker Remarks</th>
                 <th>Bill No</th>
                 <th>Party Collection</th>
                 <th>Party Collection Paid Amount</th>
@@ -231,6 +236,7 @@
                 <th>Received Balance</th>
                 <th>Received Date</th>
                 <th>Received ID</th>
+                <th>P&amp;L</th>
                 <th>Received Remarks</th>
                 <th>Action</th>
               </tr>
@@ -245,7 +251,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="app.js?v=20261017-3"></script>
+<script src="app.js?v=20261019-13"></script>
 </body>
 
 </html>

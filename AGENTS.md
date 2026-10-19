@@ -1,5 +1,33 @@
 # GTLS Transport Software - AI & Agent Instructions
 
+- **2026-10-19**: Corrected the historical Truck Details Diesel Consumption unit: the previously saved `truck_jobs.diesel_expense` number represented litres. Existing values remain untouched in the database and are now displayed as a read-only “Previous Diesel Consumption (Litres)” refill row, included in total litres and Fuel Average, but excluded from refill amount and all financial calculations. Removed the separate legacy-PKR ledger/PDF column. No database change or migration is needed just to display historical litres; the refill-table migration is still needed to save new repeatable refills remotely. Bumped shared app cache keys to `20261019-13` and Truck Details stylesheet cache to `20261019-13`.
+
+- **2026-10-19**: Replaced the Truck Details Diesel Consumption input with repeatable Fuel Refill Details (station, litres, amount, date, and manually entered running meter). Added one job-level Total Distance Covered field and a calculated Fuel Average (distance ÷ total litres). Refill amounts, meter readings, distance, and average stay outside Grand Total, Round Trip Expense, and P&L. Historical `diesel_expense` values remain unchanged and visible as legacy data. Added relational `truck_fuel_refills`, `truck_jobs.total_distance_km`, module-scoped authenticated RLS, explicit-ID-only child deletion, and the additive migration `supabase-truck-fuel-refills.sql`; no existing rows are removed. Run this migration before deploying. Updated the Truck Trip Ledger and A3 summary PDF, including separate refill rows and legacy value totals. Bumped shared `app.js` cache keys to `20261019-12` and Truck Details stylesheet cache to `20261019-12`.
+
+- **2026-10-19**: Moved the Two Pay Register's **P&L** column immediately before **Received Remarks**. Updated the matching row renderer so each value remains under its correct header. Display-only change; calculations, saved data, filters, and database schema are unchanged. Bumped shared `app.js` cache keys to `20261019-11` across HTML pages.
+
+- **2026-10-19**: Audited Two Pay Brokers against the source form and relational child rows. The summary now displays every broker detail field, including Broker Remarks, separate stable Two Pay Record ID and Broker Detail ID, plus a view-only S.No. Record Date filters/sorting are explicit and same-date rows sort deterministically while broker rows retain their saved order. No data/schema changes; bumped shared `app.js` caches to `20261019-10` and the broker-summary stylesheet cache to `20261019-3`.
+
+- **2026-10-19**: Added **Booking Brokers** and **Two Pay Brokers** tabs to Trucker/Broker Summary. Booking data remains in its own tab; Two Pay summary reads existing `twoPayBrokerRows` and keeps independent search, broker/status/date filters, totals, table, and PDF downloads. No database or saved-record change; bumped shared `app.js` cache keys to `20261019-9` and the broker-summary stylesheet cache key to `20261019-2`.
+
+- **2026-10-19**: Added a section-level **Remarks** field to Two Pay Records > Trucker / Broker Details, immediately above Add Broker Row. It saves and hydrates separately from Received Remarks, is searchable in the register, and appears in the register and individual invoice PDF. Added nullable `two_pay_records.broker_remarks` with `supabase-two-pay-broker-remarks.sql`; existing records remain unchanged. Bumped shared app.js cache keys to `20261019-8` and the Two Pay stylesheet cache to `20261019-1`.
+
+- **2026-10-19**: Added a Bank Account dropdown to Payment Voucher Register. It filters voucher rows, count, summary cards, and Download Summary by Paid From Bank Account; **No Bank Account Linked** includes cash/unassigned/older vouchers. View-only change; no saved data or database schema changes. Bumped shared app.js cache keys to `20261019-7` and the Payment Voucher stylesheet cache to `20261019-6`.
+
+- **2026-10-19**: Moved Payment Voucher totals to the top of the Vouchers tab and Fund Balance cards to the top of the Bank & Funds tab. Each card group stays with its own tab; filters, calculations, saved records, and database behavior are unchanged. Layout-only update.
+
+- **2026-10-19**: Grouped Payment Voucher form fields so Prepared By and Received By stay together, and Bank & Funds Amount and Remarks stay together on wider screens and stack on mobile. Layout-only change; saved records, database schema, and sync behavior are unchanged. Bumped the Payment Voucher stylesheet cache key to `20261019-5`.
+
+- **2026-10-19**: Removed Banker from the Payment Voucher > Bank & Funds entry form, fund history table, search, and summary PDF. Remarks now uses the full form row. Existing `reference` values remain stored and are preserved when editing older entries; new entries leave them blank. No database change. Bumped shared `app.js` cache keys to `20261019-6`.
+
+- **2026-10-19**: Combined Create Voucher and Voucher Register into one **Vouchers** tab. The voucher form stays above the register, with register filters, summary cards, and table below it; Bank & Funds remains separate. This is a display-only change: saved records, sync behavior, and database schema are unchanged. Bumped shared `app.js` cache keys to `20261019-4` and the Payment Voucher stylesheet key to `20261019-4`.
+
+- **2026-10-19**: Reorganized Payment Voucher into Create Voucher, Voucher Register, and Bank & Funds tabs to keep each task focused. Voucher summary cards now live with the register; bank setup, fund entry, balance cards, and fund history are grouped under Bank & Funds. Register Edit opens the voucher form tab, and tab controls support arrow-key navigation. Added spacing between section headings; no saved data or database schema changed. Bumped shared `app.js` cache keys to `20261019-3` and Payment Voucher `styles.css` key to `20261019-3`.
+
+- **2026-10-19**: Payment Voucher line items now include a conditional Clearance Date for Cheque and Pay Order. Blank dates display Not Cleared; entered dates display Cleared with the date in the register, individual voucher PDFs, and summary PDFs. Dates are stored in the existing `items` JSONB, so no database migration is needed. Bumped shared `app.js` cache keys to `20261019-2` and the Payment Voucher stylesheet key to `20261019-2`.
+
+- **2026-10-19**: Payment Voucher now has a reusable bank account register (Bank Name, optional Account Title, Bank Account No.). Fund entries and vouchers link to a bank with nullable `bank_account_id` foreign keys; one opening balance is allowed per bank. The Bank Name filter updates Opening Balance, Funds Added, Voucher Payments, and Balance Amount cards. Vouchers show the paid-from account in the register and PDFs. Existing entries are retained as unassigned until edited and linked. Added `supabase-payment-voucher-bank-accounts.sql` and updated the master and module setup SQL with authenticated module-scoped RLS; the bank account sync is non-pruning. Run the new migration before deploying. Bumped the shared app.js cache key to `20261019-1` across HTML pages and the Payment Voucher stylesheet key to `20261019-1`.
+
 - **2026-10-17**: Updated the field name and column header from "Reference" to "Banker" in Payment Voucher (`payment-voucher.html` / `app.js`). Applied across the Fund Balance Entries form label, input placeholder, Fund Balance History table header (`<th>Banker</th>`), and the Fund Balance summary PDF export header array, preserving backend column mapping for complete persistence compatibility. Bumped `payment-voucher.html` script asset cache key to `app.js?v=20261017-4`.
 
 - **2026-10-17**: Removed repetitive "Outstanding" keyword label from the balance cells in Accounts Payable (`accounts-payable.html` / `app.js`). Positive payable balances now cleanly display the numeric amount (e.g. `2,500,000`) without the wrapped red text label, preserving single-line formatting across on-screen statement tables, customer account lists, and exported PDF statements. Bumped `accounts-payable.html` asset cache key to `app.js?v=20261017-3`.
@@ -78,36 +106,36 @@
 
 | Module / Page | HTML File | `data-page` Attribute | Handler in `app.js` |
 | :--- | :--- | :--- | :--- |
-| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2240) |
-| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 3847) |
-| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 4019) |
-| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 5364) |
-| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 6165) |
-| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 6838) |
-| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 6838) |
-| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 7353) |
-| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 7547) |
-| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 7892) |
-| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 8277) |
-| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 8603) |
-| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 8633) |
-| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 8881) |
-| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 9033) |
-| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 9033) |
-| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 10980) |
+| **Sign In** | [`index.html`](file:///h:/Transport_Software-main/index.html) | `signin` | `softwareLoginPage()` (~Line 2783) |
+| **Dashboard** | [`dashboard.html`](file:///h:/Transport_Software-main/dashboard.html) | `dashboard` | `dashboardPage()` (~Line 4422) |
+| **Booking Form** | [`booking.html`](file:///h:/Transport_Software-main/booking.html) | `booking` | `bookingPage()` (~Line 4600) |
+| **Booking Summary** | [`ledger.html`](file:///h:/Transport_Software-main/ledger.html) | `ledger` | `ledgerPage()` (~Line 6220) |
+| **Truck Details** | [`truck.html`](file:///h:/Transport_Software-main/truck.html) | `truck` | `truckPage()` (~Line 6762) |
+| **Pending Truck Summary** | [`truck-summary.html`](file:///h:/Transport_Software-main/truck-summary.html) | `truck-summary` | `truckSummaryPage()` (~Line 7612) |
+| **Completed Truck Summary**| [`completed-truck-summary.html`](file:///h:/Transport_Software-main/completed-truck-summary.html) | `completed-truck-summary`| `truckSummaryPage()` (~Line 7612) |
+| **Two Pay Records** | [`two-pay-records.html`](file:///h:/Transport_Software-main/two-pay-records.html) | `two-pay-records` | `twoPayRecordsPage()` (~Line 7935) |
+| **Equipment Fleet** | [`equipment.html`](file:///h:/Transport_Software-main/equipment.html) | `equipment` | `equipmentPage()` (~Line 8700) |
+| **Fleet Maintenance** | [`maintenance.html`](file:///h:/Transport_Software-main/maintenance.html) | `maintenance` | `maintenancePage()` (~Line 9045) |
+| **Employees** | [`employees.html`](file:///h:/Transport_Software-main/employees.html) | `employee` | `employeePage()` (~Line 9430) |
+| **Admin Login** | [`admin-login.html`](file:///h:/Transport_Software-main/admin-login.html) | `admin-login` | `adminLoginPage()` (~Line 9756) |
+| **Admin Users** | [`admin.html`](file:///h:/Transport_Software-main/admin.html) | `admin` | `adminPage()` (~Line 9786) |
+| **Activity Logs** | [`activity-logs.html`](file:///h:/Transport_Software-main/activity-logs.html) | `activity-logs` | `activityLogsPage()` (~Line 10034) |
+| **Accounts Receivable** | [`khata.html`](file:///h:/Transport_Software-main/khata.html) | `khata` | `khataPage()` (~Line 10186) |
+| **Accounts Payable** | [`accounts-payable.html`](file:///h:/Transport_Software-main/accounts-payable.html)| `accounts-payable`| `khataPage()` (~Line 10186) |
+| **Payment Voucher** | [`payment-voucher.html`](file:///h:/Transport_Software-main/payment-voucher.html)| `payment-voucher`| `paymentVoucherPage()` (~Line 11597) |
 
 ---
 
 ## 3. Core Engine Functions in `app.js`
 
-- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 166) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`, `PV-1`.
-- **State Store**: `loadStore()` (~Line 176) & `saveStore(store, options)` (~Line 381).
-- **Audit Logging**: `collectAuditChanges()` (~Line 339), `appendAuditLog()` (~Line 321), `pruneActivityLogs()` (~Line 263).
-- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 475), `signInWithSupabase()` (~Line 506), `enforceSoftwareAccess(page)` (~Line 2269).
-- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 2715), `calculateKhataSummary(account)` (~Line 2758), `calculateTruckTripFinancials(trip)` (~Line 6149), `convertNumberToWords(amount)` (~Line 9951).
-- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3032), `buildSummaryRecordPdf()` (~Line 3196), `createRegisterPdf()` (~Line 2965), `buildTruckDetailsInvoicePdf()` (~Line 6041), `buildPaymentVoucherPdf()` (~Line 10036), `buildPaymentVoucherSummaryPdf()` (~Line 10259), `buildFundBalanceSummaryPdf()` (~Line 10881).
-- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 961), `syncOperationalStore()` (~Line 1660), `hydrateOperationalStore()` (~Line 1685), `syncTruckJobs()` (~Line 1205), `syncPaymentVouchers()` (~Line 1440), `syncPaymentVoucherFunds()` (~Line 1460).
-- **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1004) & `getPrivateDocumentUrl()` (~Line 693) to bucket `gtls-private-documents`.
+- **Sequential IDs**: `getNextSequentialId(items, prefix, field)` (~Line 172) — produces `Job-1`, `EQP-1`, `MNT-1`, `EMP-1`, `ADM-1`, `KHT-1`, `PAYE-1`, `LOG-1`, `PV-1`.
+- **State Store**: `loadStore()` (~Line 182) & `saveStore(store, options)` (~Line 401).
+- **Audit Logging**: `collectAuditChanges()` (~Line 359), `appendAuditLog()` (~Line 341), `pruneActivityLogs()` (~Line 281).
+- **Supabase Session & RBAC**: `getSupabaseSessionUser()` (~Line 498), `signInWithSupabase()` (~Line 529), `enforceSoftwareAccess(page)` (~Line 2732).
+- **Tax & Financial Math**: `calculateBookingTaxBreakdown(rate, detention, authority)` (~Line 3261), `calculateKhataSummary(account)` (~Line 3304), `calculateTruckTripFinancials(trip)` (~Line 6743), `convertNumberToWords(amount)` (~Line 11106).
+- **PDF Generation**: `buildBookingInvoicePdf()` (~Line 3581), `buildSummaryRecordPdf()` (~Line 3746), `createRegisterPdf()` (~Line 3514), `buildTruckDetailsInvoicePdf()` (~Line 6635), `buildPaymentVoucherPdf()` (~Line 11158), `buildPaymentVoucherSummaryPdf()` (~Line 11389), `buildFundBalanceSummaryPdf()` (~Line 11503).
+- **Sync & Debounce**: `scheduleOperationalSync()` (~Line 984), `syncOperationalStore()` (~Line 1830), `hydrateOperationalStore()` (~Line 1859), `syncTruckJobs()` (~Line 1211), `syncPaymentVouchers()` (~Line 1585), `syncPaymentVoucherFunds()` (~Line 1616).
+- **Storage Uploads**: `uploadPrivateDataUrl()` (~Line 1039) & `getPrivateDocumentUrl()` (~Line 723) to bucket `gtls-private-documents`.
 
 ---
 

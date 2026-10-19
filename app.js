@@ -80,6 +80,7 @@
     customerKhatas: [],
     vendorKhatas: [],
     twoPayRecords: [],
+    paymentVoucherBankAccounts: [],
     paymentVouchers: [],
     paymentVoucherFunds: [],
     builtyRecords: []
@@ -235,6 +236,10 @@
 
     if (!Array.isArray(store.paymentVouchers)) {
       store.paymentVouchers = [];
+    }
+
+    if (!Array.isArray(store.paymentVoucherBankAccounts)) {
+      store.paymentVoucherBankAccounts = [];
     }
 
     if (!Array.isArray(store.paymentVoucherFunds)) {
@@ -986,6 +991,7 @@
       twoPayRecords: collectionChanged(previousStore, store, "twoPayRecords"),
       customerKhatas: collectionChanged(previousStore, store, "customerKhatas"),
       vendorKhatas: collectionChanged(previousStore, store, "vendorKhatas"),
+      paymentVoucherBankAccounts: collectionChanged(previousStore, store, "paymentVoucherBankAccounts"),
       paymentVouchers: collectionChanged(previousStore, store, "paymentVouchers"),
       paymentVoucherFunds: collectionChanged(previousStore, store, "paymentVoucherFunds"),
       builtyRecords: collectionChanged(previousStore, store, "builtyRecords"),
@@ -1206,7 +1212,10 @@
     const rows = [];
     const importDetailRows = [];
     const exportDetailRows = [];
+    const fuelRefillRows = [];
+    const removedFuelRefillsByJob = [];
     for (const item of records || []) {
+      const jobNo = item.jobNo || item.id;
       const imagePath = await uploadPrivateDataUrl(
         item.image,
         item.imagePath,
@@ -1215,7 +1224,7 @@
         { replaceFolder: true }
       );
       rows.push({
-        job_no: item.jobNo || item.id, import_truck_no: item.truckNo || "-", import_date: formatIsoDate(item.date),
+        job_no: jobNo, import_truck_no: item.truckNo || "-", import_date: formatIsoDate(item.date),
         customer: item.customer || null, import_origin: item.origin || null, import_destination: item.destination || null,
         import_size: item.size || null, import_weight: item.weight || null, cargo_description: item.cargoDescription || null,
         mty_box_freight: Number(item.mtyBoxFreight || 0), mty_broker: item.mtyBroker || null,
@@ -1246,7 +1255,8 @@
         export_mty_payment_date: formatIsoDate(item.exportMtyPaymentDate) || null,
         export_mty_payment_status: item.exportMtyPaymentStatus === "Credit" ? "Credit" : "Awaited",
         export_remarks: item.exportRemarks || null, grand_total: Number(item.grandTotal || 0),
-        round_trip_expense: Number(item.roundTripExpense || 0), diesel_expense: Number(item.dieselExpense || 0), salary: Number(item.salary || 0),
+        round_trip_expense: Number(item.roundTripExpense || 0), diesel_expense: Number(item.dieselExpense || 0),
+        total_distance_km: Number(item.totalDistanceKm || 0), salary: Number(item.salary || 0),
         profit_loss: Number(item.profitLoss || 0), image_path: imagePath || null,
         updated_at: new Date().toISOString()
       });
@@ -1254,13 +1264,32 @@
         importDetailRows.push({ job_no: item.jobNo || item.id, detail_number: index + 2, ...mapTruckDetailToDatabase(detail, "import") });
       });
       (Array.isArray(item.additionalExportDetails) ? item.additionalExportDetails : []).forEach((detail, index) => {
-        exportDetailRows.push({ job_no: item.jobNo || item.id, detail_number: index + 2, ...mapTruckDetailToDatabase(detail, "export") });
+        exportDetailRows.push({ job_no: jobNo, detail_number: index + 2, ...mapTruckDetailToDatabase(detail, "export") });
       });
+      (Array.isArray(item.fuelRefillRows) ? item.fuelRefillRows : []).forEach((refill, index) => {
+        refill.id = refill.id || makeUuid();
+        fuelRefillRows.push({
+          id: refill.id,
+          job_no: jobNo,
+          fuel_station: String(refill.fuelStation || "").trim() || null,
+          fuel_quantity_liters: refill.fuelQuantityLiters === "" || refill.fuelQuantityLiters == null ? null : Number(refill.fuelQuantityLiters),
+          amount_pkr: refill.fuelAmountPkr === "" || refill.fuelAmountPkr == null ? null : Number(refill.fuelAmountPkr),
+          refill_date: formatIsoDate(refill.refillDate) || null,
+          running_meter: refill.runningMeter === "" || refill.runningMeter == null ? null : Number(refill.runningMeter),
+          sort_order: index,
+          updated_at: new Date().toISOString()
+        });
+      });
+      const removedIds = [...new Set((Array.isArray(item.pendingFuelRefillDeleteIds) ? item.pendingFuelRefillDeleteIds : []).filter(Boolean))];
+      if (removedIds.length) removedFuelRefillsByJob.push({ jobNo, ids: removedIds });
     }
     try {
       await syncRows("truck_jobs", "job_no", rows);
     } catch (error) {
       const msg = String(error?.message || error?.details || "");
+      if (msg.includes("total_distance_km")) {
+        throw new Error("Run supabase-truck-fuel-refills.sql before saving the new Truck Details fuel fields.");
+      }
       if (msg.includes("export_customer") || msg.includes("export_mty") || msg.includes("export_cargo_description") || msg.includes("detention") || msg.includes("payment_term") || msg.includes("customer_collection") || msg.includes("payment_received_date") || error?.code === "PGRST204" || error?.code === "42703") {
         console.warn("Retrying syncTruckJobs without new columns because schema cache / columns are not yet updated:", error.message);
         const fallbackRows = rows.map((r) => {
@@ -1281,6 +1310,7 @@
           delete copy.export_customer_collection;
           delete copy.export_payment_received_date;
           delete copy.export_cheque_details2;
+          delete copy.total_distance_km;
           return copy;
         });
         await syncRows("truck_jobs", "job_no", fallbackRows);
@@ -1291,8 +1321,22 @@
     try {
       if (importDetailRows.length) await syncRows("truck_import_details", "job_no,detail_number", importDetailRows);
       if (exportDetailRows.length) await syncRows("truck_export_details", "job_no,detail_number", exportDetailRows);
+      if (fuelRefillRows.length) await syncRows("truck_fuel_refills", "id", fuelRefillRows);
+      if (removedFuelRefillsByJob.length) {
+        const client = getSupabaseClient();
+        for (const removal of removedFuelRefillsByJob) {
+          const { error } = await client.from("truck_fuel_refills")
+            .delete()
+            .eq("job_no", removal.jobNo)
+            .in("id", removal.ids);
+          if (error) throw error;
+        }
+      }
     } catch (error) {
       const msg = String(error?.message || error?.details || "");
+      if (msg.includes("truck_fuel_refills") || ((error?.code === "PGRST205") && (fuelRefillRows.length || removedFuelRefillsByJob.length))) {
+        throw new Error("Run supabase-truck-fuel-refills.sql before syncing Truck Details fuel records.");
+      }
       if (msg.includes("truck_import_details") || msg.includes("truck_export_details") || error?.code === "PGRST205") {
         throw new Error("Run supabase-truck-multiple-details.sql before syncing additional Import / Export forms.");
       }
@@ -1391,6 +1435,7 @@
       party_collection_paid_date: formatIsoDate(item.partyCollectionPaidDate) || null,
       party_balance: Number(item.partyBalance || 0),
       party_remarks: item.partyRemarks || null,
+      broker_remarks: item.brokerRemarks || null,
       received_amount: Number(item.receivedAmount || 0),
       received_balance: Number(item.receivedBalance || 0),
       received_date: formatIsoDate(item.receivedDate) || null,
@@ -1494,6 +1539,7 @@
       partyCollectionPaidDate: row.party_collection_paid_date ?? local.partyCollectionPaidDate ?? "",
       partyBalance: Number(row.party_balance ?? local.partyBalance ?? 0),
       partyRemarks: row.party_remarks ?? local.partyRemarks ?? "",
+      brokerRemarks: row.broker_remarks ?? local.brokerRemarks ?? "",
       receivedAmount: Number(row.received_amount ?? local.receivedAmount ?? 0),
       receivedBalance: Number(row.received_balance ?? local.receivedBalance ?? 0),
       receivedDate: row.received_date ?? local.receivedDate ?? "",
@@ -1544,6 +1590,7 @@
       pay_to: String(item.payTo || "").trim(),
       pay_by: item.payBy ? String(item.payBy).trim() : null,
       account_no: item.accountNo ? String(item.accountNo).trim() : null,
+      bank_account_id: String(item.paidFromBankAccountId || "").trim() || null,
       prepared_by: item.prepared_by ? String(item.prepared_by).trim() : (item.preparedBy ? String(item.preparedBy).trim() : null),
       received_by: item.received_by ? String(item.received_by).trim() : (item.receivedBy ? String(item.receivedBy).trim() : null),
       total_amount: Number(item.totalAmount || 0),
@@ -1555,11 +1602,23 @@
     await syncRows("payment_vouchers", "id", rows);
   }
 
+  async function syncPaymentVoucherBankAccounts(records) {
+    const rows = (records || []).map((item) => ({
+      id: String(item.id || "").trim(),
+      bank_name: String(item.bankName || "").trim(),
+      account_title: String(item.accountTitle || "").trim() || null,
+      account_number: String(item.accountNumber || "").trim(),
+      updated_at: new Date().toISOString()
+    })).filter((row) => row.id && row.bank_name && row.account_number);
+    await syncRows("payment_voucher_bank_accounts", "id", rows, { pruneMissing: false });
+  }
+
   async function syncPaymentVoucherFunds(records) {
     const rows = (records || []).map((item) => ({
       id: String(item.id || "").trim(),
       entry_type: item.entryType === "opening_balance" ? "opening_balance" : "fund_added",
       entry_date: formatIsoDate(item.entryDate) || getTodayIsoDate(),
+      bank_account_id: String(item.bankAccountId || "").trim() || null,
       source_account: String(item.sourceAccount || "").trim() || null,
       reference: String(item.reference || "").trim() || null,
       remarks: String(item.remarks || "").trim() || null,
@@ -1623,6 +1682,7 @@
       payTo: row.pay_to ?? local.payTo ?? "",
       payBy: row.pay_by ?? local.payBy ?? "GTLS Logistics",
       accountNo: row.account_no ?? local.accountNo ?? "",
+      paidFromBankAccountId: row.bank_account_id ?? local.paidFromBankAccountId ?? "",
       preparedBy: row.prepared_by ?? local.preparedBy ?? "",
       receivedBy: row.received_by ?? local.receivedBy ?? "",
       totalAmount: Number(row.total_amount ?? local.totalAmount ?? 0),
@@ -1636,10 +1696,21 @@
       id: String(row.id || ""),
       entryType: row.entry_type === "opening_balance" ? "opening_balance" : "fund_added",
       entryDate: row.entry_date || "",
+      bankAccountId: row.bank_account_id || "",
       sourceAccount: row.source_account || "",
       reference: row.reference || "",
       remarks: row.remarks || "",
       amount: Number(row.amount || 0),
+      updatedAt: row.updated_at || ""
+    };
+  }
+
+  function mapPaymentVoucherBankAccountFromSupabase(row = {}) {
+    return {
+      id: String(row.id || ""),
+      bankName: row.bank_name || "",
+      accountTitle: row.account_title || "",
+      accountNumber: row.account_number || "",
       updatedAt: row.updated_at || ""
     };
   }
@@ -1759,6 +1830,10 @@
   async function syncOperationalStore(store, changed = {}) {
     if (!getSupabaseClient()) throw new Error("Supabase is not configured or the login session is unavailable.");
     const jobs = [];
+    const canSyncVoucherBanking = hasModuleAccessForSync("payment-voucher");
+    if (canSyncVoucherBanking && (changed.paymentVoucherBankAccounts || changed.paymentVouchers || changed.paymentVoucherFunds)) {
+      await syncPaymentVoucherBankAccounts(store.paymentVoucherBankAccounts || []);
+    }
     if (changed.truckExpenses && hasModuleAccessForSync("truck")) jobs.push(syncTruckJobs(store.truckExpenses));
     if (changed.equipmentFleet && hasModuleAccessForSync("equipment")) jobs.push(syncEquipment(store.equipmentFleet));
     if (changed.maintenanceJobs && hasModuleAccessForSync("maintenance")) jobs.push(syncMaintenance(store.maintenanceJobs));
@@ -1772,8 +1847,8 @@
       const records = Array.isArray(changed.vendorKhataRecords) ? changed.vendorKhataRecords : store.vendorKhatas;
       jobs.push(syncAccounts(records, "payable", { pruneMissing: !Array.isArray(changed.vendorKhataRecords) }));
     }
-    if (changed.paymentVouchers && hasModuleAccessForSync("payment-voucher")) jobs.push(syncPaymentVouchers(store.paymentVouchers));
-    if (changed.paymentVoucherFunds && hasModuleAccessForSync("payment-voucher")) jobs.push(syncPaymentVoucherFunds(store.paymentVoucherFunds));
+    if (changed.paymentVouchers && canSyncVoucherBanking) jobs.push(syncPaymentVouchers(store.paymentVouchers));
+    if (changed.paymentVoucherFunds && canSyncVoucherBanking) jobs.push(syncPaymentVoucherFunds(store.paymentVoucherFunds));
     if (changed.builtyRecords && hasModuleAccessForSync("builty")) jobs.push(syncBuiltyRecords(store.builtyRecords));
     if (changed.activityLogs) jobs.push(syncActivityLogs(store.activityLogs || []));
     const results = await Promise.allSettled(jobs);
@@ -1796,10 +1871,11 @@
       }
       return data || [];
     };
-    const [trucks, truckImportDetails, truckExportDetails, equipment, maintenance, employees, twoPayRecords, twoPayContainers, twoPayBrokers, accounts, logs, paymentVouchers, paymentVoucherFunds, builtyRecords] = await Promise.all([
+    const [trucks, truckImportDetails, truckExportDetails, truckFuelRefills, equipment, maintenance, employees, twoPayRecords, twoPayContainers, twoPayBrokers, accounts, logs, paymentVoucherBankAccounts, paymentVouchers, paymentVoucherFunds, builtyRecords] = await Promise.all([
       load("truck_jobs", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "import_date"),
       load("truck_import_details", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "detail_number"),
       load("truck_export_details", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "detail_number"),
+      load("truck_fuel_refills", hasModuleAccessForSync("truck") || hasModuleAccessForSync("truck-summary") || hasModuleAccessForSync("completed-truck-summary"), "sort_order"),
       load("equipment_fleet", hasModuleAccessForSync("equipment") || hasModuleAccessForSync("maintenance"), "truck_no"),
       load("maintenance_jobs", hasModuleAccessForSync("maintenance"), "repair_date"),
       load("employees", hasModuleAccessForSync("employee"), "joining_date"),
@@ -1808,6 +1884,7 @@
       load("two_pay_brokers", hasModuleAccessForSync("two-pay-records"), "sort_order"),
       load("accounts", hasModuleAccessForSync("khata") || hasModuleAccessForSync("accounts-payable"), "party_name"),
       load("activity_logs", hasModuleAccessForSync("activity-logs"), "created_at"),
+      load("payment_voucher_bank_accounts", hasModuleAccessForSync("payment-voucher"), "bank_name"),
       load("payment_vouchers", hasModuleAccessForSync("payment-voucher"), "voucher_date"),
       load("payment_voucher_funds", hasModuleAccessForSync("payment-voucher"), "entry_date"),
       load("builty_records", hasModuleAccessForSync("builty"), "bilty_date")
@@ -1815,6 +1892,7 @@
     if (hydrationVersion !== operationalMutationVersion) return;
     const importDetailsByJob = new Map();
     const exportDetailsByJob = new Map();
+    const fuelRefillsByJob = new Map();
     (truckImportDetails || []).forEach((row) => {
       const key = String(row.job_no || "").trim().toUpperCase();
       if (!key) return;
@@ -1827,14 +1905,44 @@
       if (!exportDetailsByJob.has(key)) exportDetailsByJob.set(key, []);
       exportDetailsByJob.get(key).push({ detailNumber: Number(row.detail_number || 0), detail: mapTruckDetailFromDatabase(row, "export") });
     });
+    (truckFuelRefills || []).forEach((row) => {
+      const key = String(row.job_no || "").trim().toUpperCase();
+      if (!key) return;
+      if (!fuelRefillsByJob.has(key)) fuelRefillsByJob.set(key, []);
+      fuelRefillsByJob.get(key).push({
+        sortOrder: Number(row.sort_order || 0),
+        detail: {
+          id: row.id || makeUuid(),
+          fuelStation: row.fuel_station || "",
+          fuelQuantityLiters: row.fuel_quantity_liters == null ? "" : Number(row.fuel_quantity_liters),
+          fuelAmountPkr: row.amount_pkr == null ? "" : Number(row.amount_pkr),
+          refillDate: row.refill_date || "",
+          runningMeter: row.running_meter == null ? "" : Number(row.running_meter)
+        }
+      });
+    });
     for (const detailMap of [importDetailsByJob, exportDetailsByJob]) {
       detailMap.forEach((details) => details.sort((left, right) => left.detailNumber - right.detailNumber));
     }
+    fuelRefillsByJob.forEach((details) => details.sort((left, right) => left.sortOrder - right.sortOrder));
     const getAdditionalDetails = (detailMap, key, legacyDetails, localDetails) => {
       const relational = (detailMap.get(key) || []).map((entry) => entry.detail);
       if (relational.length) return relational;
       if (Array.isArray(legacyDetails) && legacyDetails.length) return legacyDetails;
       return Array.isArray(localDetails) ? localDetails : [];
+    };
+    const getFuelRefillRows = (key, localDetails, pendingDeleteIds = [], hasPendingLocalSync = false) => {
+      const relational = (fuelRefillsByJob.get(key) || []).map((entry) => entry.detail);
+      const removedIds = new Set(Array.isArray(pendingDeleteIds) ? pendingDeleteIds : []);
+      const localRows = (Array.isArray(localDetails) ? localDetails : []).filter((row) => !removedIds.has(row.id));
+      const remoteRows = relational.filter((row) => !removedIds.has(row.id));
+      if (!hasPendingLocalSync) return remoteRows.length ? remoteRows : localRows;
+      const localById = new Map(localRows.filter((row) => row.id).map((row) => [row.id, row]));
+      const remoteIds = new Set(remoteRows.map((row) => row.id));
+      return [
+        ...remoteRows.map((row) => localById.get(row.id) || row),
+        ...localRows.filter((row) => row.id && !remoteIds.has(row.id))
+      ];
     };
     if (Array.isArray(trucks)) {
       const remoteMap = new Map();
@@ -1882,9 +1990,15 @@
             exportMtyPaymentDate: r.export_mty_payment_date || local.exportMtyPaymentDate || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || local.exportMtyPaymentStatus || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense ?? local.dieselExpense ?? 0), salary: Number(r.salary ?? local.salary ?? 0),
+            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense ?? local.dieselExpense ?? 0),
+            totalDistanceKm: Number(local.pendingFuelRefillSync
+              ? (local.totalDistanceKm ?? r.total_distance_km ?? 0)
+              : (r.total_distance_km ?? local.totalDistanceKm ?? 0)), salary: Number(r.salary ?? local.salary ?? 0),
             additionalImportDetails: getAdditionalDetails(importDetailsByJob, key, r.additional_import_details, local.additionalImportDetails),
             additionalExportDetails: getAdditionalDetails(exportDetailsByJob, key, r.additional_export_details, local.additionalExportDetails),
+            fuelRefillRows: getFuelRefillRows(key, local.fuelRefillRows, local.pendingFuelRefillDeleteIds, local.pendingFuelRefillSync),
+            pendingFuelRefillDeleteIds: Array.isArray(local.pendingFuelRefillDeleteIds) ? local.pendingFuelRefillDeleteIds : [],
+            pendingFuelRefillSync: Boolean(local.pendingFuelRefillSync),
             profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || local.imagePath || "",
             image: local.image || getCachedSignedUrl(r.image_path)
           });
@@ -1928,9 +2042,11 @@
             exportMtyPaymentDate: r.export_mty_payment_date || "",
             exportMtyPaymentStatus: r.export_mty_payment_status || "Awaited",
             exportRemarks: r.export_remarks || "", grandTotal: Number(r.grand_total || 0),
-            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense || 0), salary: Number(r.salary || 0),
+            roundTripExpense: Number(r.round_trip_expense || 0), dieselExpense: Number(r.diesel_expense || 0),
+            totalDistanceKm: Number(r.total_distance_km || 0), salary: Number(r.salary || 0),
             additionalImportDetails: getAdditionalDetails(importDetailsByJob, key, r.additional_import_details, []),
             additionalExportDetails: getAdditionalDetails(exportDetailsByJob, key, r.additional_export_details, []),
+            fuelRefillRows: getFuelRefillRows(key, []),
             profitLoss: Number(r.profit_loss || 0), imagePath: r.image_path || "",
             image: getCachedSignedUrl(r.image_path)
           });
@@ -2226,6 +2342,10 @@
         recordId: r.record_id || "-", details: r.description || ""
       }));
       replaceArrayContents(store.activityLogs, mappedLogs);
+    }
+
+    if (Array.isArray(paymentVoucherBankAccounts)) {
+      replaceArrayContents(store.paymentVoucherBankAccounts, paymentVoucherBankAccounts.map(mapPaymentVoucherBankAccountFromSupabase));
     }
 
     if (Array.isArray(paymentVouchers)) {
@@ -5712,23 +5832,161 @@
     pdf.save(fileName || `trucker-broker-summary-${safeStatus}.pdf`);
   }
 
-  function brokerSummaryPage(store) {
-    const body = document.querySelector("[data-broker-summary-rows]");
-    const countElement = document.querySelector("[data-broker-summary-count]");
-    const paidElement = document.querySelector("[data-broker-summary-paid]");
-    const payableElement = document.querySelector("[data-broker-summary-payable]");
-    const statusFilter = document.querySelector("[data-broker-summary-status]");
-    const brokerFilter = document.querySelector("[data-broker-summary-broker]") || document.querySelector("[data-broker-summary-customer]");
-    const searchFilter = document.querySelector("[data-broker-summary-search]");
-    const startDateFilter = document.querySelector("[data-broker-summary-start]");
-    const endDateFilter = document.querySelector("[data-broker-summary-end]");
-    const dateSort = document.querySelector("[data-broker-summary-sort]");
-    const notice = document.querySelector("[data-broker-summary-notice]");
-    const downloadButton = document.querySelector("[data-download-broker-summary]");
-    if (!body || !countElement) return;
+  async function buildTwoPayBrokerSummaryPdf(rows, statusLabel = "All", fileName = "", selectedBroker = "") {
+    if (!window.jspdf?.jsPDF) throw new Error("The PDF library could not be loaded.");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("l", "pt", "a3");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const letterhead = await loadInvoiceTemplateDataUrl();
+    const letterheadHeader = await cropImageDataUrl(letterhead, 0, 270);
+    const headerHeight = 136;
+    const headerWidth = headerHeight * (1131 / 270);
+    const titleY = summaryTitleY(headerHeight);
+    if (letterheadHeader) pdf.addImage(letterheadHeader, "JPEG", 36, 10, headerWidth, headerHeight);
 
-    function getBrokerRows() {
-      return store.bookings.flatMap((booking) => getBookingBrokerEntries(booking, booking.receivableAmount)
+    const cleanBroker = String(selectedBroker || "").trim();
+    const brokerNames = [...new Set(rows.map((row) => String(row.entry.truckerBroker || "").trim()).filter(Boolean))];
+    const brokerTitle = cleanBroker || (brokerNames.length === 1 ? brokerNames[0] : "All Truckers / Brokers");
+    pdf.setTextColor(24, 48, 77);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(15);
+    pdf.text(`TWO PAY TRUCKER / BROKER: ${brokerTitle.toUpperCase()}`, 36, titleY);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.text(`Status: ${statusLabel} | Generated: ${formatShortDate(new Date())}`, 36, titleY + 20);
+
+    const totalAmount = rows.reduce((sum, row) => sum + Number(row.entry.amount || 0), 0);
+    pdf.autoTable({
+      startY: titleY + 34,
+      margin: { top: 36, left: 28, right: 28, bottom: 65 },
+      theme: "grid",
+      head: [["S.No", "Two Pay Record ID", "Broker Detail ID", "Record Date", "Customer", "BL No", "Trucker/Broker", "Container Ref", "Truck No", "Container Size", "Amount", "Payment/Cheque/IBFT", "Payment Date", "Status", "Broker Remarks"]],
+      body: rows.map((row, index) => [
+        String(index + 1),
+        text(row.record.id),
+        text(row.entry.id),
+        formatShortDate(row.record.date),
+        text(row.record.customerName),
+        text(row.record.blNo),
+        text(row.entry.truckerBroker),
+        text(row.entry.containerRef),
+        text(row.entry.truckNo),
+        text(row.entry.containerSize),
+        row.entry.amount === "" || row.entry.amount == null ? "-" : money(row.entry.amount),
+        text(row.entry.paymentDetails),
+        row.entry.paymentDate ? formatShortDate(row.entry.paymentDate) : "-",
+        text(row.entry.paymentStatus),
+        text(row.record.brokerRemarks)
+      ]),
+      foot: [["", "", "", "", "", "", "", "", "", "Total", money(totalAmount), "", "", "", ""]],
+      showFoot: "lastPage",
+      styles: { fontSize: 8.5, cellPadding: 5, lineColor: [40, 40, 40], lineWidth: 0.65, textColor: [0, 0, 0], overflow: "linebreak", valign: "middle" },
+      headStyles: { fillColor: SUMMARY_PDF_HEADER_FILL, textColor: SUMMARY_PDF_HEADER_TEXT, fontSize: 8.5, fontStyle: "bold", minCellHeight: 38, valign: "middle", halign: "center", overflow: "linebreak" },
+      bodyStyles: { minCellHeight: 30 },
+      footStyles: { fillColor: [248, 234, 220], textColor: [24, 48, 77], fontStyle: "bold", fontSize: 8.5 },
+      columnStyles: fitSummaryColumnStyles({
+        0: { cellWidth: 34, halign: "center" },
+        1: { cellWidth: 102 },
+        2: { cellWidth: 102 },
+        3: { cellWidth: 60 },
+        4: { cellWidth: 86 },
+        5: { cellWidth: 52 },
+        6: { cellWidth: 104 },
+        7: { cellWidth: 74 },
+        8: { cellWidth: 56 },
+        9: { cellWidth: 56 },
+        10: { cellWidth: 66, halign: "right" },
+        11: { cellWidth: 108 },
+        12: { cellWidth: 58 },
+        13: { cellWidth: 46 },
+        14: { cellWidth: 114 }
+      }, pageWidth - 56),
+      didParseCell: (data) => {
+        if (data.section === "head") data.cell.styles.halign = "center";
+        if ((data.section === "body" || data.section === "foot") && data.column.index === 10) {
+          data.cell.styles.halign = "right";
+          data.cell.styles.overflow = "visible";
+        }
+      },
+      didDrawPage: () => {
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.8);
+        pdf.line(28, pageHeight - 52, pageWidth - 28, pageHeight - 52);
+        pdf.setTextColor(24, 48, 77);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9.5);
+        pdf.text("Office # 15, Ayub Shopping Center, Keamari, Karachi | 021-328 62660", 36, pageHeight - 34);
+      }
+    });
+    const safeStatus = String(statusLabel || "all").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    pdf.save(fileName || `two-pay-trucker-broker-summary-${safeStatus}.pdf`);
+  }
+
+  function brokerSummaryPage(store) {
+    const notice = document.querySelector("[data-broker-summary-notice]");
+    const tabs = Array.from(document.querySelectorAll("[data-broker-summary-tab]"));
+    const panels = Array.from(document.querySelectorAll("[data-broker-summary-panel]"));
+    const bookingBody = document.querySelector("[data-broker-summary-rows]");
+    const bookingCount = document.querySelector("[data-broker-summary-count]");
+    const bookingPaid = document.querySelector("[data-broker-summary-paid]");
+    const bookingPayable = document.querySelector("[data-broker-summary-payable]");
+    const bookingStatus = document.querySelector("[data-broker-summary-status]");
+    const bookingBroker = document.querySelector("[data-broker-summary-broker]") || document.querySelector("[data-broker-summary-customer]");
+    const bookingSearch = document.querySelector("[data-broker-summary-search]");
+    const bookingStart = document.querySelector("[data-broker-summary-start]");
+    const bookingEnd = document.querySelector("[data-broker-summary-end]");
+    const bookingSort = document.querySelector("[data-broker-summary-sort]");
+    const bookingDownload = document.querySelector("[data-download-broker-summary]");
+
+    const twoPayBody = document.querySelector("[data-two-pay-broker-rows]");
+    const twoPayCount = document.querySelector("[data-two-pay-broker-count]");
+    const twoPayPaid = document.querySelector("[data-two-pay-broker-paid]");
+    const twoPayPayable = document.querySelector("[data-two-pay-broker-payable]");
+    const twoPayStatus = document.querySelector("[data-two-pay-broker-status]");
+    const twoPayBroker = document.querySelector("[data-two-pay-broker-name]");
+    const twoPaySearch = document.querySelector("[data-two-pay-broker-search]");
+    const twoPayStart = document.querySelector("[data-two-pay-broker-start]");
+    const twoPayEnd = document.querySelector("[data-two-pay-broker-end]");
+    const twoPaySort = document.querySelector("[data-two-pay-broker-sort]");
+    const twoPayDownload = document.querySelector("[data-download-two-pay-broker-summary]");
+    if (!bookingBody || !bookingCount || !twoPayBody || !twoPayCount) return;
+
+    function showNotice(message, isError = true) {
+      if (!notice) return;
+      notice.textContent = message;
+      notice.hidden = !message;
+      notice.classList.toggle("error", isError);
+    }
+
+    function activateTab(tabName, focusTab = false) {
+      tabs.forEach((tab) => {
+        const active = tab.dataset.brokerSummaryTab === tabName;
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+      });
+      panels.forEach((panel) => { panel.hidden = panel.dataset.brokerSummaryPanel !== tabName; });
+      if (focusTab) tabs.find((tab) => tab.dataset.brokerSummaryTab === tabName)?.focus();
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => activateTab(tab.dataset.brokerSummaryTab));
+      tab.addEventListener("keydown", (event) => {
+        let nextIndex = index;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+        else if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+        else if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = tabs.length - 1;
+        else return;
+        event.preventDefault();
+        activateTab(tabs[nextIndex].dataset.brokerSummaryTab, true);
+      });
+    });
+    activateTab("booking");
+
+    function getBookingBrokerRows() {
+      return (store.bookings || []).flatMap((booking) => getBookingBrokerEntries(booking, booking.receivableAmount)
         .map((entry, brokerIndex) => ({
           booking,
           entry,
@@ -5738,23 +5996,33 @@
         })));
     }
 
-    function renderBrokerOptions() {
-      if (!brokerFilter) return;
-      const selected = brokerFilter.value;
-      const brokers = [...new Set(getBrokerRows().map((row) => String(row.entry.truckerBroker || "").trim()).filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b));
-      brokerFilter.innerHTML = `<option value="">All Truckers/Brokers</option>${brokers
-        .map((broker) => `<option value="${escapeHtml(broker)}">${text(broker)}</option>`).join("")}`;
-      brokerFilter.value = brokers.includes(selected) ? selected : "";
+    function getTwoPayBrokerRows() {
+      return (store.twoPayRecords || []).flatMap((record) => (Array.isArray(record.twoPayBrokerRows) ? record.twoPayBrokerRows : [])
+        .map((sourceEntry, brokerIndex) => ({
+          record,
+          entry: { ...sourceEntry, paymentStatus: sourceEntry.paymentStatus === "Paid" ? "Paid" : "Payable" },
+          brokerIndex,
+          date: record.date || ""
+        })));
     }
 
-    function getFilteredRows() {
-      const selectedStatus = String(statusFilter?.value || "All");
-      const selectedBroker = String(brokerFilter?.value || "").trim();
-      const startDate = String(startDateFilter?.value || "");
-      const endDate = String(endDateFilter?.value || "");
-      const terms = String(searchFilter?.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
-      return getBrokerRows()
+    function populateBrokerOptions(select, rows, getName) {
+      if (!select) return;
+      const selected = select.value;
+      const brokers = [...new Set(rows.map((row) => String(getName(row) || "").trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+      select.innerHTML = `<option value="">All Truckers/Brokers</option>${brokers
+        .map((broker) => `<option value="${escapeHtml(broker)}">${text(broker)}</option>`).join("")}`;
+      select.value = brokers.includes(selected) ? selected : "";
+    }
+
+    function getFilteredBookingRows() {
+      const selectedStatus = String(bookingStatus?.value || "All");
+      const selectedBroker = String(bookingBroker?.value || "").trim();
+      const startDate = String(bookingStart?.value || "");
+      const endDate = String(bookingEnd?.value || "");
+      const terms = String(bookingSearch?.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+      return getBookingBrokerRows()
         .filter((row) => !selectedStatus || selectedStatus === "All" || row.entry.paymentStatus === selectedStatus)
         .filter((row) => !selectedBroker || String(row.entry.truckerBroker || "").trim().toLowerCase() === selectedBroker.toLowerCase())
         .filter((row) => {
@@ -5770,30 +6038,62 @@
             .join(" ").toLowerCase();
           return terms.every((term) => searchable.includes(term));
         })
-        .sort((left, right) => compareDateValues(left.date, right.date, dateSort?.value || "desc"));
+        .sort((left, right) => compareDateValues(left.date, right.date, bookingSort?.value || "desc"));
     }
 
-    function render() {
-      const rows = getFilteredRows();
-      const allRows = getBrokerRows();
-      const selectedBroker = String(brokerFilter?.value || "").trim();
-      const scopedBrokerRows = selectedBroker
+    function getFilteredTwoPayRows() {
+      const selectedStatus = String(twoPayStatus?.value || "All");
+      const selectedBroker = String(twoPayBroker?.value || "").trim();
+      const startDate = String(twoPayStart?.value || "");
+      const endDate = String(twoPayEnd?.value || "");
+      const terms = String(twoPaySearch?.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+      return getTwoPayBrokerRows()
+        .filter((row) => !selectedStatus || selectedStatus === "All" || row.entry.paymentStatus === selectedStatus)
+        .filter((row) => !selectedBroker || String(row.entry.truckerBroker || "").trim().toLowerCase() === selectedBroker.toLowerCase())
+        .filter((row) => {
+          const date = formatIsoDate(row.date);
+          return (!startDate || (date && date >= startDate)) && (!endDate || (date && date <= endDate));
+        })
+        .filter((row) => {
+          if (!terms.length) return true;
+          const record = row.record;
+          const entry = row.entry;
+          const searchable = [record.id, record.date, record.customerName, record.customerAddress, record.origin, record.blNo,
+          record.containerNo, record.lotOf, record.destination, record.consigneeName, record.size, record.description,
+          record.truckNo, record.billNo, record.brokerRemarks, entry.id, entry.truckerBroker, entry.containerRef,
+          entry.truckNo, entry.containerSize, entry.amount, entry.paymentDetails, entry.paymentDate, entry.paymentStatus]
+            .join(" ").toLowerCase();
+          return terms.every((term) => searchable.includes(term));
+        })
+        .sort((left, right) => {
+          const direction = twoPaySort?.value || "desc";
+          const dateOrder = compareDateValues(left.date, right.date, direction);
+          if (dateOrder) return dateOrder;
+          const recordOrder = String(left.record.id || "").localeCompare(String(right.record.id || ""), undefined, { numeric: true, sensitivity: "base" });
+          if (recordOrder) return direction === "asc" ? recordOrder : -recordOrder;
+          return left.brokerIndex - right.brokerIndex;
+        });
+    }
+
+    function renderBookingView() {
+      const rows = getFilteredBookingRows();
+      const allRows = getBookingBrokerRows();
+      const selectedBroker = String(bookingBroker?.value || "").trim();
+      const scopedRows = selectedBroker
         ? allRows.filter((row) => String(row.entry.truckerBroker || "").trim().toLowerCase() === selectedBroker.toLowerCase())
         : allRows;
-      const paidTotal = scopedBrokerRows.filter((row) => row.entry.paymentStatus === "Paid")
+      const paidTotal = scopedRows.filter((row) => row.entry.paymentStatus === "Paid")
         .reduce((sum, row) => sum + Number(row.entry.amount || 0), 0);
-      const payableTotal = scopedBrokerRows.filter((row) => row.entry.paymentStatus === "Payable")
+      const payableTotal = scopedRows.filter((row) => row.entry.paymentStatus === "Payable")
         .reduce((sum, row) => sum + Number(row.entry.amount || 0), 0);
-      if (paidElement) paidElement.textContent = `PKR ${money(paidTotal)}`;
-      if (payableElement) payableElement.textContent = `PKR ${money(payableTotal)}`;
-      countElement.textContent = `${rows.length} broker payment(s) • ${new Set(rows.map((row) => row.booking.id)).size} booking(s)`;
-
+      if (bookingPaid) bookingPaid.textContent = `PKR ${money(paidTotal)}`;
+      if (bookingPayable) bookingPayable.textContent = `PKR ${money(payableTotal)}`;
+      bookingCount.textContent = `${rows.length} broker payment(s) • ${new Set(rows.map((row) => row.booking.id)).size} booking(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="9" class="empty-state">No broker payment records match the selected filters.</td></tr>`;
+        bookingBody.innerHTML = `<tr><td colspan="9" class="empty-state">No broker payment records match the selected filters.</td></tr>`;
         return;
       }
-
-      body.innerHTML = rows.map((row) => `
+      bookingBody.innerHTML = rows.map((row) => `
         <tr>
           <td>${text(row.booking.bookingNo || row.booking.id)}</td>
           <td>${formatShortDate(row.booking.date)}</td>
@@ -5808,35 +6108,80 @@
       `).join("");
     }
 
-    [statusFilter, brokerFilter, searchFilter, startDateFilter, endDateFilter, dateSort]
-      .filter(Boolean)
-      .forEach((control) => control.addEventListener(control === searchFilter ? "input" : "change", render));
-    downloadButton?.addEventListener("click", () => {
-      const rows = getFilteredRows();
+    function renderTwoPayView() {
+      const rows = getFilteredTwoPayRows();
+      const paidTotal = rows.filter((row) => row.entry.paymentStatus === "Paid")
+        .reduce((sum, row) => sum + Number(row.entry.amount || 0), 0);
+      const payableTotal = rows.filter((row) => row.entry.paymentStatus !== "Paid")
+        .reduce((sum, row) => sum + Number(row.entry.amount || 0), 0);
+      if (twoPayPaid) twoPayPaid.textContent = `PKR ${money(paidTotal)}`;
+      if (twoPayPayable) twoPayPayable.textContent = `PKR ${money(payableTotal)}`;
+      twoPayCount.textContent = `${rows.length} broker payment(s) • ${new Set(rows.map((row) => row.record.id)).size} Two Pay record(s)`;
       if (!rows.length) {
-        if (notice) {
-          notice.hidden = false;
-          notice.classList.add("error");
-          notice.textContent = "No broker payment records are available for the selected filters.";
-        }
+        twoPayBody.innerHTML = `<tr><td colspan="16" class="empty-state">No Two Pay broker records match the selected filters.</td></tr>`;
         return;
       }
-      const selectedBroker = String(brokerFilter?.value || "").trim();
-      const customFileName = selectedBroker ? `${safePdfFileName(selectedBroker)}_broker_summary.pdf` : "trucker-broker-summary-all.pdf";
-      buildBrokerSummaryPdf(rows, statusFilter?.value || "All", customFileName, selectedBroker).catch((error) => {
-        if (notice) {
-          notice.hidden = false;
-          notice.classList.add("error");
-          notice.textContent = `Download failed: ${error.message}`;
-        }
-      });
+      twoPayBody.innerHTML = rows.map((row, rowIndex) => {
+        const amount = row.entry.amount === "" || row.entry.amount == null ? "-" : money(row.entry.amount);
+        return `
+          <tr>
+            <td>${rowIndex + 1}</td>
+            <td><code class="broker-summary-record-id" title="${escapeHtml(row.record.id)}">${text(row.record.id)}</code></td>
+            <td><code class="broker-summary-record-id" title="${escapeHtml(row.entry.id)}">${text(row.entry.id)}</code></td>
+            <td>${row.record.date ? formatShortDate(row.record.date) : "-"}</td>
+            <td>${text(row.record.customerName)}</td>
+            <td>${text(row.record.blNo)}</td>
+            <td>${text(row.entry.truckerBroker)}</td>
+            <td>${text(row.entry.containerRef)}</td>
+            <td>${text(row.entry.truckNo)}</td>
+            <td>${text(row.entry.containerSize)}</td>
+            <td>${amount}</td>
+            <td>${text(row.entry.paymentDetails)}</td>
+            <td>${row.entry.paymentDate ? formatShortDate(row.entry.paymentDate) : "-"}</td>
+            <td><span class="broker-payment-status ${row.entry.paymentStatus === "Paid" ? "is-paid" : "is-payable"}">${text(row.entry.paymentStatus)}</span></td>
+            <td>${text(row.record.brokerRemarks)}</td>
+            <td><button class="btn small" type="button" data-download-two-pay-broker-row data-two-pay-record-id="${escapeHtml(row.record.id)}" data-broker-index="${row.brokerIndex}">Download</button></td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function render() {
+      populateBrokerOptions(bookingBroker, getBookingBrokerRows(), (row) => row.entry.truckerBroker);
+      populateBrokerOptions(twoPayBroker, getTwoPayBrokerRows(), (row) => row.entry.truckerBroker);
+      renderBookingView();
+      renderTwoPayView();
+    }
+
+    [bookingStatus, bookingBroker, bookingSearch, bookingStart, bookingEnd, bookingSort].filter(Boolean)
+      .forEach((control) => control.addEventListener(control === bookingSearch ? "input" : "change", renderBookingView));
+    [twoPayStatus, twoPayBroker, twoPaySearch, twoPayStart, twoPayEnd, twoPaySort].filter(Boolean)
+      .forEach((control) => control.addEventListener(control === twoPaySearch ? "input" : "change", renderTwoPayView));
+
+    bookingDownload?.addEventListener("click", () => {
+      const rows = getFilteredBookingRows();
+      if (!rows.length) return showNotice("No booking broker payments are available for the selected filters.");
+      const selectedBroker = String(bookingBroker?.value || "").trim();
+      const customFileName = selectedBroker ? `${safePdfFileName(selectedBroker)}_booking_broker_summary.pdf` : "booking-trucker-broker-summary-all.pdf";
+      buildBrokerSummaryPdf(rows, bookingStatus?.value || "All", customFileName, selectedBroker)
+        .catch((error) => showNotice(`Download failed: ${error.message}`));
     });
-    body.addEventListener("click", (event) => {
+
+    twoPayDownload?.addEventListener("click", () => {
+      const rows = getFilteredTwoPayRows();
+      if (!rows.length) return showNotice("No Two Pay broker payments are available for the selected filters.");
+      const selectedBroker = String(twoPayBroker?.value || "").trim();
+      const customFileName = selectedBroker ? `${safePdfFileName(selectedBroker)}_two_pay_broker_summary.pdf` : "two-pay-trucker-broker-summary-all.pdf";
+      buildTwoPayBrokerSummaryPdf(rows, twoPayStatus?.value || "All", customFileName, selectedBroker)
+        .catch((error) => showNotice(`Download failed: ${error.message}`));
+    });
+
+    bookingBody.addEventListener("click", (event) => {
       const button = event.target.closest("[data-download-broker-row]");
       if (!button) return;
       const bookingId = button.getAttribute("data-booking-id");
       const brokerIndex = Number(button.getAttribute("data-broker-index"));
-      const booking = store.bookings.find((item) => String(item.id) === String(bookingId));
+      const booking = (store.bookings || []).find((item) => String(item.id) === String(bookingId));
       if (!booking) return;
       const entries = getBookingBrokerEntries(booking, booking.receivableAmount);
       const entry = entries[brokerIndex];
@@ -5847,15 +6192,27 @@
       const singleFileName = entries.length > 1
         ? `${truckerBrokerName}_${safeBooking || "booking"}_${brokerIndex + 1}.pdf`
         : (safeBooking ? `${truckerBrokerName}_${safeBooking}.pdf` : `${truckerBrokerName}.pdf`);
-      buildBrokerSummaryPdf([row], entry.paymentStatus, singleFileName, entry.truckerBroker).catch((error) => {
-        if (notice) {
-          notice.hidden = false;
-          notice.classList.add("error");
-          notice.textContent = `Download failed: ${error.message}`;
-        }
-      });
+      buildBrokerSummaryPdf([row], entry.paymentStatus, singleFileName, entry.truckerBroker)
+        .catch((error) => showNotice(`Download failed: ${error.message}`));
     });
-    renderBrokerOptions();
+
+    twoPayBody.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-download-two-pay-broker-row]");
+      if (!button) return;
+      const recordId = button.getAttribute("data-two-pay-record-id");
+      const brokerIndex = Number(button.getAttribute("data-broker-index"));
+      const record = (store.twoPayRecords || []).find((item) => String(item.id) === String(recordId));
+      const sourceEntry = record?.twoPayBrokerRows?.[brokerIndex];
+      if (!record || !sourceEntry) return;
+      const entry = { ...sourceEntry, paymentStatus: sourceEntry.paymentStatus === "Paid" ? "Paid" : "Payable" };
+      const row = { record, entry, brokerIndex, date: record.date || "" };
+      const name = safePdfFileName(entry.truckerBroker || "broker");
+      const recordNo = safePdfFileName(record.blNo || record.billNo || record.id || "two-pay-record");
+      const fileName = `${name}_${recordNo}_${brokerIndex + 1}_two_pay.pdf`;
+      buildTwoPayBrokerSummaryPdf([row], entry.paymentStatus || "All", fileName, entry.truckerBroker)
+        .catch((error) => showNotice(`Download failed: ${error.message}`));
+    });
+
     window.activePageRender = render;
     render();
   }
@@ -6421,10 +6778,17 @@
     const truckImageModal = document.querySelector("[data-truck-image-modal]");
     const truckImageModalImage = document.querySelector("[data-truck-image-modal-image]");
     const closeTruckImageModalButton = document.querySelector("[data-close-truck-image-modal]");
+    const fuelRefillList = form?.querySelector("[data-fuel-refill-list]");
+    const addFuelRefillButton = form?.querySelector("[data-add-fuel-refill]");
+    const fuelTotalLiters = form?.querySelector("[data-fuel-total-liters]");
+    const fuelTotalAmount = form?.querySelector("[data-fuel-total-amount]");
+    const fuelAverageInput = form?.querySelector("[data-fuel-average]");
+    const legacyDieselNote = form?.querySelector("[data-legacy-diesel-note]");
     if (!body || !form) return;
     let editingId = "";
     let tripImageData = "";
     let tripImagePromise = Promise.resolve("");
+    let removedFuelRefillIds = new Set();
     const detailNumericFields = {
       import: ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection"],
       export: ["exportMtyBoxFreight", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection"]
@@ -6506,6 +6870,96 @@
         .map(({ detail }) => detail);
     }
 
+    function renumberFuelRefillRows() {
+      let refillNumber = 0;
+      [...(fuelRefillList?.querySelectorAll("[data-fuel-refill-row]") || [])].forEach((row) => {
+        const title = row.querySelector("[data-fuel-row-title]");
+        if (title) {
+          title.textContent = row.dataset.legacyFuelRefill === "true"
+            ? "Previous Diesel Consumption (Litres)"
+            : `Fuel Refill ${++refillNumber}`;
+        }
+      });
+    }
+
+    function addFuelRefillRow(refill = {}) {
+      if (!fuelRefillList) return null;
+      const isLegacy = Boolean(refill.isLegacy);
+      const row = document.createElement("section");
+      row.className = "truck-fuel-refill-row";
+      row.dataset.fuelRefillRow = "true";
+      if (isLegacy) {
+        row.dataset.legacyFuelRefill = "true";
+        row.classList.add("truck-fuel-refill-row-legacy");
+      }
+      if (refill.id) row.dataset.refillId = refill.id;
+      row.innerHTML = `
+        <div class="truck-fuel-row-head"><strong data-fuel-row-title></strong>${isLegacy ? "" : '<button class="btn small truck-fuel-remove" type="button" data-remove-fuel-refill>Remove</button>'}</div>
+        <div class="truck-fuel-row-fields">
+          <div class="field"><label>Fuel Station</label><input data-fuel-field="fuelStation" value="${escapeHtml(refill.fuelStation || (isLegacy ? "Previous entry (details unavailable)" : ""))}" placeholder="Fuel station name" ${isLegacy ? "disabled" : ""} /></div>
+          <div class="field"><label>Fuel Refilled (Litres)</label><input data-fuel-field="fuelQuantityLiters" type="number" min="0" step="any" value="${escapeHtml(refill.fuelQuantityLiters ?? "")}" placeholder="Litres" ${isLegacy ? "disabled" : ""} /></div>
+          <div class="field"><label>Fuel Refill Amount (PKR)</label><input data-fuel-field="fuelAmountPkr" type="number" min="0" step="0.01" value="${escapeHtml(refill.fuelAmountPkr ?? "")}" placeholder="Amount" ${isLegacy ? "disabled" : ""} /></div>
+          <div class="field"><label>Refill Date</label><input data-fuel-field="refillDate" type="date" value="${escapeHtml(formatIsoDate(refill.refillDate) || "")}" ${isLegacy ? "disabled" : ""} /></div>
+          <div class="field"><label>Running Meter (KM)</label><input data-fuel-field="runningMeter" type="number" min="0" step="any" value="${escapeHtml(refill.runningMeter ?? "")}" placeholder="Enter meter reading" ${isLegacy ? "disabled" : ""} /></div>
+        </div>`;
+      fuelRefillList.append(row);
+      renumberFuelRefillRows();
+      return row;
+    }
+
+    function getFuelRefillsForTrip(item = {}) {
+      const refills = Array.isArray(item.fuelRefillRows) ? item.fuelRefillRows : [];
+      const previousLiters = Number(item.dieselExpense || 0);
+      if (previousLiters <= 0) return refills;
+      return [{
+        isLegacy: true,
+        fuelStation: "Previous Diesel Consumption",
+        fuelQuantityLiters: previousLiters,
+        fuelAmountPkr: "",
+        refillDate: "",
+        runningMeter: ""
+      }, ...refills];
+    }
+
+    function readFuelRefillRows() {
+      return [...(fuelRefillList?.querySelectorAll("[data-fuel-refill-row]") || [])]
+        .filter((row) => row.dataset.legacyFuelRefill !== "true")
+        .map((row) => {
+          const values = {};
+          row.querySelectorAll("[data-fuel-field]").forEach((control) => {
+            values[control.dataset.fuelField] = control.value;
+          });
+          return { row, refill: { id: row.dataset.refillId || "", ...values } };
+        })
+        .filter(({ refill }) => ["fuelStation", "fuelQuantityLiters", "fuelAmountPkr", "refillDate", "runningMeter"]
+          .some((key) => String(refill[key] ?? "").trim() !== ""));
+    }
+
+    function collectFuelRefillRows() {
+      return readFuelRefillRows().map(({ row, refill }) => {
+        if (!refill.id) {
+          refill.id = makeUuid();
+          row.dataset.refillId = refill.id;
+        }
+        const normalized = { ...refill };
+        ["fuelQuantityLiters", "fuelAmountPkr", "runningMeter"].forEach((key) => {
+          normalized[key] = normalized[key] === "" ? "" : Number(normalized[key]);
+        });
+        return normalized;
+      });
+    }
+
+    function updateFuelMetrics() {
+      const refills = readFuelRefillRows().map(({ refill }) => refill);
+      const previousLiters = Number(form.elements.dieselExpense?.value || 0);
+      const totalLiters = previousLiters + refills.reduce((total, refill) => total + (Number(refill.fuelQuantityLiters) || 0), 0);
+      const totalAmount = refills.reduce((total, refill) => total + (Number(refill.fuelAmountPkr) || 0), 0);
+      const totalDistance = Number(form.elements.totalDistanceKm?.value || 0);
+      if (fuelTotalLiters) fuelTotalLiters.textContent = `${totalLiters.toLocaleString("en-US", { maximumFractionDigits: 2 })} L`;
+      if (fuelTotalAmount) fuelTotalAmount.textContent = `PKR ${money(totalAmount)}`;
+      if (fuelAverageInput) fuelAverageInput.value = totalLiters > 0 && totalDistance > 0 ? (totalDistance / totalLiters).toFixed(2) : "";
+    }
+
     function restoreAdditionalDetails(type, details = []) {
       (Array.isArray(details) ? details : []).forEach((detail) => {
         const section = addDetailSection(type, detail, false);
@@ -6524,7 +6978,7 @@
       if (receivableInput) receivableInput.value = String((Number(values[freightKey] || 0) + Number(values[detentionKey] || 0)) - Number(values[commissionKey] || 0));
     }
 
-    const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "dieselExpense", "salary", "profitLoss"];
+    const numberFields = ["mtyBoxFreight", "importFreight", "importDetention", "importBrokerCommission", "importReceivedAmount", "importCustomerCollection", "exportFreight", "exportDetention", "exportBrokerCommission", "exportReceivedAmount", "exportCustomerCollection", "exportMtyBoxFreight", "grandTotal", "roundTripExpense", "dieselExpense", "totalDistanceKm", "salary", "profitLoss"];
 
     function calculateTrip() {
       const importSections = getDetailSections("import");
@@ -6542,6 +6996,7 @@
       const financials = calculateTruckTripFinancials(tripForCalculation);
       if (form.elements.grandTotal) form.elements.grandTotal.value = String(financials.grandTotal);
       if (form.elements.profitLoss) form.elements.profitLoss.value = String(financials.profitLoss);
+      updateFuelMetrics();
     }
 
     function getNextTruckJobNo() {
@@ -6565,6 +7020,13 @@
     function resetForm() {
       form.reset();
       clearAdditionalDetailSections();
+      removedFuelRefillIds = new Set();
+      if (fuelRefillList) fuelRefillList.innerHTML = "";
+      addFuelRefillRow();
+      if (legacyDieselNote) {
+        legacyDieselNote.hidden = true;
+        legacyDieselNote.textContent = "";
+      }
       form.elements.date.value = getTodayIsoDate();
       if (form.elements.truckNo) form.elements.truckNo.value = "";
       if (form.elements.exportTruckNo) form.elements.exportTruckNo.value = "";
@@ -6649,13 +7111,13 @@
           .some((value) => String(value || "").trim() === selectedTruckNo))
         .filter((item) => {
           if (!from && !to) return true;
-          const dates = [...getTruckImportDetails(item).map((detail) => detail.date), ...getTruckExportDetails(item).map((detail) => detail.exportLoadDate)]
+          const dates = [...getTruckImportDetails(item).map((detail) => detail.date), ...getTruckExportDetails(item).map((detail) => detail.exportLoadDate), ...getFuelRefillsForTrip(item).map((refill) => refill.refillDate)]
             .map(parseDateValue).filter(Boolean);
           return dates.some((jobDate) => (!from || jobDate >= from) && (!to || jobDate <= to));
         })
         .filter((item) => expenseStatus === "all" ||
           (expenseStatus === "missing" ? Number(item.roundTripExpense || 0) <= 0 : Number(item.roundTripExpense || 0) > 0))
-        .filter((item) => !query || [item.jobNo, ...getTruckImportDetails(item), ...getTruckExportDetails(item)]
+        .filter((item) => !query || [item.jobNo, ...getTruckImportDetails(item), ...getTruckExportDetails(item), ...getFuelRefillsForTrip(item), item.totalDistanceKm]
           .some((detail) => Object.values(typeof detail === "object" ? detail : { value: detail })
             .some((value) => value != null && typeof value !== "object" && String(value).toLowerCase().includes(query))))
         .sort((left, right) => compareJobValues(left.jobNo, right.jobNo, jobSort?.value || "desc"));
@@ -6670,7 +7132,7 @@
       }
       count.textContent = `${rows.length} record(s)`;
       if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="58">No truck trip records available yet.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="64">No truck trip records available yet.</td></tr>`;
         return;
       }
       let serialNumber = 0;
@@ -6678,10 +7140,13 @@
         const financials = calculateTruckTripFinancials(item);
         const imports = getTruckImportDetails(item);
         const exports = getTruckExportDetails(item);
-        const detailCount = Math.max(imports.length, exports.length);
+        const fuelRefills = getFuelRefillsForTrip(item);
+        const totalFuelLiters = fuelRefills.reduce((sum, refill) => sum + (Number(refill.fuelQuantityLiters) || 0), 0);
+        const detailCount = Math.max(imports.length, exports.length, fuelRefills.length, 1);
         return Array.from({ length: detailCount }, (_, detailIndex) => {
           const importDetail = imports[detailIndex] || {};
           const exportDetail = exports[detailIndex] || {};
+          const fuelRefill = fuelRefills[detailIndex] || {};
           const isFirstLine = detailIndex === 0;
           const importInvoice = detailIndex < imports.length ? `<button class="btn small" data-import-invoice="${escapeHtml(item.id)}" data-detail-index="${detailIndex}">Import Invoice${detailIndex ? ` ${detailIndex + 1}` : ""}</button>` : "";
           const exportInvoice = detailIndex < exports.length ? `<button class="btn small" data-export-invoice="${escapeHtml(item.id)}" data-detail-index="${detailIndex}">Export Invoice${detailIndex ? ` ${detailIndex + 1}` : ""}</button>` : "";
@@ -6697,7 +7162,13 @@
           <td>${money(exportDetail.exportMtyBoxFreight || 0)}</td><td>${text(exportDetail.exportMtyBroker || "-")}</td>
           <td>${money(exportDetail.exportFreight || 0)}</td><td>${money(exportDetail.exportDetention || 0)}</td><td>${money(exportDetail.exportBrokerCommission || 0)}</td><td>${text(exportDetail.exportBroker || "-")}</td><td>${money(exportDetail.exportReceivedAmount || 0)}</td>
           <td>${text(exportDetail.exportPaymentTerm || "-")}</td><td>${text(exportDetail.exportChequeDetails || "-")}</td><td>${exportDetail.exportPaymentReceivedDate ? formatShortDate(exportDetail.exportPaymentReceivedDate) : "-"}</td><td><span class="badge ${exportDetail.exportPaymentStatus === "Credit" ? "good" : "bad"}">${text(exportDetail.exportPaymentStatus || "Awaited")}</span></td><td>${exportDetail.exportMtyPaymentDate ? formatShortDate(exportDetail.exportMtyPaymentDate) : "-"}</td><td><span class="badge ${exportDetail.exportMtyPaymentStatus === "Credit" ? "good" : "bad"}">${text(exportDetail.exportMtyPaymentStatus || "Awaited")}</span></td><td>${money(exportDetail.exportCustomerCollection || 0)}</td><td>${exportDetail.exportPaymentDate ? formatShortDate(exportDetail.exportPaymentDate) : "-"}</td><td>${text(exportDetail.exportChequeDetails2 || "-")}</td><td class="remarks-cell">${text(exportDetail.exportRemarks || "-")}</td>
-          <td>${isFirstLine ? money(financials.grandTotal) : "-"}</td><td class="${Number(item.roundTripExpense || 0) > 0 ? "" : "truck-expense-missing"}" title="${Number(item.roundTripExpense || 0) > 0 ? "Round trip expense entered" : "Round trip expense not entered"}">${isFirstLine ? (Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing") : "-"}</td><td>${isFirstLine ? money(item.dieselExpense || 0) : "-"}</td><td>${isFirstLine ? money(financials.profitLoss) : "-"}</td>
+          <td>${isFirstLine ? money(financials.grandTotal) : "-"}</td><td class="${Number(item.roundTripExpense || 0) > 0 ? "" : "truck-expense-missing"}" title="${Number(item.roundTripExpense || 0) > 0 ? "Round trip expense entered" : "Round trip expense not entered"}">${isFirstLine ? (Number(item.roundTripExpense || 0) > 0 ? money(financials.roundTripExpense) : "Missing") : "-"}</td>
+          <td>${text(fuelRefill.fuelStation || "-")}</td><td>${fuelRefill.fuelQuantityLiters !== "" && fuelRefill.fuelQuantityLiters != null ? text(fuelRefill.fuelQuantityLiters) : "-"}</td>
+          <td>${fuelRefill.fuelAmountPkr !== "" && fuelRefill.fuelAmountPkr != null ? money(fuelRefill.fuelAmountPkr) : "-"}</td>
+          <td>${fuelRefill.refillDate ? formatShortDate(fuelRefill.refillDate) : "-"}</td><td>${fuelRefill.runningMeter !== "" && fuelRefill.runningMeter != null ? text(fuelRefill.runningMeter) : "-"}</td>
+          <td>${isFirstLine && Number(item.totalDistanceKm || 0) > 0 ? text(item.totalDistanceKm) : "-"}</td>
+          <td>${isFirstLine && totalFuelLiters > 0 && Number(item.totalDistanceKm || 0) > 0 ? (Number(item.totalDistanceKm) / totalFuelLiters).toFixed(2) : "-"}</td>
+          <td>${isFirstLine ? money(financials.profitLoss) : "-"}</td>
           <td>${isFirstLine && item.image ? `
             <button class="bilty-thumbnail" type="button" data-view-truck-image="${escapeHtml(item.id)}" aria-label="View truck details image">
               <img src="${escapeHtml(item.image)}" alt="Truck details attachment" />
@@ -6728,10 +7199,24 @@
     function fillForm(item) {
       if (!item) return;
       clearAdditionalDetailSections();
+      removedFuelRefillIds = new Set(Array.isArray(item.pendingFuelRefillDeleteIds) ? item.pendingFuelRefillDeleteIds : []);
+      if (fuelRefillList) fuelRefillList.innerHTML = "";
+      const existingFuelRefills = Array.isArray(item.fuelRefillRows) ? item.fuelRefillRows : [];
+      const historicalDieselLitres = Number(item.dieselExpense || 0);
+      if (historicalDieselLitres > 0) addFuelRefillRow({ isLegacy: true, fuelQuantityLiters: historicalDieselLitres });
+      if (existingFuelRefills.length) existingFuelRefills.forEach((refill) => addFuelRefillRow(refill));
+      else addFuelRefillRow();
       Object.keys(item).forEach((key) => {
         if (form.elements[key]) form.elements[key].value = item[key] !== null && item[key] !== undefined ? item[key] : "";
       });
       if (form.elements.dieselExpense) form.elements.dieselExpense.value = String(item.dieselExpense ?? 0);
+      if (legacyDieselNote) {
+        const historicalDiesel = Number(item.dieselExpense || 0);
+        legacyDieselNote.hidden = historicalDiesel <= 0;
+        legacyDieselNote.textContent = historicalDiesel > 0
+          ? `Purani Diesel Consumption value ko litres maana gaya hai. Original database value jaisi thi waisi hi hai; isay Fuel Refilled total aur average mein count kiya gaya hai. Purani entry mein station, date, amount aur meter reading saved nahi thay.`
+          : "";
+      }
       if (form.elements.salary) form.elements.salary.value = String(item.salary ?? 0);
       if (form.elements.importDetention) {
         form.elements.importDetention.value = item.importDetention !== undefined && item.importDetention !== null ? String(item.importDetention) : "0";
@@ -6785,7 +7270,20 @@
     form.querySelectorAll("[data-add-truck-detail]").forEach((button) => {
       button.addEventListener("click", () => addDetailSection(button.dataset.addTruckDetail));
     });
+    addFuelRefillButton?.addEventListener("click", () => {
+      addFuelRefillRow();
+      calculateTrip();
+    });
     form.addEventListener("click", (event) => {
+      const removeFuelButton = event.target.closest("[data-remove-fuel-refill]");
+      if (removeFuelButton) {
+        const row = removeFuelButton.closest("[data-fuel-refill-row]");
+        if (row?.dataset.refillId) removedFuelRefillIds.add(row.dataset.refillId);
+        row?.remove();
+        renumberFuelRefillRows();
+        calculateTrip();
+        return;
+      }
       const removeButton = event.target.closest("[data-remove-truck-detail]");
       if (!removeButton) return;
       const section = removeButton.closest("[data-truck-detail-section]");
@@ -6837,6 +7335,9 @@
       numberFields.forEach((name) => { normalized[name] = Number(calculatedData[name] || 0); });
       normalized.additionalImportDetails = collectAdditionalDetails("import");
       normalized.additionalExportDetails = collectAdditionalDetails("export");
+      normalized.fuelRefillRows = collectFuelRefillRows();
+      normalized.pendingFuelRefillDeleteIds = [...removedFuelRefillIds];
+      normalized.pendingFuelRefillSync = true;
       const existingItem = editingId
         ? store.truckExpenses.find((item) => item.id === editingId)
         : null;
@@ -6863,6 +7364,9 @@
           : `Truck trip saved locally, but Supabase sync failed: ${error.message}`;
         return;
       }
+      normalized.pendingFuelRefillDeleteIds = [];
+      normalized.pendingFuelRefillSync = false;
+      saveStore(store, { skipRemote: true });
       render();
       resetForm();
     });
@@ -6915,18 +7419,24 @@
           const financials = calculateTruckTripFinancials(item);
           sum.grand += financials.grandTotal;
           sum.expense += financials.roundTripExpense;
-          sum.diesel += Number(item.dieselExpense || 0);
           sum.profit += financials.profitLoss;
+          getFuelRefillsForTrip(item).forEach((refill) => {
+            sum.fuelLiters += Number(refill.fuelQuantityLiters || 0);
+            sum.fuelAmount += Number(refill.fuelAmountPkr || 0);
+          });
           return sum;
-        }, { grand: 0, expense: 0, diesel: 0, profit: 0 });
+        }, { grand: 0, expense: 0, profit: 0, fuelLiters: 0, fuelAmount: 0 });
         const summaryRows = rows.flatMap((item) => {
           const imports = getTruckImportDetails(item);
           const exports = getTruckExportDetails(item);
-          const lineCount = Math.max(imports.length, exports.length);
+          const fuelRefills = getFuelRefillsForTrip(item);
+          const totalFuelLiters = fuelRefills.reduce((total, refill) => total + Number(refill.fuelQuantityLiters || 0), 0);
+          const lineCount = Math.max(imports.length, exports.length, fuelRefills.length, 1);
           const jobTotals = calculateTruckTripFinancials(item);
           return Array.from({ length: lineCount }, (_, detailIndex) => {
             const importDetail = imports[detailIndex] || {};
             const exportDetail = exports[detailIndex] || {};
+            const fuelRefill = fuelRefills[detailIndex] || {};
             const importReceivable = Number(importDetail.importReceivedAmount ?? (Number(importDetail.importFreight || 0) + Number(importDetail.importDetention || 0) - Number(importDetail.importBrokerCommission || 0)));
             const exportReceivable = Number(exportDetail.exportReceivedAmount ?? (Number(exportDetail.exportFreight || 0) + Number(exportDetail.exportDetention || 0) - Number(exportDetail.exportBrokerCommission || 0)));
             const firstLine = detailIndex === 0;
@@ -6944,12 +7454,27 @@
               money(Number(importDetail.mtyBoxFreight || 0) + Number(exportDetail.exportMtyBoxFreight || 0)),
               firstLine ? money(jobTotals.grandTotal) : "-",
               firstLine ? (Number(item.roundTripExpense || 0) > 0 ? money(jobTotals.roundTripExpense) : "Missing") : "-",
-              firstLine ? money(item.dieselExpense || 0) : "-",
+              fuelRefill.fuelStation || "-",
+              fuelRefill.fuelQuantityLiters !== "" && fuelRefill.fuelQuantityLiters != null ? money(fuelRefill.fuelQuantityLiters) : "-",
+              fuelRefill.fuelAmountPkr !== "" && fuelRefill.fuelAmountPkr != null ? money(fuelRefill.fuelAmountPkr) : "-",
+              fuelRefill.refillDate ? formatShortDate(fuelRefill.refillDate) : "-",
+              fuelRefill.runningMeter !== "" && fuelRefill.runningMeter != null ? money(fuelRefill.runningMeter) : "-",
+              firstLine && Number(item.totalDistanceKm || 0) > 0 ? money(item.totalDistanceKm) : "-",
+              firstLine && Number(item.totalDistanceKm || 0) > 0 && totalFuelLiters > 0
+                ? (Number(item.totalDistanceKm) / totalFuelLiters).toFixed(2)
+                : "-",
               firstLine ? money(jobTotals.profitLoss) : "-"
             ];
           });
         });
-        const amountColumnIndices = [6, 7, 8, 9, 10, 11, 12, 13, 14];
+        const amountColumnIndices = [6, 7, 8, 9, 10, 11, 12, 14, 15, 17, 18, 20];
+        const summaryFoot = Array(21).fill("");
+        summaryFoot[10] = "Total";
+        summaryFoot[11] = money(totals.grand);
+        summaryFoot[12] = money(totals.expense);
+        summaryFoot[14] = money(totals.fuelLiters);
+        summaryFoot[15] = money(totals.fuelAmount);
+        summaryFoot[20] = money(totals.profit);
         pdf.autoTable({
           startY: titleY + 16,
           margin: { left: 24, right: 24, top: 36, bottom: 65 },
@@ -6969,14 +7494,20 @@
             "MTY Freight",
             "Grand Total",
             "Round Trip\nExpense",
-            "Diesel\nConsumption",
+            "Fuel\nStation",
+            "Fuel Refilled\n(Litres)",
+            "Fuel Refill\nAmount (PKR)",
+            "Refill\nDate",
+            "Running Meter\n(KM)",
+            "Total Distance\nCovered (KM)",
+            "Fuel Average\n(KM/L)",
             "P&L"
           ]],
           body: summaryRows,
-          foot: [["", "", "", "", "", "", "", "", "", "", "Total", money(totals.grand), money(totals.expense), money(totals.diesel), money(totals.profit)]],
+          foot: [summaryFoot],
           styles: {
-            fontSize: 10,
-            cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
+            fontSize: 8.5,
+            cellPadding: { top: 6, bottom: 6, left: 3, right: 3 },
             lineColor: [40, 40, 40],
             lineWidth: 0.65,
             textColor: [0, 0, 0],
@@ -6986,7 +7517,7 @@
           headStyles: {
             fillColor: SUMMARY_PDF_HEADER_FILL,
             textColor: SUMMARY_PDF_HEADER_TEXT,
-            fontSize: 9.5,
+            fontSize: 8.2,
             fontStyle: "bold",
             minCellHeight: 46,
             valign: "middle",
@@ -7001,26 +7532,33 @@
             fillColor: [248, 234, 220],
             textColor: [24, 48, 77],
             fontStyle: "bold",
-            fontSize: 10,
-            minCellHeight: 34,
+            fontSize: 8.5,
+            minCellHeight: 30,
             valign: "middle"
           },
           columnStyles: {
-            0: { cellWidth: 90, halign: "center" },
-            1: { cellWidth: 64, halign: "center" },
-            2: { cellWidth: 70, halign: "center" },
-            3: { cellWidth: 100, halign: "left" },
-            4: { cellWidth: 50, halign: "center" },
-            5: { cellWidth: 50, halign: "center" },
-            6: { cellWidth: 79, halign: "right" },
-            7: { cellWidth: 79, halign: "right" },
-            8: { cellWidth: 79, halign: "right" },
-            9: { cellWidth: 79, halign: "right" },
-            10: { cellWidth: 79, halign: "right" },
-            11: { cellWidth: 79, halign: "right" },
-            12: { cellWidth: 79, halign: "right" },
-            13: { cellWidth: 79, halign: "right" },
-            14: { cellWidth: 79, halign: "right" }
+            0: { cellWidth: 48, halign: "center" },
+            1: { cellWidth: 40, halign: "center" },
+            2: { cellWidth: 45, halign: "center" },
+            3: { cellWidth: 65, halign: "left" },
+            4: { cellWidth: 32, halign: "center" },
+            5: { cellWidth: 32, halign: "center" },
+            6: { cellWidth: 58, halign: "right" },
+            7: { cellWidth: 58, halign: "right" },
+            8: { cellWidth: 58, halign: "right" },
+            9: { cellWidth: 58, halign: "right" },
+            10: { cellWidth: 58, halign: "right" },
+            11: { cellWidth: 58, halign: "right" },
+            12: { cellWidth: 58, halign: "right" },
+            13: { cellWidth: 58, halign: "left" },
+            14: { cellWidth: 38, halign: "right" },
+            15: { cellWidth: 52, halign: "right" },
+            16: { cellWidth: 42, halign: "center" },
+            17: { cellWidth: 44, halign: "right" },
+            18: { cellWidth: 48, halign: "right" },
+            19: { cellWidth: 38, halign: "right" },
+            20: { cellWidth: 50, halign: "right" },
+            21: { cellWidth: 55, halign: "right" }
           },
           didParseCell: (data) => {
             if (data.section === "head") {
@@ -7701,7 +8239,7 @@
           : String(item.customerName || "").trim().toLowerCase() === selectedCustomer))
         .filter((item) => !from || String(item.date || "") >= from)
         .filter((item) => !to || String(item.date || "") <= to)
-        .filter((item) => !query || [item.date, item.customerName, item.customerAddress, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks,
+        .filter((item) => !query || [item.date, item.customerName, item.customerAddress, item.origin, item.blNo, item.containerNo, item.lotOf, item.destination, item.consigneeName, item.size, item.description, item.truckNo, item.billNo, item.receivedId, item.remarks, item.partyRemarks, item.brokerRemarks,
         ...(item.twoPayContainerRows || []).flatMap((line) => [line.containerNo, line.containerSize, line.truckNo, line.quantity]),
         ...(item.twoPayBrokerRows || []).flatMap((line) => [line.truckerBroker, line.containerRef, line.truckNo, line.containerSize, line.amount, line.paymentDetails, line.paymentDate, line.paymentStatus])]
           .some((value) => String(value || "").toLowerCase().includes(query)))
@@ -7768,7 +8306,7 @@
           ["Party Balance", money(getPartyBalance(item))], ["Party Remarks", item.partyRemarks || "-"],
           ["Received Amount", money(item.receivedAmount)], ["Receivable Balance", money(item.receivedBalance)],
           ["Received Date", item.receivedDate ? formatShortDate(item.receivedDate) : "-"], ["Received ID", item.receivedId || "-"],
-          ["Received Remarks", item.remarks || "-"]
+          ["Received Remarks", item.remarks || "-"], ["Trucker / Broker Remarks", item.brokerRemarks || "-"]
         ],
         styles: { fontSize: 8.6, cellPadding: { top: 3.5, bottom: 3.5, left: 6, right: 6 }, lineColor: [226, 210, 193], textColor: [25, 40, 58] },
         headStyles: { fillColor: [24, 48, 77], textColor: [255, 255, 255], fontSize: 9, fontStyle: "bold", cellPadding: { top: 4, bottom: 4, left: 6, right: 6 } },
@@ -7996,12 +8534,12 @@
           <td>${renderStackedValues(containers.map((line) => line.containerNo), item.containerNo || "-")}</td><td>${totalQuantity ? money(totalQuantity) : "-"}</td><td>${text(item.lotOf || "-")}</td><td>${text(item.destination || "-")}</td><td>${text(item.consigneeName || "-")}</td><td>${renderStackedValues(containers.map((line) => line.containerSize), item.size || "-")}</td><td>${text(item.description || "-")}</td><td>${renderStackedValues(containers.map((line) => line.truckNo), item.truckNo || "-")}</td>
           <td>${money(item.roadFreightTwoPay)}</td><td>${money(item.taxAmount)}</td><td>${money(item.detentionCharges)}</td><td>${money(item.billingAmount)}</td><td>${money(item.globalReceivable)}</td>
           <td>${renderStackedValues(brokers.map((line) => line.truckerBroker))}</td><td>${renderStackedValues(brokers.map((line) => line.containerRef))}</td><td>${renderStackedValues(brokers.map((line) => line.truckNo))}</td><td>${renderStackedValues(brokers.map((line) => line.containerSize))}</td><td>${renderStackedValues(brokers.map((line) => line.amount === "" ? "-" : money(line.amount)))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentDetails))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentDate ? formatShortDate(line.paymentDate) : "-"))}</td><td>${renderStackedValues(brokers.map((line) => line.paymentStatus))}</td>
-          <td>${money(pnl)}</td>
-          <td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(getPartyBalance(item))}${getPartyPending(item) > 0 ? ' <span class="badge warn">Pending</span>' : ""}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${text(item.remarks || "-")}</td>
+          <td>${text(item.brokerRemarks || "-")}</td>
+          <td>${text(item.billNo || "-")}</td><td>${money(item.partyCollection)}</td><td>${money(item.partyCollectionPaidAmount)}</td><td>${item.partyCollectionPaidDate ? formatShortDate(item.partyCollectionPaidDate) : "-"}</td><td>${money(getPartyBalance(item))}${getPartyPending(item) > 0 ? ' <span class="badge warn">Pending</span>' : ""}</td><td>${text(item.partyRemarks || "-")}</td><td>${money(item.receivedAmount)}</td><td>${money(item.receivedBalance)}</td><td>${item.receivedDate ? formatShortDate(item.receivedDate) : "-"}</td><td>${text(item.receivedId || "-")}</td><td>${money(pnl)}</td><td>${text(item.remarks || "-")}</td>
           <td><div class="table-actions"><button class="btn small" type="button" data-download-two-pay="${escapeHtml(item.id)}">Invoice</button><button class="btn small" type="button" data-edit-two-pay="${escapeHtml(item.id)}">Edit</button></div></td>
         </tr>
       `;
-      }).join("") : `<tr><td colspan="40" class="empty-state">No Two Pay records available.</td></tr>`;
+      }).join("") : `<tr><td colspan="41" class="empty-state">No Two Pay records available.</td></tr>`;
     }
 
     [search, customerFilter, startDate, endDate, order].filter(Boolean).forEach((control) => {
@@ -10606,6 +11144,17 @@
     return `Rupees ${words.trim()} Only`;
   }
 
+  function requiresVoucherClearanceDate(method) {
+    return ["cheque", "pay order"].includes(String(method || "").trim().toLowerCase());
+  }
+
+  function getVoucherPaymentMethodLabel(item = {}) {
+    const method = String(item.paymentMethod || "-");
+    if (!requiresVoucherClearanceDate(method)) return method;
+    const status = item.clearanceDate ? `Cleared: ${formatShortDate(item.clearanceDate)}` : "Not Cleared";
+    return `${method}\n${status}`;
+  }
+
   async function buildPaymentVoucherPdf(voucher) {
     if (!window.jspdf || !window.jspdf.jsPDF) {
       throw new Error("The PDF library could not be loaded.");
@@ -10627,7 +11176,7 @@
       if (item) {
         tableBody.push([
           String(item.serialNo || i + 1),
-          item.paymentMethod || "-",
+          getVoucherPaymentMethodLabel(item),
           item.unitPrice ? money(item.unitPrice) : "-",
           item.description || "-",
           money(item.amount)
@@ -10639,13 +11188,14 @@
 
     const bannerY = 26;
     const metaStartY = bannerY + 148;
-    const tableStartY = metaStartY + 42;
+    const tableStartY = metaStartY + 66;
     const wrappedDescriptionLines = tableBody.reduce((count, row) => {
       const lineCount = Math.max(1, Math.ceil(String(row[3] || "").length / 40));
       return count + lineCount - 1;
     }, 0);
+    const wrappedMethodLines = tableBody.reduce((count, row) => count + Math.max(0, String(row[1] || "").split("\n").length - 1), 0);
     const standardA4Height = 841.89;
-    const compactPageHeight = Math.ceil(tableStartY + 25 + (totalRowCount * 24) + (wrappedDescriptionLines * 12) + 25 + 36 + 75 + 16 + 28);
+    const compactPageHeight = Math.ceil(tableStartY + 25 + (totalRowCount * 24) + ((wrappedDescriptionLines + wrappedMethodLines) * 12) + 25 + 36 + 75 + 16 + 28);
     const pdf = new jsPDF("p", "pt", compactPageHeight < standardA4Height ? [pageWidth, compactPageHeight] : "a4");
     const pageHeight = pdf.internal.pageSize.getHeight();
 
@@ -10684,7 +11234,7 @@
     // pdf.text("Contact No. 021-328 62660 / 0300-1234567", pageWidth / 2, bannerY + 107, { align: "center" });
     // pdf.text("E-mail ID: info@gtls.com.pk", pageWidth / 2, bannerY + 121, { align: "center" });
 
-    // Metadata lines: Pay To, PV No., Pay By, Date
+    // Metadata lines: Pay To, PV No., Pay By, Date, and the linked bank account.
     const leftLabelX = 36;
     const leftValX = 84;
     const leftLineEnd = 290;
@@ -10722,6 +11272,13 @@
     pdf.line(rightValX, metaStartY + 26, rightLineEnd, metaStartY + 26);
     pdf.setFont("helvetica", "normal");
     pdf.text(formatShortDate(voucher.voucherDate) || "-", rightValX + 4, metaStartY + 24);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Paid From Bank Account", leftLabelX, metaStartY + 48);
+    pdf.line(150, metaStartY + 50, rightLineEnd, metaStartY + 50);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9.5);
+    pdf.text(String(voucher.paidFromBankAccountLabel || "Not linked"), 154, metaStartY + 48);
 
     const footTotalAmount = money(voucher.totalAmount);
 
@@ -10853,9 +11410,10 @@
     pdf.text(String(filterTitle || "All Records"), 36, titleY + 20);
 
     const totalDisbursed = vouchers.reduce((sum, v) => sum + Number(v.totalAmount || 0), 0);
-    const headers = ["S.No", "PV No.", "Date", "Pay To", "Pay By", "A/C No.", "Payment Method", "Description / Particulars", "Amount (PKR)", "Prepared By", "Received By"];
+    const headers = ["S.No", "PV No.", "Date", "Pay To", "Pay By", "Paid From Bank", "A/C No.", "Payment Method", "Description / Particulars", "Amount (PKR)", "Prepared By", "Received By"];
     const body = vouchers.map((v, index) => {
-      const methods = (v.items || []).map((i) => i.paymentMethod).filter(Boolean).join(", ") || "-";
+      const methods = (v.items || []).filter((item) => item?.paymentMethod)
+        .map((item) => getVoucherPaymentMethodLabel(item).replace(/\n/g, " ")).join(", ") || "-";
       const desc = (v.items || []).map((i) => i.description).filter(Boolean).join("; ") || "-";
       return [
         String(index + 1),
@@ -10863,6 +11421,7 @@
         formatShortDate(v.voucherDate),
         v.payTo || "-",
         v.payBy || "-",
+        v.paidFromBankAccountLabel || "-",
         v.accountNo || "-",
         methods,
         desc,
@@ -10871,7 +11430,7 @@
         v.receivedBy || "-"
       ];
     });
-    const foot = ["", "", "", "", "", "", "", "Total Disbursed", money(totalDisbursed), "", ""];
+    const foot = ["", "", "", "", "", "", "", "", "Total Disbursed", money(totalDisbursed), "", ""];
 
     pdf.autoTable({
       startY: titleY + 34,
@@ -10912,17 +11471,18 @@
         2: { cellWidth: 75, halign: "center" },
         3: { cellWidth: 140 },
         4: { cellWidth: 100 },
-        5: { cellWidth: 85 },
-        6: { cellWidth: 110, halign: "center" },
-        7: { cellWidth: "auto" },
-        8: { cellWidth: 95, halign: "right" },
-        9: { cellWidth: 90 },
-        10: { cellWidth: 90 }
+        5: { cellWidth: 150 },
+        6: { cellWidth: 85 },
+        7: { cellWidth: 110, halign: "center" },
+        8: { cellWidth: "auto" },
+        9: { cellWidth: 95, halign: "right" },
+        10: { cellWidth: 90 },
+        11: { cellWidth: 90 }
       },
       didParseCell: (data) => {
         if (data.section === "foot") {
-          if (data.column.index === 7) data.cell.styles.halign = "center";
-          if (data.column.index === 8) data.cell.styles.halign = "right";
+          if (data.column.index === 8) data.cell.styles.halign = "center";
+          if (data.column.index === 9) data.cell.styles.halign = "right";
         }
       }
     });
@@ -10964,17 +11524,16 @@
     pdf.text(String(filterTitle || "All Records"), 36, titleY + 20);
 
     const totalAmount = entries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const headers = ["S.No", "Date", "Entry Type", "From Account / Source", "Banker", "Remarks", "Amount (PKR)"];
+    const headers = ["S.No", "Date", "Entry Type", "Bank Account", "Remarks", "Amount (PKR)"];
     const body = entries.map((e, index) => [
       String(index + 1),
       formatShortDate(e.entryDate),
       e.entryType === "opening_balance" ? "Opening Fund Balance" : "Funds Added",
-      text(e.sourceAccount || "-"),
-      text(e.reference || "-"),
+      text(e.bankAccountLabel || e.sourceAccount || "-"),
       text(e.remarks || "-"),
       money(e.amount)
     ]);
-    const foot = ["", "", "", "", "", "Total Amount", money(totalAmount)];
+    const foot = ["", "", "", "", "Total Amount", money(totalAmount)];
 
     pdf.autoTable({
       startY: titleY + 34,
@@ -11013,16 +11572,12 @@
         0: { cellWidth: 35, halign: "center" },
         1: { cellWidth: 80, halign: "center" },
         2: { cellWidth: 120, halign: "center" },
-        3: { cellWidth: 140 },
-        4: { cellWidth: 110 },
-        5: { cellWidth: "auto" },
-        6: { cellWidth: 110, halign: "right" }
+        3: { cellWidth: 165 },
+        4: { cellWidth: "auto" },
+        5: { cellWidth: 110, halign: "right" }
       },
       didParseCell: (data) => {
-        if (data.section === "foot") {
-          if (data.column.index === 5) data.cell.styles.halign = "right";
-          if (data.column.index === 6) data.cell.styles.halign = "right";
-        }
+        if (data.section === "foot" && data.column.index === 5) data.cell.styles.halign = "right";
       }
     });
 
@@ -11041,6 +11596,7 @@
 
   function paymentVoucherPage(store) {
     const form = document.querySelector("[data-voucher-form]");
+    const bankAccountForm = document.querySelector("[data-voucher-bank-account-form]");
     const fundForm = document.querySelector("[data-voucher-fund-form]");
     const itemsBody = document.querySelector("[data-voucher-items-body]");
     const addItemBtn = document.querySelector("[data-add-voucher-item]");
@@ -11054,9 +11610,18 @@
     const totalAmountEl = document.querySelector("[data-voucher-total-amount]");
     const cashCountEl = document.querySelector("[data-voucher-cash-count]");
     const bankCountEl = document.querySelector("[data-voucher-bank-count]");
-    const openingBalanceEl = document.querySelector("[data-voucher-opening-balance]");
-    const availableBalanceEl = document.querySelector("[data-voucher-available-balance]");
+    const bankOpeningBalanceEl = document.querySelector("[data-voucher-bank-opening]");
+    const bankFundsAddedEl = document.querySelector("[data-voucher-bank-added]");
+    const bankVoucherPaymentsEl = document.querySelector("[data-voucher-bank-paid]");
+    const bankAvailableBalanceEl = document.querySelector("[data-voucher-bank-available]");
+    const bankStatsScope = document.querySelector("[data-voucher-fund-scope]");
+    const paidFromBankSelect = document.querySelector("[data-voucher-paid-from-bank]");
+    const bankAccountTableBody = document.querySelector("[data-voucher-bank-account-rows]");
+    const bankAccountNotice = document.querySelector("[data-voucher-bank-account-notice]");
+    const bankAccountSubmitBtn = bankAccountForm?.querySelector("[data-voucher-bank-account-submit]");
+    const bankAccountResetBtn = document.querySelector("[data-voucher-bank-account-reset]");
     const fundTypeSelect = document.querySelector("[data-voucher-fund-type]");
+    const fundBankAccountSelect = document.querySelector("[data-voucher-fund-bank-account]");
     const fundSubmitBtn = document.querySelector("[data-voucher-fund-submit]");
     const fundResetBtn = document.querySelector("[data-voucher-fund-reset]");
     const fundTableBody = document.querySelector("[data-voucher-fund-rows]");
@@ -11064,7 +11629,7 @@
 
     const fundSearchInput = document.querySelector("[data-voucher-fund-search]");
     const fundTypeFilter = document.querySelector("[data-voucher-fund-type-filter]");
-    const fundSourceFilter = document.querySelector("[data-voucher-fund-source-filter]");
+    const fundBankFilter = document.querySelector("[data-voucher-fund-bank-filter]");
     const fundStartDateInput = document.querySelector("[data-voucher-fund-start-date]");
     const fundEndDateInput = document.querySelector("[data-voucher-fund-end-date]");
     const fundDateOrderSelect = document.querySelector("[data-voucher-fund-date-order]");
@@ -11074,17 +11639,49 @@
 
     const searchInput = document.querySelector("[data-voucher-search]");
     const payeeFilter = document.querySelector("[data-voucher-payee-filter]");
+    const voucherBankFilter = document.querySelector("[data-voucher-bank-filter]");
     const startDateInput = document.querySelector("[data-voucher-start-date]");
     const endDateInput = document.querySelector("[data-voucher-end-date]");
     const dateOrderSelect = document.querySelector("[data-voucher-date-order]");
     const countBadge = document.querySelector("[data-voucher-count]");
     const downloadSummaryBtn = document.querySelector("[data-download-voucher-summary]");
     const tableBody = document.querySelector("[data-voucher-rows]");
+    const voucherTabs = Array.from(document.querySelectorAll("[data-voucher-tab]"));
+    const voucherPanels = Array.from(document.querySelectorAll("[data-voucher-panel]"));
 
     if (!form || !tableBody || !fundForm || !fundTableBody) return;
 
+    function activateVoucherTab(tabName, focusTab = false) {
+      voucherTabs.forEach((tab) => {
+        const isActive = tab.dataset.voucherTab === tabName;
+        tab.classList.toggle("is-active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+        tab.tabIndex = isActive ? 0 : -1;
+      });
+      voucherPanels.forEach((panel) => {
+        panel.hidden = panel.dataset.voucherPanel !== tabName;
+      });
+      if (focusTab) voucherTabs.find((tab) => tab.dataset.voucherTab === tabName)?.focus();
+    }
+
+    voucherTabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => activateVoucherTab(tab.dataset.voucherTab));
+      tab.addEventListener("keydown", (event) => {
+        let nextIndex = index;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % voucherTabs.length;
+        else if (event.key === "ArrowLeft") nextIndex = (index - 1 + voucherTabs.length) % voucherTabs.length;
+        else if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = voucherTabs.length - 1;
+        else return;
+        event.preventDefault();
+        activateVoucherTab(voucherTabs[nextIndex].dataset.voucherTab, true);
+      });
+    });
+    activateVoucherTab("vouchers");
+
     let editingId = "";
     let editingFundId = "";
+    let editingBankAccountId = "";
 
     function setNotice(message = "", isError = false) {
       if (!notice) return;
@@ -11100,47 +11697,145 @@
       fundNotice.classList.toggle("error", isError);
     }
 
+    function setBankAccountNotice(message = "", isError = false) {
+      if (!bankAccountNotice) return;
+      bankAccountNotice.textContent = message;
+      bankAccountNotice.hidden = !message;
+      bankAccountNotice.classList.toggle("error", isError);
+    }
+
+    function getBankAccountById(id) {
+      return (store.paymentVoucherBankAccounts || []).find((account) => String(account.id) === String(id)) || null;
+    }
+
+    function getBankAccountDisplay(id, fallback = "") {
+      const account = getBankAccountById(id);
+      if (!account) return fallback || "Unassigned / old record";
+      return [account.bankName, account.accountTitle, account.accountNumber].filter(Boolean).join(" — ");
+    }
+
+    function getBankAccountOptionLabel(account) {
+      const title = String(account.accountTitle || "").trim();
+      const number = String(account.accountNumber || "").trim();
+      const accountHint = [title, number ? `A/C ${number}` : "Account"].filter(Boolean).join(" — ");
+      return `${account.bankName} — ${accountHint}`;
+    }
+
+    function renderBankAccountOptions() {
+      const accounts = [...(store.paymentVoucherBankAccounts || [])]
+        .filter((account) => account.id && account.bankName && account.accountNumber)
+        .sort((left, right) => String(left.bankName).localeCompare(String(right.bankName)) || String(left.accountTitle || left.accountNumber).localeCompare(String(right.accountTitle || right.accountNumber)));
+      const currentFundAccountId = fundBankAccountSelect?.value || "";
+      const currentVoucherAccountId = paidFromBankSelect?.value || "";
+      if (fundBankAccountSelect) {
+        fundBankAccountSelect.innerHTML = `<option value="">Select a bank account</option>${accounts.map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(getBankAccountOptionLabel(account))}</option>`).join("")}`;
+        fundBankAccountSelect.value = accounts.some((account) => String(account.id) === currentFundAccountId) ? currentFundAccountId : "";
+      }
+      if (paidFromBankSelect) {
+        paidFromBankSelect.innerHTML = `<option value="">No bank account linked (e.g. cash)</option>${accounts.map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(getBankAccountOptionLabel(account))}</option>`).join("")}`;
+        paidFromBankSelect.value = accounts.some((account) => String(account.id) === currentVoucherAccountId) ? currentVoucherAccountId : "";
+      }
+    }
+
+    function resetBankAccountForm() {
+      bankAccountForm?.reset();
+      editingBankAccountId = "";
+      if (bankAccountSubmitBtn) bankAccountSubmitBtn.textContent = "Save Bank Account";
+      setBankAccountNotice("");
+    }
+
+    function refreshFundEntryTypeAvailability() {
+      if (!fundTypeSelect) return;
+      const selectedBankId = String(fundBankAccountSelect?.value || "");
+      const hasOpening = selectedBankId && (store.paymentVoucherFunds || []).some((entry) =>
+        entry.entryType === "opening_balance" && String(entry.bankAccountId || "") === selectedBankId && String(entry.id) !== String(editingFundId)
+      );
+      const openingOption = fundTypeSelect.querySelector('option[value="opening_balance"]');
+      if (openingOption) openingOption.disabled = Boolean(hasOpening);
+      if (hasOpening && fundTypeSelect.value === "opening_balance") fundTypeSelect.value = "fund_added";
+    }
+
+    function renderBankAccountRows() {
+      if (!bankAccountTableBody) return;
+      const accounts = [...(store.paymentVoucherBankAccounts || [])]
+        .sort((left, right) => String(left.bankName).localeCompare(String(right.bankName)) || String(left.accountNumber).localeCompare(String(right.accountNumber)));
+      if (!accounts.length) {
+        bankAccountTableBody.innerHTML = '<tr><td colspan="4" class="empty-state">No bank accounts added yet.</td></tr>';
+        return;
+      }
+      bankAccountTableBody.innerHTML = accounts.map((account) => `
+        <tr>
+          <td><strong>${text(account.bankName)}</strong></td>
+          <td>${text(account.accountTitle || "-")}</td>
+          <td>${text(account.accountNumber)}</td>
+          <td><button class="btn small" type="button" data-edit-voucher-bank-account="${escapeHtml(account.id)}">Edit</button></td>
+        </tr>`).join("");
+    }
+
     function resetFundForm() {
+      const previousAccountId = fundBankAccountSelect?.value || fundBankFilter?.value || "";
       fundForm.reset();
       editingFundId = "";
       fundForm.elements.entryDate.value = getTodayIsoDate();
-      const hasOpening = (store.paymentVoucherFunds || []).some((entry) => entry.entryType === "opening_balance");
+      renderBankAccountOptions();
+      if (fundBankAccountSelect) {
+        if ((store.paymentVoucherBankAccounts || []).some((account) => String(account.id) === String(previousAccountId))) {
+          fundBankAccountSelect.value = previousAccountId;
+        } else if ((store.paymentVoucherBankAccounts || []).length === 1) {
+          fundBankAccountSelect.value = String(store.paymentVoucherBankAccounts[0].id);
+        }
+      }
+      const selectedBankId = String(fundBankAccountSelect?.value || "");
+      const hasOpening = selectedBankId && (store.paymentVoucherFunds || []).some((entry) =>
+        entry.entryType === "opening_balance" && String(entry.bankAccountId || "") === selectedBankId
+      );
       fundTypeSelect.value = hasOpening ? "fund_added" : "opening_balance";
-      const openingOption = fundTypeSelect.querySelector('option[value="opening_balance"]');
-      if (openingOption) openingOption.disabled = hasOpening;
+      refreshFundEntryTypeAvailability();
       if (fundSubmitBtn) fundSubmitBtn.textContent = "Save Funds Entry";
       setFundNotice("");
     }
 
-    function getVoucherFundTotals() {
-      const funds = store.paymentVoucherFunds || [];
-      const openingEntry = funds.find((entry) => entry.entryType === "opening_balance");
-      const openingBalance = Number(openingEntry?.amount || 0);
-      const openingDate = String(openingEntry?.entryDate || "");
+    function getVoucherFundTotals(accountFilter = String(fundBankFilter?.value || "")) {
+      const allFunds = store.paymentVoucherFunds || [];
+      const allVouchers = store.paymentVouchers || [];
+      const matchesAccount = (accountId) => !accountFilter
+        || (accountFilter === "__unassigned__" ? !accountId : String(accountId || "") === accountFilter);
+      const funds = allFunds.filter((entry) => matchesAccount(entry.bankAccountId));
+      const vouchers = allVouchers.filter((voucher) => matchesAccount(voucher.paidFromBankAccountId));
+      const bucketIds = [...new Set([...funds.map((entry) => String(entry.bankAccountId || "__unassigned__")), ...vouchers.map((voucher) => String(voucher.paidFromBankAccountId || "__unassigned__"))])];
       const today = getTodayIsoDate();
-      const isInBalancePeriod = (date) => {
-        const normalizedDate = String(date || "");
-        return Boolean(normalizedDate && normalizedDate <= today && (!openingDate || normalizedDate >= openingDate));
-      };
-      const addedFunds = funds.filter((entry) => entry.entryType === "fund_added" && isInBalancePeriod(entry.entryDate))
-        .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
-      const disbursed = (store.paymentVouchers || [])
-        .filter((voucher) => isInBalancePeriod(voucher.voucherDate))
-        .reduce((sum, voucher) => sum + Number(voucher.totalAmount || 0), 0);
+      let openingBalance = 0;
+      let addedFunds = 0;
+      let disbursed = 0;
+      bucketIds.forEach((bucketId) => {
+        const bucketFunds = funds.filter((entry) => String(entry.bankAccountId || "__unassigned__") === bucketId);
+        const openingEntry = bucketFunds.find((entry) => entry.entryType === "opening_balance");
+        const bucketOpening = Number(openingEntry?.amount || 0);
+        const openingDate = String(openingEntry?.entryDate || "");
+        openingBalance += bucketOpening;
+        const isInBalancePeriod = (date) => {
+          const normalizedDate = String(date || "");
+          return Boolean(normalizedDate && normalizedDate <= today && (!openingDate || normalizedDate >= openingDate));
+        };
+        addedFunds += bucketFunds.filter((entry) => entry.entryType === "fund_added" && isInBalancePeriod(entry.entryDate))
+          .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+        disbursed += vouchers.filter((voucher) => String(voucher.paidFromBankAccountId || "__unassigned__") === bucketId && isInBalancePeriod(voucher.voucherDate))
+          .reduce((sum, voucher) => sum + Number(voucher.totalAmount || 0), 0);
+      });
       return { openingBalance, addedFunds, disbursed, availableBalance: openingBalance + addedFunds - disbursed };
     }
 
     function getFilteredFundRows() {
       const query = String(fundSearchInput?.value || "").trim().toLowerCase();
       const type = String(fundTypeFilter?.value || "").trim();
-      const source = String(fundSourceFilter?.value || "").trim().toLowerCase();
+      const bankAccountId = String(fundBankFilter?.value || "").trim();
       const start = String(fundStartDateInput?.value || "").trim();
       const end = String(fundEndDateInput?.value || "").trim();
       const order = fundDateOrderSelect?.value || "desc";
 
       return (store.paymentVoucherFunds || [])
         .filter((item) => !type || item.entryType === type)
-        .filter((item) => !source || String(item.sourceAccount || "").trim().toLowerCase() === source)
+        .filter((item) => !bankAccountId || (bankAccountId === "__unassigned__" ? !item.bankAccountId : String(item.bankAccountId || "") === bankAccountId))
         .filter((item) => !start || String(item.entryDate || "") >= start)
         .filter((item) => !end || String(item.entryDate || "") <= end)
         .filter((item) => {
@@ -11151,8 +11846,8 @@
             formatShortDate(item.entryDate),
             item.entryType,
             typeLabel,
+            getBankAccountDisplay(item.bankAccountId, item.sourceAccount),
             item.sourceAccount,
-            item.reference,
             item.remarks,
             String(item.amount || ""),
             money(item.amount)
@@ -11165,36 +11860,72 @@
         });
     }
 
-    function renderFundSourceFilter() {
-      if (!fundSourceFilter) return;
-      const currentSource = fundSourceFilter.value;
-      const sources = [...new Set((store.paymentVoucherFunds || [])
-        .map((item) => String(item.sourceAccount || "").trim())
-        .filter(Boolean))].sort((a, b) => a.localeCompare(b));
-
-      fundSourceFilter.innerHTML = `<option value="">All Sources</option>${sources.map((s) => `<option value="${escapeHtml(s.toLowerCase())}">${escapeHtml(s)}</option>`).join("")}`;
-      fundSourceFilter.value = sources.map((s) => s.toLowerCase()).includes(currentSource) ? currentSource : "";
+    function renderFundBankFilter() {
+      if (!fundBankFilter) return;
+      const currentAccountId = fundBankFilter.value;
+      const accounts = [...(store.paymentVoucherBankAccounts || [])]
+        .filter((account) => account.id && account.bankName && account.accountNumber)
+        .sort((left, right) => String(left.bankName).localeCompare(String(right.bankName)) || String(left.accountTitle || left.accountNumber).localeCompare(String(right.accountTitle || right.accountNumber)));
+      const hasUnassigned = (store.paymentVoucherFunds || []).some((entry) => !entry.bankAccountId)
+        || (store.paymentVouchers || []).some((voucher) => !voucher.paidFromBankAccountId);
+      const unassignedOption = hasUnassigned ? '<option value="__unassigned__">Unassigned / Old Records</option>' : "";
+      fundBankFilter.innerHTML = `<option value="">All Bank Accounts</option>${accounts.map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(getBankAccountOptionLabel(account))}</option>`).join("")}${unassignedOption}`;
+      fundBankFilter.value = accounts.some((account) => String(account.id) === currentAccountId) || (hasUnassigned && currentAccountId === "__unassigned__") ? currentAccountId : "";
     }
 
     function renderFundEntries() {
-      renderFundSourceFilter();
+      renderBankAccountOptions();
+      renderFundBankFilter();
+      renderBankAccountRows();
+      refreshFundEntryTypeAvailability();
+      const selectedBankId = String(fundBankFilter?.value || "");
+      const selectedBank = getBankAccountById(selectedBankId);
+      if (bankStatsScope) {
+        bankStatsScope.textContent = selectedBank
+          ? `Balances for ${getBankAccountDisplay(selectedBank.id)}.`
+          : selectedBankId === "__unassigned__"
+            ? "Balances for older records without a linked bank account."
+            : "Balances for all bank accounts, including older unlinked records.";
+      }
+      const totals = getVoucherFundTotals(selectedBankId);
+      if (bankOpeningBalanceEl) bankOpeningBalanceEl.textContent = `PKR ${money(totals.openingBalance)}`;
+      if (bankFundsAddedEl) bankFundsAddedEl.textContent = `PKR ${money(totals.addedFunds)}`;
+      if (bankVoucherPaymentsEl) bankVoucherPaymentsEl.textContent = `PKR ${money(totals.disbursed)}`;
+      if (bankAvailableBalanceEl) {
+        bankAvailableBalanceEl.textContent = `PKR ${money(totals.availableBalance)}`;
+        bankAvailableBalanceEl.classList.toggle("negative-balance", totals.availableBalance < 0);
+      }
       const entries = getFilteredFundRows();
       if (fundCountBadge) fundCountBadge.textContent = `${entries.length} entry(ies)`;
 
       if (!entries.length) {
-        fundTableBody.innerHTML = '<tr><td colspan="7" class="empty-state">No matching fund balance entries found.</td></tr>';
+        fundTableBody.innerHTML = '<tr><td colspan="6" class="empty-state">No matching fund balance entries found.</td></tr>';
         return;
       }
       fundTableBody.innerHTML = entries.map((entry) => `
         <tr>
           <td>${formatShortDate(entry.entryDate)}</td>
           <td><span class="badge ${entry.entryType === "opening_balance" ? "neutral" : "good"}">${entry.entryType === "opening_balance" ? "Opening Fund Balance" : "Funds Added"}</span></td>
-          <td>${text(entry.sourceAccount || "-")}</td>
-          <td>${text(entry.reference || "-")}</td>
+          <td>${text(getBankAccountDisplay(entry.bankAccountId, entry.sourceAccount))}</td>
           <td>${text(entry.remarks || "-")}</td>
           <td class="text-right"><strong>${money(entry.amount)}</strong></td>
           <td><div class="table-actions"><button class="btn small" type="button" data-edit-voucher-fund="${escapeHtml(entry.id)}">Edit</button><button class="btn small danger" type="button" data-delete-voucher-fund="${escapeHtml(entry.id)}">Delete</button></div></td>
         </tr>`).join("");
+    }
+
+    function isClearanceTrackedMethod(method) {
+      return requiresVoucherClearanceDate(method);
+    }
+
+    function renderClearanceStatus(items = []) {
+      const trackedItems = items.filter((item) => isClearanceTrackedMethod(item.paymentMethod));
+      if (!trackedItems.length) return "-";
+      return `<div class="voucher-clearance-status-list">${trackedItems.map((item, index) => {
+        const cleared = Boolean(item.clearanceDate);
+        const method = String(item.paymentMethod || "Payment");
+        const lineNo = item.serialNo || index + 1;
+        return `<div><span class="badge ${cleared ? "good" : "warn"}">${escapeHtml(method)} #${lineNo}: ${cleared ? "Cleared" : "Not Cleared"}</span>${cleared ? `<small>${formatShortDate(item.clearanceDate)}</small>` : ""}</div>`;
+      }).join("")}</div>`;
     }
 
     function createItemRow(item = {}) {
@@ -11213,6 +11944,13 @@
             <option value="Other"${method === "Other" ? " selected" : ""}>Other</option>
           </select>
         </td>
+        <td class="voucher-clearance-cell">
+          <div class="voucher-clearance-editor" data-clearance-editor>
+            <input type="date" name="itemClearanceDate" value="${escapeHtml(item.clearanceDate || "")}" aria-label="Cheque or pay order clearance date" />
+            <small>Leave blank if not cleared</small>
+          </div>
+          <span class="voucher-clearance-na" data-clearance-na>—</span>
+        </td>
         <td>
           <input type="text" name="itemDescription" placeholder="Description / Particulars" value="${escapeHtml(item.description || "")}" />
         </td>
@@ -11227,12 +11965,26 @@
         </td>
       `;
 
+      const paymentMethodSelect = tr.querySelector('[name="itemPaymentMethod"]');
+      const clearanceDateInput = tr.querySelector('[name="itemClearanceDate"]');
+      const clearanceEditor = tr.querySelector("[data-clearance-editor]");
+      const clearanceNotApplicable = tr.querySelector("[data-clearance-na]");
+      const updateClearanceField = () => {
+        const applies = isClearanceTrackedMethod(paymentMethodSelect?.value);
+        if (clearanceEditor) clearanceEditor.hidden = !applies;
+        if (clearanceNotApplicable) clearanceNotApplicable.hidden = applies;
+      };
+      paymentMethodSelect?.addEventListener("change", updateClearanceField);
+      updateClearanceField();
+
       tr.querySelector(".voucher-item-remove-btn").addEventListener("click", () => {
         const rows = itemsBody.querySelectorAll("tr");
         if (rows.length <= 1) {
           tr.querySelector('[name="itemDescription"]').value = "";
           tr.querySelector('[name="itemUnitPrice"]').value = "";
           tr.querySelector('[name="itemAmount"]').value = "";
+          tr.querySelector('[name="itemClearanceDate"]').value = "";
+          updateClearanceField();
         } else {
           tr.remove();
         }
@@ -11291,6 +12043,7 @@
       form.elements.payBy.value = "GTLS Logistics";
       if (form.elements.payTo) form.elements.payTo.value = "";
       if (form.elements.accountNo) form.elements.accountNo.value = "";
+      if (form.elements.paidFromBankAccountId) form.elements.paidFromBankAccountId.value = "";
       if (form.elements.preparedBy) form.elements.preparedBy.value = "";
       if (form.elements.receivedBy) form.elements.receivedBy.value = "";
       populateItems([]);
@@ -11306,10 +12059,13 @@
       form.elements.payTo.value = item.payTo || "";
       form.elements.payBy.value = item.payBy || "GTLS Logistics";
       form.elements.accountNo.value = item.accountNo || "";
+      renderBankAccountOptions();
+      form.elements.paidFromBankAccountId.value = item.paidFromBankAccountId || "";
       form.elements.preparedBy.value = item.preparedBy || "";
       form.elements.receivedBy.value = item.receivedBy || "";
       populateItems(item.items || []);
       if (submitBtn) submitBtn.textContent = "Update Payment Voucher";
+      activateVoucherTab("vouchers");
       form.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
@@ -11327,9 +12083,11 @@
         const description = tr.querySelector('[name="itemDescription"]')?.value || "";
         const unitPrice = Number(tr.querySelector('[name="itemUnitPrice"]')?.value || 0);
         const amount = Number(tr.querySelector('[name="itemAmount"]')?.value || 0);
+        const clearanceDate = tr.querySelector('[name="itemClearanceDate"]')?.value || "";
         return {
           serialNo: index + 1,
           paymentMethod,
+          clearanceDate: isClearanceTrackedMethod(paymentMethod) ? clearanceDate : "",
           description,
           unitPrice,
           amount
@@ -11352,6 +12110,7 @@
         payTo: form.elements.payTo.value.trim(),
         payBy: form.elements.payBy.value.trim() || "GTLS Logistics",
         accountNo: form.elements.accountNo.value.trim(),
+        paidFromBankAccountId: String(form.elements.paidFromBankAccountId?.value || "").trim(),
         preparedBy: form.elements.preparedBy.value.trim(),
         receivedBy: form.elements.receivedBy.value.trim(),
         totalAmount,
@@ -11387,12 +12146,82 @@
 
     resetBtn?.addEventListener("click", resetForm);
 
+    bankAccountForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const bankName = String(bankAccountForm.elements.bankName.value || "").trim();
+      const accountTitle = String(bankAccountForm.elements.accountTitle.value || "").trim();
+      const accountNumber = String(bankAccountForm.elements.accountNumber.value || "").trim();
+      const accountKey = accountNumber.replace(/[\s-]+/g, "").toLowerCase();
+      const duplicate = (store.paymentVoucherBankAccounts || []).find((account) =>
+        String(account.id) !== String(editingBankAccountId)
+        && String(account.bankName || "").trim().toLowerCase() === bankName.toLowerCase()
+        && String(account.accountNumber || "").replace(/[\s-]+/g, "").toLowerCase() === accountKey
+      );
+      if (!bankName || !accountKey) {
+        setBankAccountNotice("Enter both the bank name and account number.", true);
+        return;
+      }
+      if (duplicate) {
+        setBankAccountNotice("This bank and account number are already registered.", true);
+        return;
+      }
+
+      const wasEditing = Boolean(editingBankAccountId);
+      const bankAccount = {
+        id: editingBankAccountId || makeUuid(),
+        bankName,
+        accountTitle,
+        accountNumber,
+        updatedAt: new Date().toISOString()
+      };
+      const index = (store.paymentVoucherBankAccounts || []).findIndex((account) => String(account.id) === String(editingBankAccountId));
+      if (index >= 0) store.paymentVoucherBankAccounts[index] = bankAccount;
+      else store.paymentVoucherBankAccounts.unshift(bankAccount);
+
+      saveStore(store, { skipRemote: true });
+      let message = wasEditing ? "Bank account updated." : "Bank account saved.";
+      let failed = false;
+      try {
+        await syncStoreImmediately(store, { paymentVoucherBankAccounts: true, activityLogs: true });
+      } catch (error) {
+        message = `${message} It is saved on this device, but Supabase sync failed: ${error.message}`;
+        failed = true;
+      }
+      resetBankAccountForm();
+      renderBankAccountOptions();
+      if (fundBankAccountSelect && !fundBankAccountSelect.value) fundBankAccountSelect.value = bankAccount.id;
+      setBankAccountNotice(message, failed);
+      render();
+    });
+
+    bankAccountResetBtn?.addEventListener("click", resetBankAccountForm);
+    bankAccountTableBody?.addEventListener("click", (event) => {
+      const editId = event.target.closest("[data-edit-voucher-bank-account]")?.dataset.editVoucherBankAccount;
+      if (!editId || !bankAccountForm) return;
+      const account = getBankAccountById(editId);
+      if (!account) return;
+      editingBankAccountId = String(account.id);
+      bankAccountForm.elements.bankName.value = account.bankName || "";
+      bankAccountForm.elements.accountTitle.value = account.accountTitle || "";
+      bankAccountForm.elements.accountNumber.value = account.accountNumber || "";
+      if (bankAccountSubmitBtn) bankAccountSubmitBtn.textContent = "Update Bank Account";
+      setBankAccountNotice("");
+      bankAccountForm.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
     fundForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const entryType = fundTypeSelect.value === "opening_balance" ? "opening_balance" : "fund_added";
       const amount = Number(fundForm.elements.amount.value || 0);
+      const bankAccountId = String(fundForm.elements.bankAccountId.value || "").trim();
+      if (!getBankAccountById(bankAccountId)) {
+        setFundNotice("Please select a registered bank account for this entry.", true);
+        return;
+      }
       const existingOpening = (store.paymentVoucherFunds || []).find((entry) =>
-        entry.entryType === "opening_balance" && String(entry.id) !== String(editingFundId)
+        entry.entryType === "opening_balance"
+        && String(entry.bankAccountId || "") === bankAccountId
+        && String(entry.id) !== String(editingFundId)
       );
       if (!Number.isFinite(amount) || amount <= 0) {
         setFundNotice("Enter an amount greater than zero.", true);
@@ -11404,12 +12233,14 @@
       }
 
       const wasEditing = Boolean(editingFundId);
+      const oldEntry = (store.paymentVoucherFunds || []).find((entry) => String(entry.id) === String(editingFundId));
       const normalized = {
         id: editingFundId || (window.crypto?.randomUUID ? window.crypto.randomUUID() : `FUND-${Date.now()}`),
         entryType,
         entryDate: fundForm.elements.entryDate.value || getTodayIsoDate(),
-        sourceAccount: fundForm.elements.sourceAccount.value.trim(),
-        reference: fundForm.elements.reference.value.trim(),
+        bankAccountId,
+        sourceAccount: oldEntry?.sourceAccount || "",
+        reference: oldEntry?.reference || "",
         remarks: fundForm.elements.remarks.value.trim(),
         amount,
         updatedAt: new Date().toISOString()
@@ -11448,11 +12279,10 @@
         if (!entry) return;
         editingFundId = entry.id;
         fundForm.elements.entryType.value = entry.entryType;
-        const openingOption = fundTypeSelect.querySelector('option[value="opening_balance"]');
-        if (openingOption) openingOption.disabled = false;
+        renderBankAccountOptions();
+        fundBankAccountSelect.value = entry.bankAccountId || "";
         fundForm.elements.entryDate.value = entry.entryDate || getTodayIsoDate();
-        fundForm.elements.sourceAccount.value = entry.sourceAccount || "";
-        fundForm.elements.reference.value = entry.reference || "";
+        refreshFundEntryTypeAvailability();
         fundForm.elements.remarks.value = entry.remarks || "";
         fundForm.elements.amount.value = String(entry.amount || "");
         if (fundSubmitBtn) fundSubmitBtn.textContent = "Update Funds Entry";
@@ -11484,12 +12314,16 @@
     function getFilteredRows() {
       const query = String(searchInput?.value || "").trim().toLowerCase();
       const payee = String(payeeFilter?.value || "").trim().toLowerCase();
+      const bankAccountId = String(voucherBankFilter?.value || "").trim();
       const start = String(startDateInput?.value || "").trim();
       const end = String(endDateInput?.value || "").trim();
       const order = dateOrderSelect?.value || "desc";
 
       return (store.paymentVouchers || [])
         .filter((item) => !payee || String(item.payTo || "").trim().toLowerCase() === payee)
+        .filter((item) => !bankAccountId || (bankAccountId === "__unassigned__"
+          ? !item.paidFromBankAccountId
+          : String(item.paidFromBankAccountId || "") === bankAccountId))
         .filter((item) => !start || String(item.voucherDate || "") >= start)
         .filter((item) => !end || String(item.voucherDate || "") <= end)
         .filter((item) => {
@@ -11499,11 +12333,12 @@
             item.payTo,
             item.payBy,
             item.accountNo,
+            getBankAccountDisplay(item.paidFromBankAccountId, ""),
             item.preparedBy,
             item.receivedBy,
             item.amountInWords,
             item.voucherDate,
-            ...(item.items || []).flatMap((i) => [i.paymentMethod, i.description, String(i.amount)])
+            ...(item.items || []).flatMap((i) => [i.paymentMethod, i.clearanceDate, i.clearanceDate ? "cleared" : (isClearanceTrackedMethod(i.paymentMethod) ? "not cleared" : ""), i.description, String(i.amount)])
           ];
           return searchTargets.some((val) => String(val || "").toLowerCase().includes(query));
         })
@@ -11524,8 +12359,23 @@
       payeeFilter.value = payees.map((p) => p.toLowerCase()).includes(currentPayee) ? currentPayee : "";
     }
 
+    function renderVoucherBankFilter() {
+      if (!voucherBankFilter) return;
+      const currentBankAccountId = voucherBankFilter.value;
+      const accounts = [...(store.paymentVoucherBankAccounts || [])]
+        .filter((account) => account.id && account.bankName && account.accountNumber)
+        .sort((left, right) => String(left.bankName).localeCompare(String(right.bankName)) || String(left.accountTitle || left.accountNumber).localeCompare(String(right.accountTitle || right.accountNumber)));
+
+      voucherBankFilter.innerHTML = `<option value="">All Bank Accounts</option><option value="__unassigned__">No Bank Account Linked</option>${accounts.map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(getBankAccountOptionLabel(account))}</option>`).join("")}`;
+      voucherBankFilter.value = currentBankAccountId === "__unassigned__"
+        || accounts.some((account) => String(account.id) === currentBankAccountId)
+        ? currentBankAccountId
+        : "";
+    }
+
     function render() {
       renderPayeeFilter();
+      renderVoucherBankFilter();
       const rows = getFilteredRows();
 
       const totalDisbursed = rows.reduce((sum, v) => sum + Number(v.totalAmount || 0), 0);
@@ -11540,16 +12390,10 @@
       if (cashCountEl) cashCountEl.textContent = cashCount;
       if (bankCountEl) bankCountEl.textContent = bankCount;
       if (countBadge) countBadge.textContent = `${rows.length} voucher(s)`;
-      const fundTotals = getVoucherFundTotals();
-      if (openingBalanceEl) openingBalanceEl.textContent = `PKR ${money(fundTotals.openingBalance)}`;
-      if (availableBalanceEl) {
-        availableBalanceEl.textContent = `PKR ${money(fundTotals.availableBalance)}`;
-        availableBalanceEl.classList.toggle("negative-balance", fundTotals.availableBalance < 0);
-      }
       renderFundEntries();
 
       if (!rows.length) {
-        tableBody.innerHTML = `<tr><td colspan="13" class="empty-state">No payment vouchers found.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="15" class="empty-state">No payment vouchers found.</td></tr>`;
         return;
       }
 
@@ -11563,8 +12407,10 @@
             <td>${formatShortDate(item.voucherDate)}</td>
             <td><strong>${text(item.payTo)}</strong></td>
             <td>${text(item.payBy || "-")}</td>
+            <td>${text(getBankAccountDisplay(item.paidFromBankAccountId, "-"))}</td>
             <td>${text(item.accountNo || "-")}</td>
             <td>${methods.length ? methods.map((m) => `<span class="badge neutral">${escapeHtml(m)}</span>`).join(" ") : "-"}</td>
+            <td>${renderClearanceStatus(item.items || [])}</td>
             <td>${descriptions.length ? descriptions.map((d) => `<div>${escapeHtml(d)}</div>`).join("") : "-"}</td>
             <td class="text-right"><strong>${money(item.totalAmount)}</strong></td>
             <td><small class="muted">${text(item.amountInWords || "-")}</small></td>
@@ -11582,7 +12428,7 @@
       }).join("");
     }
 
-    [searchInput, payeeFilter, startDateInput, endDateInput, dateOrderSelect].filter(Boolean).forEach((el) => {
+    [searchInput, payeeFilter, voucherBankFilter, startDateInput, endDateInput, dateOrderSelect].filter(Boolean).forEach((el) => {
       el.addEventListener(el === searchInput ? "input" : "change", render);
     });
 
@@ -11595,7 +12441,10 @@
         const voucher = (store.paymentVouchers || []).find((v) => String(v.id) === String(downloadId));
         if (voucher) {
           try {
-            await buildPaymentVoucherPdf(voucher);
+            await buildPaymentVoucherPdf({
+              ...voucher,
+              paidFromBankAccountLabel: getBankAccountDisplay(voucher.paidFromBankAccountId, "-")
+            });
           } catch (err) {
             setNotice(`PDF generation failed: ${err.message}`, true);
           }
@@ -11643,21 +12492,29 @@
         return;
       }
       try {
-        const payeeText = payeeFilter?.value ? payeeFilter.options[payeeFilter.selectedIndex]?.text : "All Vouchers";
-        await buildPaymentVoucherSummaryPdf(rows, payeeText);
+        const filterLabels = [];
+        if (payeeFilter?.value) filterLabels.push(`Pay To: ${payeeFilter.options[payeeFilter.selectedIndex]?.text || ""}`);
+        if (voucherBankFilter?.value) filterLabels.push(`Bank Account: ${voucherBankFilter.options[voucherBankFilter.selectedIndex]?.text || ""}`);
+        const filterTitle = filterLabels.join(" · ") || "All Vouchers";
+        await buildPaymentVoucherSummaryPdf(rows.map((voucher) => ({
+          ...voucher,
+          paidFromBankAccountLabel: getBankAccountDisplay(voucher.paidFromBankAccountId, "-")
+        })), filterTitle);
       } catch (err) {
         setNotice(`Summary download failed: ${err.message}`, true);
       }
     });
 
-    [fundSearchInput, fundTypeFilter, fundSourceFilter, fundStartDateInput, fundEndDateInput, fundDateOrderSelect].filter(Boolean).forEach((el) => {
+    fundBankAccountSelect?.addEventListener("change", refreshFundEntryTypeAvailability);
+    fundTypeSelect?.addEventListener("change", refreshFundEntryTypeAvailability);
+    [fundSearchInput, fundTypeFilter, fundBankFilter, fundStartDateInput, fundEndDateInput, fundDateOrderSelect].filter(Boolean).forEach((el) => {
       el.addEventListener(el === fundSearchInput ? "input" : "change", renderFundEntries);
     });
 
     clearFundFiltersBtn?.addEventListener("click", () => {
       if (fundSearchInput) fundSearchInput.value = "";
       if (fundTypeFilter) fundTypeFilter.value = "";
-      if (fundSourceFilter) fundSourceFilter.value = "";
+      if (fundBankFilter) fundBankFilter.value = "";
       if (fundStartDateInput) fundStartDateInput.value = "";
       if (fundEndDateInput) fundEndDateInput.value = "";
       if (fundDateOrderSelect) fundDateOrderSelect.value = "desc";
@@ -11673,8 +12530,13 @@
       try {
         const typeText = fundTypeFilter?.value
           ? (fundTypeFilter.value === "opening_balance" ? "Opening Fund Balance" : "Funds Added")
-          : (fundSourceFilter?.value ? `Source: ${fundSourceFilter.options[fundSourceFilter.selectedIndex]?.text}` : "All Fund Entries");
-        await buildFundBalanceSummaryPdf(rows, typeText);
+          : "All Fund Entries";
+        const bankText = fundBankFilter?.value ? `Bank: ${fundBankFilter.options[fundBankFilter.selectedIndex]?.text}` : "All Bank Accounts";
+        const entriesWithBankLabels = rows.map((entry) => ({
+          ...entry,
+          bankAccountLabel: getBankAccountDisplay(entry.bankAccountId, entry.sourceAccount || "-")
+        }));
+        await buildFundBalanceSummaryPdf(entriesWithBankLabels, `${bankText} · ${typeText}`);
       } catch (err) {
         setFundNotice(`Summary download failed: ${err.message}`, true);
       }

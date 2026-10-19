@@ -6,7 +6,7 @@
   <title>GTLS Transport - Trucker/Broker Summary</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="alternate icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20261016-1" />
+  <link rel="stylesheet" href="styles.css?v=20261019-3" />
 </head>
 <body data-page="broker-summary">
   <div class="app">
@@ -54,26 +54,55 @@
 
       <section class="screen">
         <div class="broker-summary-notice notice" data-broker-summary-notice hidden></div>
-        <div class="broker-summary-kpis">
-          <div class="ledger-total"><span>Total Paid</span><strong data-broker-summary-paid>PKR 0</strong></div>
-          <div class="ledger-total"><span>Total Payable</span><strong data-broker-summary-payable>PKR 0</strong></div>
-          <span class="ledger-count" data-broker-summary-count>0 broker payment(s)</span>
-          <button class="btn primary broker-summary-download" type="button" data-download-broker-summary>Download Summary</button>
+        <div class="voucher-tabs broker-summary-tabs" role="tablist" aria-label="Trucker/Broker Summary sources">
+          <button class="voucher-tab is-active" id="broker-summary-tab-booking" type="button" role="tab" aria-selected="true" aria-controls="broker-summary-panel-booking" tabindex="0" data-broker-summary-tab="booking">Booking Brokers</button>
+          <button class="voucher-tab" id="broker-summary-tab-two-pay" type="button" role="tab" aria-selected="false" aria-controls="broker-summary-panel-two-pay" tabindex="-1" data-broker-summary-tab="two-pay">Two Pay Brokers</button>
         </div>
-        <div class="ledger-filter broker-summary-filter">
-          <div class="ledger-filter-control ledger-filter-search"><label for="broker-summary-search">General Filter</label><input id="broker-summary-search" type="search" placeholder="Search broker payments..." data-broker-summary-search /></div>
-          <div class="ledger-filter-control"><label for="broker-summary-status">Status</label><select id="broker-summary-status" data-broker-summary-status><option value="All" selected>All</option><option value="Paid">Paid</option><option value="Payable">Payable</option></select></div>
-          <div class="ledger-filter-control"><label for="broker-summary-broker">Trucker/Broker</label><select id="broker-summary-broker" data-broker-summary-broker data-broker-summary-customer><option value="">All Truckers/Brokers</option></select></div>
-          <div class="ledger-filter-control"><label for="broker-summary-start">Start Date</label><input id="broker-summary-start" type="date" data-broker-summary-start /></div>
-          <div class="ledger-filter-control"><label for="broker-summary-end">End Date</label><input id="broker-summary-end" type="date" data-broker-summary-end /></div>
-          <div class="ledger-filter-control"><label for="broker-summary-sort">Date Order</label><select id="broker-summary-sort" data-broker-summary-sort><option value="desc">Sort Z to A</option><option value="asc">Sort A to Z</option></select></div>
-        </div>
-        <div class="table-wrap broker-summary-table-wrap">
-          <table class="statement-table broker-summary-table">
-            <thead><tr><th>Booking No</th><th>Booking Date</th><th>Trucker/Broker</th><th>Truck No</th><th>Container No</th><th>Payment/Cheque/IBFT</th><th>Payment Date</th><th>Amount</th><th>Action</th></tr></thead>
-            <tbody data-broker-summary-rows></tbody>
-          </table>
-        </div>
+        <section class="voucher-tab-panel broker-summary-panel" id="broker-summary-panel-booking" role="tabpanel" aria-labelledby="broker-summary-tab-booking" tabindex="0" data-broker-summary-panel="booking">
+          <div class="broker-summary-kpis">
+            <div class="ledger-total"><span>Total Paid</span><strong data-broker-summary-paid>PKR 0</strong></div>
+            <div class="ledger-total"><span>Total Payable</span><strong data-broker-summary-payable>PKR 0</strong></div>
+            <span class="ledger-count" data-broker-summary-count>0 broker payment(s)</span>
+            <button class="btn primary broker-summary-download" type="button" data-download-broker-summary>Download Summary</button>
+          </div>
+          <div class="ledger-filter broker-summary-filter">
+            <div class="ledger-filter-control ledger-filter-search"><label for="broker-summary-search">General Filter</label><input id="broker-summary-search" type="search" placeholder="Search broker payments..." data-broker-summary-search /></div>
+            <div class="ledger-filter-control"><label for="broker-summary-status">Status</label><select id="broker-summary-status" data-broker-summary-status><option value="All" selected>All</option><option value="Paid">Paid</option><option value="Payable">Payable</option></select></div>
+            <div class="ledger-filter-control"><label for="broker-summary-broker">Trucker/Broker</label><select id="broker-summary-broker" data-broker-summary-broker data-broker-summary-customer><option value="">All Truckers/Brokers</option></select></div>
+            <div class="ledger-filter-control"><label for="broker-summary-start">Start Date</label><input id="broker-summary-start" type="date" data-broker-summary-start /></div>
+            <div class="ledger-filter-control"><label for="broker-summary-end">End Date</label><input id="broker-summary-end" type="date" data-broker-summary-end /></div>
+            <div class="ledger-filter-control"><label for="broker-summary-sort">Date Order</label><select id="broker-summary-sort" data-broker-summary-sort><option value="desc">Sort Z to A</option><option value="asc">Sort A to Z</option></select></div>
+          </div>
+          <div class="table-wrap broker-summary-table-wrap">
+            <table class="statement-table broker-summary-table">
+              <thead><tr><th>Booking No</th><th>Booking Date</th><th>Trucker/Broker</th><th>Truck No</th><th>Container No</th><th>Payment/Cheque/IBFT</th><th>Payment Date</th><th>Amount</th><th>Action</th></tr></thead>
+              <tbody data-broker-summary-rows></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="voucher-tab-panel broker-summary-panel" id="broker-summary-panel-two-pay" role="tabpanel" aria-labelledby="broker-summary-tab-two-pay" tabindex="0" data-broker-summary-panel="two-pay" hidden>
+          <div class="broker-summary-kpis">
+            <div class="ledger-total"><span>Paid in Filter</span><strong data-two-pay-broker-paid>PKR 0</strong></div>
+            <div class="ledger-total"><span>Payable in Filter</span><strong data-two-pay-broker-payable>PKR 0</strong></div>
+            <span class="ledger-count" data-two-pay-broker-count>0 broker payment(s)</span>
+            <button class="btn primary broker-summary-download" type="button" data-download-two-pay-broker-summary>Download Summary</button>
+          </div>
+          <div class="ledger-filter broker-summary-filter">
+            <div class="ledger-filter-control ledger-filter-search"><label for="two-pay-broker-search">General Filter</label><input id="two-pay-broker-search" type="search" placeholder="Search Two Pay broker payments..." data-two-pay-broker-search /></div>
+            <div class="ledger-filter-control"><label for="two-pay-broker-status">Status</label><select id="two-pay-broker-status" data-two-pay-broker-status><option value="All" selected>All</option><option value="Paid">Paid</option><option value="Payable">Payable</option></select></div>
+            <div class="ledger-filter-control"><label for="two-pay-broker-name">Trucker/Broker</label><select id="two-pay-broker-name" data-two-pay-broker-name><option value="">All Truckers/Brokers</option></select></div>
+            <div class="ledger-filter-control"><label for="two-pay-broker-start">Record Date From</label><input id="two-pay-broker-start" type="date" data-two-pay-broker-start /></div>
+            <div class="ledger-filter-control"><label for="two-pay-broker-end">Record Date To</label><input id="two-pay-broker-end" type="date" data-two-pay-broker-end /></div>
+            <div class="ledger-filter-control"><label for="two-pay-broker-sort">Record Date Order</label><select id="two-pay-broker-sort" data-two-pay-broker-sort><option value="desc">Newest First</option><option value="asc">Oldest First</option></select></div>
+          </div>
+          <p class="broker-summary-id-help">S.No sirf current filtered/sorted list ka number hai. Two Pay Record ID parent record ko pehchanta hai; Broker Detail ID har broker row ka unique saved ID hai.</p>
+          <div class="table-wrap broker-summary-table-wrap two-pay-broker-summary-table-wrap">
+            <table class="statement-table broker-summary-table two-pay-broker-summary-table">
+              <thead><tr><th>S.No</th><th>Two Pay Record ID</th><th>Broker Detail ID</th><th>Record Date</th><th>Customer</th><th>BL No</th><th>Trucker/Broker</th><th>Container Ref</th><th>Truck No</th><th>Container Size</th><th>Amount</th><th>Payment/Cheque/IBFT</th><th>Payment Date</th><th>Status</th><th>Broker Remarks</th><th>Action</th></tr></thead>
+              <tbody data-two-pay-broker-rows></tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
   </div>
@@ -81,6 +110,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-<script src="app.js?v=20261016-2"></script>
+<script src="app.js?v=20261019-13"></script>
 </body>
 </html>

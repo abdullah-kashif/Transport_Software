@@ -1562,7 +1562,7 @@ a.dashboard-kpi-card:focus-visible {
 .truck-financial-fields {
   grid-column: span 12;
   display: grid;
-  grid-template-columns: minmax(155px, .88fr) repeat(5, minmax(135px, 1fr));
+  grid-template-columns: minmax(155px, .88fr) repeat(6, minmax(135px, 1fr));
   gap: 14px;
   min-width: 0;
 }
@@ -1626,6 +1626,105 @@ a.dashboard-kpi-card:focus-visible {
   min-width: 0;
 }
 
+.truck-fuel-section {
+  grid-column: span 12;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line, #ead5c2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.truck-fuel-section-head,
+.truck-fuel-row-head,
+.truck-fuel-totals {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.truck-fuel-section-head {
+  margin-bottom: 14px;
+}
+
+.truck-fuel-section-head h3 {
+  margin: 0 0 5px;
+}
+
+.truck-fuel-section-head p,
+.truck-fuel-legacy-note {
+  margin: 0;
+  color: var(--muted, #60758d);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.truck-fuel-refill-list {
+  display: grid;
+  gap: 10px;
+}
+
+.truck-fuel-refill-row {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line, #ead5c2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.truck-fuel-refill-row-legacy {
+  border-style: dashed;
+  background: rgba(2, 39, 99, 0.035);
+}
+
+.truck-fuel-refill-row-legacy input:disabled {
+  color: var(--navy, #18304d);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.truck-fuel-row-head {
+  margin-bottom: 10px;
+  color: var(--navy, #18304d);
+  font-size: 13px;
+}
+
+.truck-fuel-remove {
+  flex: 0 0 auto;
+}
+
+.truck-fuel-row-fields {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.truck-fuel-row-fields .field {
+  grid-column: auto;
+  min-width: 0;
+}
+
+.truck-fuel-totals {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: var(--muted, #60758d);
+  font-size: 13px;
+}
+
+.truck-fuel-totals strong {
+  color: var(--navy, #18304d);
+}
+
+.truck-fuel-legacy-note {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(217, 142, 4, 0.1);
+  color: #78500a;
+}
+
 body[data-page="truck"] .truck-trip-table .table-actions {
   display: flex;
   flex-wrap: nowrap;
@@ -1659,10 +1758,23 @@ body[data-page="truck"] .truck-trip-table tbody tr.truck-trip-row-multiple:hover
   .truck-details-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .truck-fuel-row-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 600px) {
   .truck-details-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .truck-fuel-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .truck-fuel-row-fields {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -2692,6 +2804,26 @@ th {
   flex-wrap: wrap;
 }
 
+.two-pay-broker-remarks {
+  margin-top: 14px;
+}
+
+.two-pay-broker-remarks label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.two-pay-broker-remarks textarea {
+  display: block;
+  min-height: 72px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
 .broker-summary {
   display: flex;
   gap: 16px;
@@ -2729,8 +2861,33 @@ th {
 .broker-summary-download { align-self: center; white-space: nowrap; }
 
 .broker-summary-notice { margin-bottom: 14px; }
+.broker-summary-tabs { margin-top: 2px; }
+.broker-summary-panel { min-width: 0; }
 .broker-summary-table-wrap { margin-top: 16px; }
 .broker-summary-table { min-width: 1280px; }
+.two-pay-broker-summary-table { min-width: 2380px; }
+.two-pay-broker-summary-table td:nth-child(2),
+.two-pay-broker-summary-table td:nth-child(3) { min-width: 180px; }
+.two-pay-broker-summary-table td:nth-child(5),
+.two-pay-broker-summary-table td:nth-child(7),
+.two-pay-broker-summary-table td:nth-child(8),
+.two-pay-broker-summary-table td:nth-child(12),
+.two-pay-broker-summary-table td:nth-child(15) { white-space: normal; min-width: 125px; }
+.broker-summary-record-id { display: block; color: var(--nav); font: 11px/1.45 Consolas, "Courier New", monospace; overflow-wrap: anywhere; }
+.broker-summary-id-help { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.broker-payment-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.broker-payment-status.is-paid { color: #087f67; background: rgba(8, 127, 103, 0.12); }
+.broker-payment-status.is-payable { color: #a85c18; background: rgba(197, 107, 45, 0.14); }
 .employee-register-table { min-width: 1980px; }
 .employee-register-table th, .employee-register-table td { white-space: nowrap; }
 .muted-cell { color: var(--muted); font-size: 12px; }
@@ -2746,6 +2903,7 @@ th {
   .broker-row .field-lite label { display: block; }
   .broker-row .row-action { justify-content: flex-start; }
   .broker-footer { align-items: stretch; flex-direction: column; }
+  .two-pay-broker-remarks { margin-top: 12px; }
   .broker-summary { justify-content: space-between; flex-wrap: wrap; }
   .broker-summary-kpis { grid-template-columns: 1fr; }
 }
@@ -4158,7 +4316,7 @@ body[data-page="booking"] .ledger-table {
 }
 
 body[data-page="truck"] .truck-trip-table {
-  min-width: 6800px;
+  min-width: 7700px;
   width: max-content;
   table-layout: auto;
   font-size: 11.5px;
@@ -4539,6 +4697,17 @@ body[data-page="truck"] .truck-trip-table td:nth-child(10),
 body[data-page="truck"] .truck-trip-table td:nth-child(35) {
   min-width: 170px;
   max-width: 240px;
+}
+
+body[data-page="truck"] .truck-trip-table td:nth-child(55) {
+  min-width: 145px;
+  max-width: 220px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+body[data-page="truck"] .truck-trip-table td:nth-child(n+56):nth-child(-n+62) {
+  min-width: 105px;
 }
 
 body[data-page="truck"] .truck-trip-table td.truck-expense-missing {
@@ -5956,9 +6125,77 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
    Payment Voucher Module
    ========================================================================== */
 
+.voucher-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding-bottom: 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.voucher-tab {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.voucher-tab:hover {
+  background: rgba(24, 48, 77, 0.05);
+  color: var(--ink);
+}
+
+.voucher-tab.is-active {
+  border-color: var(--line);
+  background: var(--paper-2);
+  color: var(--nav);
+  box-shadow: inset 0 -2px 0 #c56b2d;
+}
+
+.voucher-tab:focus-visible {
+  outline: 3px solid rgba(1, 155, 208, 0.45);
+  outline-offset: 2px;
+}
+
+.voucher-tab-panel[hidden] {
+  display: none !important;
+}
+
+.voucher-tab-panel > .screen-head {
+  margin-top: 4px;
+  margin-bottom: 20px;
+}
+
+.voucher-tab-panel > .screen-head h3 {
+  margin-top: 0;
+}
+
+.voucher-register-block {
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.voucher-fund-history-head {
+  margin-top: 30px !important;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
 .voucher-stats {
   margin-bottom: 20px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .voucher-stats .span-3 {
@@ -5971,6 +6208,68 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.55);
+}
+
+.voucher-form-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.voucher-bank-account-panel {
+  padding: 16px;
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.voucher-bank-account-panel > .screen-head {
+  margin-bottom: 10px;
+}
+
+.voucher-bank-account-panel h4 {
+  margin: 0 0 5px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.voucher-bank-account-form {
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.voucher-bank-account-table-wrap {
+  max-height: 200px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.voucher-bank-account-table {
+  min-width: 700px;
+}
+
+.voucher-bank-account-table th,
+.voucher-bank-account-table td {
+  white-space: nowrap;
+}
+
+.voucher-fund-scope {
+  margin: 18px 0 10px;
+  font-size: 12px;
+}
+
+.voucher-fund-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.voucher-fund-stats .span-3 {
+  grid-column: span 1;
 }
 
 .voucher-fund-table-wrap {
@@ -5996,19 +6295,32 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
   overflow-wrap: anywhere;
 }
 
-.voucher-stats [data-voucher-available-balance].negative-balance {
+.voucher-fund-stats [data-voucher-bank-available].negative-balance {
   color: #b42318;
 }
 
 @media (max-width: 1024px) {
-  .voucher-stats {
+  .voucher-stats,
+  .voucher-fund-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 600px) {
-  .voucher-stats {
+  .voucher-stats,
+  .voucher-fund-stats {
     grid-template-columns: 1fr;
+  }
+
+  .voucher-tabs {
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+
+  .voucher-tab {
+    flex: 1 0 auto;
+    padding-inline: 12px;
+    font-size: 12px;
   }
 }
 
@@ -6036,7 +6348,7 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
 
 .voucher-items-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 940px;
   border-collapse: collapse;
 }
 
@@ -6063,6 +6375,35 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
   padding: 6px 10px;
   font-size: 13px;
   border-radius: 8px;
+}
+
+.voucher-clearance-editor {
+  display: grid;
+  gap: 4px;
+  min-width: 165px;
+}
+
+.voucher-clearance-editor[hidden],
+.voucher-clearance-na[hidden] {
+  display: none;
+}
+
+.voucher-clearance-editor small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.voucher-clearance-status-list {
+  display: grid;
+  gap: 5px;
+  min-width: 145px;
+}
+
+.voucher-clearance-status-list small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
 }
 
 .voucher-item-remove-btn {
@@ -6162,6 +6503,11 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
   width: 100%;
 }
 
+.voucher-bank-filter-control {
+  min-width: 210px;
+  max-width: 300px;
+}
+
 .voucher-summary-download {
   height: 38px;
   min-height: 38px;
@@ -6170,7 +6516,7 @@ body[data-page="accounts-payable"] .account-overview-table .overview-action-butt
 
 .payment-voucher-table {
   width: 100%;
-  min-width: 1750px;
+  min-width: 2150px;
   table-layout: auto;
   border-collapse: collapse;
 }
